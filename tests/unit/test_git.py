@@ -136,9 +136,12 @@ class TestIsMainBranch:
         mock_current_branch.return_value = None
         assert not is_main_branch()
 
-    def test_is_main_branch_none_explicit(self):
-        """Test is_main_branch returns False for None."""
-        assert not is_main_branch(None)
+    @patch("simpletask.core.git.current_branch")
+    def test_is_main_branch_none_explicit(self, mock_current_branch):
+        """Test is_main_branch with None falls back to current branch."""
+        mock_current_branch.return_value = "main"
+        # Explicitly passing None should behave same as no argument
+        assert is_main_branch(None)
 
 
 class TestCreateBranch:
