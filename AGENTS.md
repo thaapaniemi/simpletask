@@ -51,7 +51,7 @@ schema/                   # Schema documentation
 ├── README.md
 └── examples/
 
-tasks/                    # Example task YAML files
+.tasks/                   # Task YAML files (git-ignored)
 └── *.yaml
 
 tests/                    # Test suite

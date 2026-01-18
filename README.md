@@ -69,7 +69,7 @@ pip install -e ".[dev]"
 simpletask new "Add user authentication" --branch feature/auth
 ```
 
-This creates a task file in `tasks/feature-auth.yml` linked to the `feature/auth` branch.
+This creates a task file in `.tasks/feature-auth.yml` linked to the `feature/auth` branch.
 
 ### View current task
 
@@ -171,7 +171,7 @@ Use `simpletask --help` or `simpletask <command> --help` for detailed options.
 
 ## Configuration
 
-Task files are stored in the `tasks/` directory by default. The filename is derived from the branch name with slashes converted to hyphens.
+Task files are stored in the `.tasks/` directory by default. The filename is derived from the branch name with slashes converted to hyphens.
 
 ### Editor Integration
 
@@ -184,7 +184,7 @@ Add the schema reference to your YAML files for editor validation and autocomple
 ### Validate with CLI
 
 ```sh
-ajv validate -s schema/simpletask.schema.json -d tasks/my-task.yml --spec=draft2020 -c ajv-formats
+ajv validate -s schema/simpletask.schema.json -d .tasks/my-task.yml --spec=draft2020 -c ajv-formats
 ```
 
 ## Development

@@ -73,7 +73,7 @@ class SimpleTaskSpec(BaseModel):
     """Top-level model for task YAML files.
 
     This represents the complete structure of a task definition file
-    stored in ./tasks/<branch>.yml
+    stored in ./.tasks/<branch>.yml
     """
 
     model_config = {"extra": "forbid"}

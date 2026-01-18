@@ -38,13 +38,13 @@ class TestProject:
     def test_tasks_dir_property(self, tmp_project):
         """Test tasks_dir property returns correct path."""
         project = Project(root=tmp_project)
-        assert project.tasks_dir == tmp_project / "tasks"
+        assert project.tasks_dir == tmp_project / ".tasks"
 
     def test_get_task_file(self, tmp_project):
         """Test get_task_file returns correct path."""
         project = Project(root=tmp_project)
         task_file = project.get_task_file("feature-branch")
-        assert task_file == tmp_project / "tasks" / "feature-branch.yml"
+        assert task_file == tmp_project / ".tasks" / "feature-branch.yml"
 
 
 class TestProjectFindRoot:
@@ -97,7 +97,7 @@ class TestProjectListTasks:
 
     def test_list_tasks_empty(self, tmp_path):
         """Test list_tasks returns empty list when no tasks exist."""
-        # Create project without tasks directory
+        # Create project without .tasks directory
         project_root = tmp_path / "empty-project"
         project_root.mkdir()
         git_dir = project_root / ".git"
@@ -116,7 +116,7 @@ class TestProjectListTasks:
 
     def test_list_tasks_multiple(self, tmp_project, sample_yaml_content):
         """Test list_tasks returns multiple tasks sorted."""
-        tasks_dir = tmp_project / "tasks"
+        tasks_dir = tmp_project / ".tasks"
         (tasks_dir / "feature-a.yml").write_text(sample_yaml_content)
         (tasks_dir / "feature-b.yml").write_text(sample_yaml_content)
         (tasks_dir / "bugfix-x.yml").write_text(sample_yaml_content)
@@ -127,7 +127,7 @@ class TestProjectListTasks:
 
     def test_list_tasks_ignores_non_yml(self, tmp_project, sample_yaml_content):
         """Test list_tasks ignores non-yml files."""
-        tasks_dir = tmp_project / "tasks"
+        tasks_dir = tmp_project / ".tasks"
         (tasks_dir / "feature.yml").write_text(sample_yaml_content)
         (tasks_dir / "README.md").write_text("# Notes")
         (tasks_dir / "backup.txt").write_text("backup")
@@ -138,7 +138,7 @@ class TestProjectListTasks:
 
     def test_list_tasks_ignores_directories(self, tmp_project, sample_yaml_content):
         """Test list_tasks ignores directories."""
-        tasks_dir = tmp_project / "tasks"
+        tasks_dir = tmp_project / ".tasks"
         (tasks_dir / "feature.yml").write_text(sample_yaml_content)
         (tasks_dir / "subdir").mkdir()
 
@@ -147,7 +147,7 @@ class TestProjectListTasks:
         assert tasks == ["feature"]
 
     def test_list_tasks_no_tasks_dir(self, tmp_path):
-        """Test list_tasks returns empty when tasks/ doesn't exist."""
+        """Test list_tasks returns empty when .tasks/ doesn't exist."""
         # Create project without tasks directory
         project_root = tmp_path / "no-tasks-project"
         project_root.mkdir()
@@ -263,11 +263,11 @@ class TestGetTaskFilePath:
     def test_get_task_file_explicit_branch(self, mock_ensure_project, tmp_project):
         """Test get_task_file_path with explicit branch."""
         mock_project = Mock(spec=Project)
-        mock_project.get_task_file.return_value = tmp_project / "tasks" / "test.yml"
+        mock_project.get_task_file.return_value = tmp_project / ".tasks" / "test.yml"
         mock_ensure_project.return_value = mock_project
 
         result = get_task_file_path("test-branch")
-        assert result == tmp_project / "tasks" / "test.yml"
+        assert result == tmp_project / ".tasks" / "test.yml"
         mock_project.get_task_file.assert_called_once_with("test-branch")
 
     @patch("simpletask.core.project.current_branch")
@@ -277,12 +277,12 @@ class TestGetTaskFilePath:
     ):
         """Test get_task_file_path uses current branch."""
         mock_project = Mock(spec=Project)
-        mock_project.get_task_file.return_value = tmp_project / "tasks" / "main.yml"
+        mock_project.get_task_file.return_value = tmp_project / ".tasks" / "main.yml"
         mock_ensure_project.return_value = mock_project
         mock_current_branch.return_value = "main"
 
         result = get_task_file_path()
-        assert result == tmp_project / "tasks" / "main.yml"
+        assert result == tmp_project / ".tasks" / "main.yml"
         mock_current_branch.assert_called_once()
         mock_project.get_task_file.assert_called_once_with("main")
 

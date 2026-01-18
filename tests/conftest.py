@@ -100,7 +100,7 @@ def tmp_task_file(tmp_path: Path, sample_spec: SimpleTaskSpec) -> Path:
 
 @pytest.fixture
 def tmp_project(tmp_path: Path) -> Generator[Path, None, None]:
-    """Create a temporary git repository with tasks/ directory.
+    """Create a temporary git repository with .tasks/ directory.
 
     Args:
         tmp_path: pytest's tmp_path fixture
@@ -120,7 +120,7 @@ def tmp_project(tmp_path: Path) -> Generator[Path, None, None]:
     repo.index.commit("Initial commit")
 
     # Create tasks directory
-    tasks_dir = project_root / "tasks"
+    tasks_dir = project_root / ".tasks"
     tasks_dir.mkdir()
 
     yield project_root
@@ -141,7 +141,7 @@ def tmp_project_with_task(
     Yields:
         Tuple of (project_root, task_file_path)
     """
-    task_file = tmp_project / "tasks" / "test-feature.yml"
+    task_file = tmp_project / ".tasks" / "test-feature.yml"
     write_task_file(task_file, sample_spec, update_timestamp=False)
 
     yield tmp_project, task_file

@@ -27,7 +27,7 @@ class Project:
     @property
     def tasks_dir(self) -> Path:
         """Get tasks directory."""
-        return self.root / "tasks"
+        return self.root / ".tasks"
 
     def get_task_file(self, branch: str) -> Path:
         """Get task file path for a branch."""

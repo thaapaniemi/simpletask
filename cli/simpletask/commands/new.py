@@ -19,7 +19,7 @@ def new(
     """Create a new task file and git branch.
 
     Creates:
-    - Task YAML file at ./tasks/<branch>.yml
+    - Task YAML file at ./.tasks/<branch>.yml
     - Git branch named <branch> (if in a git repo)
 
     Warns if not currently on main/master branch.
