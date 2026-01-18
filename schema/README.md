@@ -1,0 +1,134 @@
+# SimpleTask Schema v1.0
+
+JSON Schema for AI-friendly task definitions. Designed for branch-based development workflows where AI agents execute structured tasks.
+
+## Files
+
+| File | Description |
+|------|-------------|
+| `simpletask.schema.json` | JSON Schema (Draft 2020-12) |
+| `example.yml` | Valid example task file |
+
+## Usage
+
+Add to your YAML file for editor validation:
+
+```yaml
+# yaml-language-server: $schema=simpletask.schema.json
+schema_version: "1.0"
+branch: feature/my-task
+# ...
+```
+
+Validate with ajv-cli:
+
+```bash
+ajv validate -s simpletask.schema.json -d task.yml --spec=draft2020 -c ajv-formats
+```
+
+## Schema Structure
+
+### Required Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `schema_version` | string | Schema version (e.g., "1.0") |
+| `branch` | string | Git branch name / task identifier |
+| `title` | string | Human-readable task title |
+| `original_prompt` | string | Verbatim user request that initiated the task |
+| `acceptance_criteria` | array | Criteria defining task completion |
+
+### Optional Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `status` | enum | `not_started` \| `in_progress` \| `completed` \| `blocked` |
+| `created` | datetime | ISO 8601 creation timestamp |
+| `updated` | datetime | ISO 8601 last update timestamp |
+| `constraints` | array[string] | Boundaries the agent must follow |
+| `context` | object | Flexible context (requirements, dependencies, etc.) |
+| `tasks` | array | Implementation tasks |
+
+### Acceptance Criterion
+
+```yaml
+acceptance_criteria:
+  - id: AC1
+    description: "What must be true"
+    completed: false
+```
+
+All three fields required.
+
+### Task
+
+```yaml
+tasks:
+  - id: T001
+    name: Short task name
+    status: not_started
+    goal: What this task achieves
+    steps:
+      - Step one
+      - Step two
+    done_when:              # optional
+      - Condition one
+      - "command succeeds"
+    prerequisites: [T000]   # optional
+    files:                  # optional
+      - path: src/file.py
+        action: create
+    code_examples:          # optional
+      - language: python
+        code: |
+          def example():
+              pass
+```
+
+Required: `id`, `name`, `status`, `goal`, `steps`
+
+### File Action
+
+```yaml
+files:
+  - path: src/example.py
+    action: create | modify | delete
+```
+
+### Code Example
+
+```yaml
+code_examples:
+  - language: python
+    description: Optional description
+    code: |
+      # code here
+```
+
+## Status Values
+
+Used for both top-level `status` and `tasks[].status`:
+
+- `not_started` - Work has not begun
+- `in_progress` - Currently being worked on
+- `blocked` - Cannot proceed (dependency/issue)
+- `completed` - Done
+
+## Minimal Example
+
+```yaml
+# yaml-language-server: $schema=simpletask.schema.json
+schema_version: "1.0"
+branch: fix/typo-readme
+title: Fix typo in README
+original_prompt: "Fix the typo in README.md line 42"
+
+acceptance_criteria:
+  - id: AC1
+    description: Typo is corrected
+    completed: false
+```
+
+## Full Example
+
+See `example.yml` for a comprehensive task definition.

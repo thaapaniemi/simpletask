@@ -1,0 +1,198 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "simpletask-v1.schema.json",
+  "title": "SimpleTask Schema",
+  "description": "Schema for AI-friendly task definitions with acceptance criteria, implementation tasks, and context. Designed for branch-based development workflows.",
+  "type": "object",
+  "required": ["schema_version", "branch", "title", "original_prompt", "acceptance_criteria"],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "description": "Schema version for compatibility tracking",
+      "examples": ["1.0"]
+    },
+    "branch": {
+      "type": "string",
+      "description": "Branch name / unique task identifier. Used for both the Git branch and filename.",
+      "examples": ["020-list-show-commands", "feature/dark-mode"]
+    },
+    "title": {
+      "type": "string",
+      "description": "Human-readable task title",
+      "examples": ["Add list and show commands for task management"]
+    },
+    "original_prompt": {
+      "type": "string",
+      "description": "The verbatim user request that initiated this task. Preserved for context recovery and human verification.",
+      "examples": ["Add list and show commands so users can see available tasks and their details"]
+    },
+    "status": {
+      "type": "string",
+      "enum": ["not_started", "in_progress", "completed", "blocked"],
+      "default": "not_started",
+      "description": "Overall task status"
+    },
+    "created": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp when task was created"
+    },
+    "updated": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp when task was last updated"
+    },
+    "acceptance_criteria": {
+      "type": "array",
+      "description": "List of criteria that define task completion",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/AcceptanceCriterion"
+      }
+    },
+    "constraints": {
+      "type": "array",
+      "description": "Boundaries and rules the agent must follow during execution",
+      "items": {
+        "type": "string"
+      },
+      "examples": [
+        ["Do not modify files in src/core/legacy/", "Follow existing error handling patterns", "No new dependencies without approval"]
+      ]
+    },
+    "context": {
+      "type": "object",
+      "description": "Flexible context block for requirements, dependencies, related files, gotchas, and any other relevant information",
+      "additionalProperties": true
+    },
+    "tasks": {
+      "type": "array",
+      "description": "List of implementation tasks",
+      "items": {
+        "$ref": "#/$defs/Task"
+      }
+    }
+  },
+  "$defs": {
+    "AcceptanceCriterion": {
+      "type": "object",
+      "description": "A single acceptance criterion that must be met",
+      "required": ["id", "description", "completed"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the criterion",
+          "examples": ["AC1", "AC2"]
+        },
+        "description": {
+          "type": "string",
+          "description": "What needs to be true for this criterion to be met"
+        },
+        "completed": {
+          "type": "boolean",
+          "description": "Whether this criterion has been satisfied"
+        }
+      }
+    },
+    "Task": {
+      "type": "object",
+      "description": "A single implementation task",
+      "required": ["id", "name", "status", "goal", "steps"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique task identifier",
+          "examples": ["T001", "T002"]
+        },
+        "name": {
+          "type": "string",
+          "description": "Short descriptive name for the task"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["not_started", "in_progress", "completed", "blocked"],
+          "description": "Current status of this task"
+        },
+        "goal": {
+          "type": "string",
+          "description": "What this task aims to achieve"
+        },
+        "steps": {
+          "type": "array",
+          "description": "Ordered list of steps to complete this task",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        },
+        "done_when": {
+          "type": "array",
+          "description": "Conditions that indicate this task is complete. Can include success criteria and verification commands.",
+          "items": {
+            "type": "string"
+          },
+          "examples": [
+            ["File exists at src/commands/list.py", "All imports are present", "pytest tests/test_list.py passes"]
+          ]
+        },
+        "code_examples": {
+          "type": "array",
+          "description": "Code examples to guide implementation",
+          "items": {
+            "$ref": "#/$defs/CodeExample"
+          }
+        },
+        "prerequisites": {
+          "type": "array",
+          "description": "List of task IDs that must be completed before this task",
+          "items": {
+            "type": "string"
+          }
+        },
+        "files": {
+          "type": "array",
+          "description": "Files to create or modify",
+          "items": {
+            "$ref": "#/$defs/FileAction"
+          }
+        }
+      }
+    },
+    "CodeExample": {
+      "type": "object",
+      "description": "A code example to guide implementation",
+      "required": ["language", "code"],
+      "properties": {
+        "language": {
+          "type": "string",
+          "description": "Programming language for syntax highlighting",
+          "examples": ["python", "javascript", "bash", "yaml"]
+        },
+        "description": {
+          "type": "string",
+          "description": "What this code example demonstrates"
+        },
+        "code": {
+          "type": "string",
+          "description": "The actual code"
+        }
+      }
+    },
+    "FileAction": {
+      "type": "object",
+      "description": "A file to be created or modified",
+      "required": ["path", "action"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "Path to the file"
+        },
+        "action": {
+          "type": "string",
+          "enum": ["create", "modify", "delete"],
+          "description": "Action to perform on the file"
+        }
+      }
+    }
+  }
+}
