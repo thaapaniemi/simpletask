@@ -306,6 +306,7 @@ class TestGitOperations:
 - Use `typing.List`, `typing.Dict`, `typing.Optional` instead of native syntax
 - Add `extra="allow"` to Pydantic models (use `"forbid"`)
 - Hardcode file paths (use `pathlib.Path`)
+- Bump the major version (only bump minor or patch)
 
 ## Key Files Reference
 
