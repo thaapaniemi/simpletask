@@ -234,16 +234,20 @@ Git operations return `None` or `False` on failure rather than raising exception
 
 ### Adding AI Editor Support
 
-1. Create template directory: `templates/<editor>/`
+1. Create template directory: `cli/simpletask/templates/<editor>/`
 2. Add template files in editor's format
-3. Add functions in `ai_templates.py`:
-   - `get_<editor>_templates_dir()`
-   - `get_bundled_<editor>_templates()`
-   - `get_global_<editor>_commands_dir()`
-   - `get_local_<editor>_commands_dir()`
-   - `install_<editor>_templates()`
-   - `get_<editor>_installed_status()`
-4. Update `ai/install.py` and `ai/list.py`
+3. Add functions in `core/ai_templates.py`:
+   - `get_bundled_<editor>_templates()` - returns list of bundled template paths
+   - `get_global_<editor>_commands_dir()` - returns global installation target (e.g., `~/.config/<editor>/commands/`)
+   - `get_local_<editor>_commands_dir()` - returns local installation target (e.g., `./<editor>/commands/`)
+   - `install_<editor>_templates()` - copies templates to target directory
+   - `get_<editor>_installed_status()` - checks which templates are installed
+4. Update `commands/ai/install.py` to add new `--<editor>` flag
+5. Update `commands/ai/list.py` to show installation status
+
+**Template Installation Targets** (examples):
+- OpenCode: `~/.config/opencode/commands/` (global), `.opencode/commands/` (local)
+- Qwen: `~/.qwen/commands/` (global), `.qwen/commands/` (local)
 
 ### Adding New Model Fields
 
@@ -257,7 +261,7 @@ Git operations return `None` or `False` on failure rather than raising exception
 |------|---------|
 | `.tasks/` | Task YAML files (one per branch) |
 | `.tasks/<branch>.yml` | Task specification for a branch |
-| `~/.config/opencode/commands/` | Global OpenCode templates |
-| `.opencode/commands/` | Local OpenCode templates |
-| `~/.qwen/commands/` | Global Qwen templates |
-| `.qwen/commands/` | Local Qwen templates |
+| `cli/simpletask/templates/opencode/` | Bundled OpenCode template files (`.md`) |
+| `cli/simpletask/templates/qwen/` | Bundled Qwen template files (`.toml`) |
+| `cli/simpletask/schema/task_schema.json` | JSON Schema for validation (bundled) |
+| `schema/simpletask.schema.json` | JSON Schema for IDE integration (repository) |
