@@ -1,0 +1,150 @@
+"""Unit tests for criteria_ops module.
+
+Tests cover:
+- get_next_criterion_id() - ID generation
+- add_acceptance_criterion() - Criterion addition
+- mark_criterion_complete() - Update completion status
+- remove_acceptance_criterion() - Criterion removal
+"""
+
+import pytest
+from datetime import datetime
+
+from simpletask.core.criteria_ops import (
+    get_next_criterion_id,
+    add_acceptance_criterion,
+    mark_criterion_complete,
+    remove_acceptance_criterion,
+)
+from simpletask.core.yaml_parser import parse_task_file
+from simpletask.core.models import AcceptanceCriterion
+
+
+class TestGetNextCriterionId:
+    """Test get_next_criterion_id function."""
+
+    def test_empty_list(self):
+        """Return AC1 for empty criterion list."""
+        assert get_next_criterion_id([]) == "AC1"
+
+    def test_sequential_ids(self):
+        """Return next sequential ID."""
+        criteria = [
+            AcceptanceCriterion(id="AC1", description="Test 1"),
+            AcceptanceCriterion(id="AC2", description="Test 2"),
+            AcceptanceCriterion(id="AC3", description="Test 3"),
+        ]
+        assert get_next_criterion_id(criteria) == "AC4"
+
+    def test_non_sequential_ids(self):
+        """Return max ID + 1 even if IDs are not sequential."""
+        criteria = [
+            AcceptanceCriterion(id="AC1", description="Test 1"),
+            AcceptanceCriterion(id="AC5", description="Test 5"),
+            AcceptanceCriterion(id="AC3", description="Test 3"),
+        ]
+        assert get_next_criterion_id(criteria) == "AC6"
+
+
+class TestAddAcceptanceCriterion:
+    """Test add_acceptance_criterion function."""
+
+    def test_add_criterion_basic(self, tmp_task_file):
+        """Add criterion with basic properties."""
+        new_id = add_acceptance_criterion(tmp_task_file, description="New criterion")
+        assert new_id == "AC3"
+
+        spec = parse_task_file(tmp_task_file)
+        assert len(spec.acceptance_criteria) == 3
+        assert spec.acceptance_criteria[2].id == "AC3"
+        assert spec.acceptance_criteria[2].description == "New criterion"
+        assert spec.acceptance_criteria[2].completed is False
+
+    def test_add_criterion_updates_timestamp(self, tmp_task_file):
+        """Verify updated timestamp is modified."""
+        spec_before = parse_task_file(tmp_task_file)
+        updated_before = spec_before.updated
+
+        add_acceptance_criterion(tmp_task_file, description="Test")
+
+        spec_after = parse_task_file(tmp_task_file)
+        assert spec_after.updated > updated_before
+
+    def test_add_multiple_criteria(self, tmp_task_file):
+        """Add multiple criteria."""
+        id1 = add_acceptance_criterion(tmp_task_file, description="Criterion 1")
+        id2 = add_acceptance_criterion(tmp_task_file, description="Criterion 2")
+
+        assert id1 == "AC3"
+        assert id2 == "AC4"
+
+        spec = parse_task_file(tmp_task_file)
+        assert len(spec.acceptance_criteria) == 4
+
+
+class TestMarkCriterionComplete:
+    """Test mark_criterion_complete function."""
+
+    def test_mark_complete(self, tmp_task_file):
+        """Mark criterion as complete."""
+        mark_criterion_complete(tmp_task_file, "AC1", completed=True)
+
+        spec = parse_task_file(tmp_task_file)
+        assert spec.acceptance_criteria[0].completed is True
+
+    def test_mark_incomplete(self, tmp_task_file):
+        """Mark criterion as incomplete."""
+        # First mark complete
+        mark_criterion_complete(tmp_task_file, "AC1", completed=True)
+        # Then mark incomplete
+        mark_criterion_complete(tmp_task_file, "AC1", completed=False)
+
+        spec = parse_task_file(tmp_task_file)
+        assert spec.acceptance_criteria[0].completed is False
+
+    def test_default_completed_true(self, tmp_task_file):
+        """Default value for completed is True."""
+        mark_criterion_complete(tmp_task_file, "AC1")
+
+        spec = parse_task_file(tmp_task_file)
+        assert spec.acceptance_criteria[0].completed is True
+
+    def test_mark_criterion_not_found(self, tmp_task_file):
+        """Raise ValueError when criterion doesn't exist."""
+        with pytest.raises(ValueError, match="Criterion AC999 not found"):
+            mark_criterion_complete(tmp_task_file, "AC999")
+
+
+class TestRemoveAcceptanceCriterion:
+    """Test remove_acceptance_criterion function."""
+
+    def test_remove_criterion(self, tmp_task_file):
+        """Remove criterion successfully."""
+        remove_acceptance_criterion(tmp_task_file, "AC2")
+
+        spec = parse_task_file(tmp_task_file)
+        assert len(spec.acceptance_criteria) == 1
+        assert spec.acceptance_criteria[0].id == "AC1"
+
+    def test_remove_criterion_not_found(self, tmp_task_file):
+        """Raise ValueError when criterion doesn't exist."""
+        with pytest.raises(ValueError, match="Criterion AC999 not found"):
+            remove_acceptance_criterion(tmp_task_file, "AC999")
+
+    def test_remove_first_criterion(self, tmp_task_file):
+        """Remove first criterion from list."""
+        remove_acceptance_criterion(tmp_task_file, "AC1")
+
+        spec = parse_task_file(tmp_task_file)
+        assert len(spec.acceptance_criteria) == 1
+        assert spec.acceptance_criteria[0].id == "AC2"
+
+    def test_remove_updates_timestamp(self, tmp_task_file):
+        """Verify updated timestamp is modified."""
+        spec_before = parse_task_file(tmp_task_file)
+        updated_before = spec_before.updated
+
+        remove_acceptance_criterion(tmp_task_file, "AC1")
+
+        spec_after = parse_task_file(tmp_task_file)
+        assert spec_after.updated > updated_before

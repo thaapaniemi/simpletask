@@ -1,0 +1,64 @@
+"""simpletask: A Python CLI for managing AI-friendly task definition YAML files."""
+
+__version__ = "0.1.0"
+
+import typer
+from typing import Optional
+
+# Import top-level commands
+from .commands import new, list as list_cmd, show, status
+
+# Import subcommand groups
+from .commands import schema, task, criteria
+
+
+def version_callback(value: bool):
+    """Print version and exit."""
+    if value:
+        typer.echo(f"simpletask version {__version__}")
+        raise typer.Exit()
+
+
+# Create main app
+app = typer.Typer(
+    name="simpletask",
+    help="Manage AI-friendly task definition YAML files in a branch-based workflow",
+    no_args_is_help=True,
+)
+
+
+# Add version option
+@app.callback()
+def main(
+    version: Optional[bool] = typer.Option(
+        None,
+        "--version",
+        "-v",
+        callback=version_callback,
+        is_eager=True,
+        help="Show version and exit",
+    ),
+):
+    """simpletask: Manage AI-friendly task definition YAML files."""
+    pass
+
+
+# Register top-level commands
+app.command(name="new")(new.new)
+app.command(name="list")(list_cmd.list_tasks)
+app.command(name="show")(show.show)
+app.command(name="status")(status.status)
+
+# Register subcommand groups
+app.add_typer(schema.app, name="schema")
+app.add_typer(task.app, name="task")
+app.add_typer(criteria.app, name="criteria")
+
+
+def main_cli():
+    """Entry point for the CLI."""
+    app()
+
+
+if __name__ == "__main__":
+    main_cli()
