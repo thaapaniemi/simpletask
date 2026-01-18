@@ -8,17 +8,14 @@ Tests cover:
 """
 
 import pytest
-from pathlib import Path
-from datetime import datetime
-
+from simpletask.core.models import Task, TaskStatus
 from simpletask.core.task_ops import (
-    get_next_task_id,
     add_implementation_task,
-    update_implementation_task,
+    get_next_task_id,
     remove_implementation_task,
+    update_implementation_task,
 )
 from simpletask.core.yaml_parser import parse_task_file
-from simpletask.core.models import TaskStatus, Task
 
 
 class TestGetNextTaskId:
@@ -80,7 +77,7 @@ class TestAddImplementationTask:
 
     def test_add_task_with_status(self, tmp_task_file):
         """Add task with custom status."""
-        new_id = add_implementation_task(tmp_task_file, name="Task", status=TaskStatus.IN_PROGRESS)
+        add_implementation_task(tmp_task_file, name="Task", status=TaskStatus.IN_PROGRESS)
 
         spec = parse_task_file(tmp_task_file)
         assert spec.tasks[2].status == TaskStatus.IN_PROGRESS

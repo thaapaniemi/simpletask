@@ -1,11 +1,12 @@
 """List acceptance criteria command."""
 
 from typing import Optional
+
 import typer
 
 from simpletask.core.project import get_task_file_path
 from simpletask.core.yaml_parser import parse_task_file
-from simpletask.utils.console import error, console
+from simpletask.utils.console import console, error
 
 
 def list_command(
@@ -39,7 +40,6 @@ def list_command(
         # Apply filters
         if completed_only and incomplete_only:
             error("Cannot use both --completed and --incomplete")
-            raise typer.Exit(1)
 
         if completed_only:
             criteria = [c for c in criteria if c.completed]
@@ -64,7 +64,5 @@ def list_command(
 
     except FileNotFoundError as e:
         error(str(e))
-        raise typer.Exit(1)
     except Exception as e:
         error(f"Unexpected error: {e}")
-        raise typer.Exit(1)

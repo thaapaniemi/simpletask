@@ -1,12 +1,13 @@
 """List implementation tasks command."""
 
 from typing import Optional
+
 import typer
 
+from simpletask.core.models import TaskStatus
 from simpletask.core.project import get_task_file_path
 from simpletask.core.yaml_parser import parse_task_file
-from simpletask.core.models import TaskStatus
-from simpletask.utils.console import error, console
+from simpletask.utils.console import console, error
 
 
 def _get_status_icon(status: TaskStatus) -> str:
@@ -58,7 +59,6 @@ def list_command(
                 error(
                     f"Invalid status: {status}. Valid values: not_started, in_progress, completed, blocked"
                 )
-                raise typer.Exit(1)
 
         # Display tasks
         if not tasks:
@@ -82,7 +82,5 @@ def list_command(
 
     except FileNotFoundError as e:
         error(str(e))
-        raise typer.Exit(1)
     except Exception as e:
         error(f"Unexpected error: {e}")
-        raise typer.Exit(1)

@@ -1,7 +1,6 @@
 """Console utility functions using Rich."""
 
-import sys
-
+import typer
 from rich.console import Console
 from rich.table import Table
 
@@ -10,14 +9,17 @@ error_console = Console(stderr=True, style="red")
 
 
 def error(message: str, exit_code: int = 1) -> None:
-    """Print error message to stderr and exit.
+    """Print error message to stderr and exit via typer.Exit.
 
     Args:
         message: Error message to display
         exit_code: Exit code (default: 1)
+
+    Raises:
+        typer.Exit: Always raises to exit the CLI
     """
     error_console.print(f"[red]Error:[/red] {message}")
-    sys.exit(exit_code)
+    raise typer.Exit(exit_code)
 
 
 def success(message: str) -> None:

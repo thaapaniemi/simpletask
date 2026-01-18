@@ -1,17 +1,16 @@
 """Shared pytest fixtures for simpletask tests."""
 
-import pytest
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Generator
 
 import git
-
+import pytest
 from simpletask.core.models import (
-    SimpleTaskSpec,
-    TaskStatus,
     AcceptanceCriterion,
+    SimpleTaskSpec,
     Task,
+    TaskStatus,
 )
 from simpletask.core.yaml_parser import write_task_file
 

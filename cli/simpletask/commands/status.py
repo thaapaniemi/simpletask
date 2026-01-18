@@ -1,7 +1,5 @@
 """Status command - Show status summary of all tasks."""
 
-import typer
-
 from ..core.project import ensure_project
 from ..core.yaml_parser import InvalidTaskFileError, parse_task_file
 from ..utils.console import create_table, error, info
@@ -61,11 +59,11 @@ def status() -> None:
                 status_color = (
                     "green"
                     if spec.status.value == "completed"
-                    else "yellow"
-                    if spec.status.value == "in_progress"
-                    else "red"
-                    if spec.status.value == "blocked"
-                    else "white"
+                    else (
+                        "yellow"
+                        if spec.status.value == "in_progress"
+                        else "red" if spec.status.value == "blocked" else "white"
+                    )
                 )
 
                 table.add_row(
@@ -76,7 +74,7 @@ def status() -> None:
                     task_progress,
                 )
 
-            except (FileNotFoundError, InvalidTaskFileError) as e:
+            except (FileNotFoundError, InvalidTaskFileError):
                 # Skip invalid task files
                 table.add_row(branch, "[red]Error[/red]", "-", "-", "-")
 

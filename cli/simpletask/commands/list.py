@@ -1,7 +1,5 @@
 """List command - List all task files."""
 
-import typer
-
 from ..core.project import ensure_project
 from ..utils.console import console, error, info
 

@@ -37,7 +37,7 @@ def parse_task_file(path: Path) -> SimpleTaskSpec:
     try:
         data = yaml.safe_load(content)
     except yaml.YAMLError as e:
-        raise InvalidTaskFileError(f"Invalid YAML syntax:\n{str(e)}\n\nFile: {path}")
+        raise InvalidTaskFileError(f"Invalid YAML syntax:\n{str(e)}\n\nFile: {path}") from e
 
     # Validate that YAML parsed to a dict
     if not isinstance(data, dict):
@@ -59,11 +59,11 @@ def parse_task_file(path: Path) -> SimpleTaskSpec:
             error_messages.append(f"  • {field}: {message} (type: {error_type})")
 
         raise InvalidTaskFileError(
-            f"Invalid task file schema - YAML content doesn't match expected format:\n\n"
+            "Invalid task file schema - YAML content doesn't match expected format:\n\n"
             + "\n".join(error_messages)
             + f"\n\nFile: {path}\n\n"
             f"See documentation for correct schema format."
-        )
+        ) from e
 
     return spec
 

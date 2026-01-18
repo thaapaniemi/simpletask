@@ -9,21 +9,15 @@ Tests cover:
 """
 
 import pytest
-from pathlib import Path
-from datetime import datetime, timezone
-
+from simpletask.core.models import (
+    TaskStatus,
+)
 from simpletask.core.yaml_parser import (
     InvalidTaskFileError,
     parse_task_file,
-    write_task_file,
-    update_task_status,
     update_criterion_status,
-)
-from simpletask.core.models import (
-    SimpleTaskSpec,
-    TaskStatus,
-    AcceptanceCriterion,
-    Task,
+    update_task_status,
+    write_task_file,
 )
 
 

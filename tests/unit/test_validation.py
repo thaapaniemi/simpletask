@@ -1,9 +1,6 @@
 """Tests for validation module."""
 
-from pathlib import Path
-from unittest.mock import Mock, patch
-
-import pytest
+from unittest.mock import patch
 
 from simpletask.core.validation import get_bundled_schema, validate_task_file
 
@@ -204,6 +201,6 @@ tasks:
 """)
         # Note: This might not be caught by JSON schema alone,
         # but by Pydantic model validation. Schema might allow it.
-        errors = validate_task_file(bad_prereq)
+        validate_task_file(bad_prereq)
         # This test documents the current behavior - adjust expectations
         # based on whether prerequisite validation is in schema or model

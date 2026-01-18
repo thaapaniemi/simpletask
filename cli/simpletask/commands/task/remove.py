@@ -1,11 +1,12 @@
 """Remove implementation task command."""
 
 from typing import Optional
+
 import typer
 
 from simpletask.core.project import get_task_file_path
 from simpletask.core.task_ops import remove_implementation_task
-from simpletask.utils.console import success, error, confirm
+from simpletask.utils.console import confirm, error, success
 
 
 def remove_command(
@@ -40,10 +41,7 @@ def remove_command(
         raise
     except ValueError as e:
         error(str(e))
-        raise typer.Exit(1)
     except FileNotFoundError as e:
         error(str(e))
-        raise typer.Exit(1)
     except Exception as e:
         error(f"Unexpected error: {e}")
-        raise typer.Exit(1)

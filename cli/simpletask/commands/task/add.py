@@ -1,12 +1,13 @@
 """Add implementation task command."""
 
 from typing import Optional
+
 import typer
 
+from simpletask.core.models import TaskStatus
 from simpletask.core.project import get_task_file_path
 from simpletask.core.task_ops import add_implementation_task
-from simpletask.core.models import TaskStatus
-from simpletask.utils.console import success, error
+from simpletask.utils.console import error, success
 
 
 def add_command(
@@ -39,16 +40,7 @@ def add_command(
 
     except ValueError as e:
         error(str(e))
-        raise typer.Exit(1)
     except FileNotFoundError as e:
         error(str(e))
-        raise typer.Exit(1)
     except Exception as e:
         error(f"Unexpected error: {e}")
-        raise typer.Exit(1)
-    except FileNotFoundError as e:
-        error(str(e))
-        raise typer.Exit(1)
-    except Exception as e:
-        error(f"Unexpected error: {e}")
-        raise typer.Exit(1)

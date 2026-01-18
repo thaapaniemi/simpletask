@@ -1,10 +1,8 @@
 """Tests for project management utilities."""
 
-from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pytest
-
 from simpletask.core.project import (
     Project,
     ensure_project,

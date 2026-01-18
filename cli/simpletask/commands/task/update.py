@@ -1,12 +1,13 @@
 """Update implementation task command."""
 
 from typing import Optional
+
 import typer
 
+from simpletask.core.models import TaskStatus
 from simpletask.core.project import get_task_file_path
 from simpletask.core.task_ops import update_implementation_task
-from simpletask.core.models import TaskStatus
-from simpletask.utils.console import success, error
+from simpletask.utils.console import error, success
 
 
 def update_command(
@@ -40,7 +41,6 @@ def update_command(
                 error(
                     f"Invalid status: {status}. Valid values: not_started, in_progress, completed, blocked"
                 )
-                raise typer.Exit(1)
 
         # Update task
         update_implementation_task(
@@ -55,10 +55,7 @@ def update_command(
 
     except ValueError as e:
         error(str(e))
-        raise typer.Exit(1)
     except FileNotFoundError as e:
         error(str(e))
-        raise typer.Exit(1)
     except Exception as e:
         error(f"Unexpected error: {e}")
-        raise typer.Exit(1)

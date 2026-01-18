@@ -3,8 +3,6 @@
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-import pytest
-
 from simpletask.core import git as git_module
 from simpletask.core.git import (
     branch_exists,

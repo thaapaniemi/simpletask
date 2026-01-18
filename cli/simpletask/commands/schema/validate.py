@@ -69,7 +69,7 @@ def validate(
             if errors:
                 from ...utils.console import error_console
 
-                error_console.print(f"\n[red]Validation errors:[/red]")
+                error_console.print("\n[red]Validation errors:[/red]")
                 for err in errors:
                     error_console.print(f"  {err}")
                 error("Schema validation failed")

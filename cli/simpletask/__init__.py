@@ -2,14 +2,14 @@
 
 __version__ = "0.1.0"
 
-import typer
 from typing import Optional
 
-# Import top-level commands
-from .commands import new, list as list_cmd, show, status
+import typer
 
+# Import top-level commands
 # Import subcommand groups
-from .commands import schema, task, criteria
+from .commands import ai, criteria, new, schema, show, status, task
+from .commands import list as list_cmd
 
 
 def version_callback(value: bool):
@@ -53,6 +53,7 @@ app.command(name="status")(status.status)
 app.add_typer(schema.app, name="schema")
 app.add_typer(task.app, name="task")
 app.add_typer(criteria.app, name="criteria")
+app.add_typer(ai.app, name="ai")
 
 
 def main_cli():

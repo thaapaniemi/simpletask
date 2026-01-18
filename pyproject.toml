@@ -46,6 +46,9 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["cli/simpletask"]
 
+[tool.hatch.build.targets.wheel.force-include]
+"cli/simpletask/templates" = "simpletask/templates"
+
 [tool.black]
 line-length = 100
 target-version = ['py311', 'py312']

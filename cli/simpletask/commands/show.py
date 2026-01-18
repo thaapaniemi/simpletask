@@ -38,7 +38,7 @@ def show(
             console.print(f"[bold]Updated:[/bold] {spec.updated.strftime('%Y-%m-%d %H:%M:%S')}")
 
         # Acceptance criteria
-        console.print(f"\n[bold magenta]Acceptance Criteria:[/bold magenta]")
+        console.print("\n[bold magenta]Acceptance Criteria:[/bold magenta]")
         for criterion in spec.acceptance_criteria:
             status_icon = "✓" if criterion.completed else "○"
             status_color = "green" if criterion.completed else "white"
@@ -48,29 +48,29 @@ def show(
 
         # Constraints
         if spec.constraints:
-            console.print(f"\n[bold yellow]Constraints:[/bold yellow]")
+            console.print("\n[bold yellow]Constraints:[/bold yellow]")
             for constraint in spec.constraints:
                 console.print(f"  • {constraint}")
 
         # Tasks
         if spec.tasks:
-            console.print(f"\n[bold green]Implementation Tasks:[/bold green]")
+            console.print("\n[bold green]Implementation Tasks:[/bold green]")
             for task in spec.tasks:
                 status_icon = "✓" if task.status.value == "completed" else "○"
                 status_color = (
                     "green"
                     if task.status.value == "completed"
-                    else "yellow"
-                    if task.status.value == "in_progress"
-                    else "red"
-                    if task.status.value == "blocked"
-                    else "white"
+                    else (
+                        "yellow"
+                        if task.status.value == "in_progress"
+                        else "red" if task.status.value == "blocked" else "white"
+                    )
                 )
                 console.print(
                     f"  [{status_color}]{status_icon}[/{status_color}] {task.id}: {task.name} ({task.status.value})"
                 )
         else:
-            console.print(f"\n[dim]No implementation tasks defined yet[/dim]")
+            console.print("\n[dim]No implementation tasks defined yet[/dim]")
 
         console.print()
 

@@ -8,16 +8,14 @@ Tests cover:
 """
 
 import pytest
-from datetime import datetime
-
 from simpletask.core.criteria_ops import (
-    get_next_criterion_id,
     add_acceptance_criterion,
+    get_next_criterion_id,
     mark_criterion_complete,
     remove_acceptance_criterion,
 )
-from simpletask.core.yaml_parser import parse_task_file
 from simpletask.core.models import AcceptanceCriterion
+from simpletask.core.yaml_parser import parse_task_file
 
 
 class TestGetNextCriterionId:

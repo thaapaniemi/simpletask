@@ -1,11 +1,12 @@
 """Add acceptance criterion command."""
 
 from typing import Optional
+
 import typer
 
-from simpletask.core.project import get_task_file_path
 from simpletask.core.criteria_ops import add_acceptance_criterion
-from simpletask.utils.console import success, error
+from simpletask.core.project import get_task_file_path
+from simpletask.utils.console import error, success
 
 
 def add_command(
@@ -31,10 +32,7 @@ def add_command(
 
     except ValueError as e:
         error(str(e))
-        raise typer.Exit(1)
     except FileNotFoundError as e:
         error(str(e))
-        raise typer.Exit(1)
     except Exception as e:
         error(f"Unexpected error: {e}")
-        raise typer.Exit(1)

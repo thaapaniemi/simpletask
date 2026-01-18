@@ -1,10 +1,11 @@
 """Task management subcommands."""
 
 import typer
+
 from .add import add_command
-from .update import update_command
-from .remove import remove_command
 from .list import list_command
+from .remove import remove_command
+from .update import update_command
 
 app = typer.Typer(help="Manage implementation tasks")
 app.command(name="add")(add_command)

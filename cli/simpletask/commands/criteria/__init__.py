@@ -1,10 +1,11 @@
 """Criteria management subcommands."""
 
 import typer
+
 from .add import add_command
 from .complete import complete_command
-from .remove import remove_command
 from .list import list_command
+from .remove import remove_command
 
 app = typer.Typer(help="Manage acceptance criteria")
 app.command(name="add")(add_command)
