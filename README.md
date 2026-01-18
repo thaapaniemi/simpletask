@@ -49,14 +49,16 @@ This approach enables:
 
 ### Installation
 
+#### Via uv (recommended)
+
 ```sh
-pip install simpletask
+uv tool install simpletask --from git+https://github.com/thaapaniemi/simpletask.git
 ```
 
-For development installation:
+#### Development installation
 
 ```sh
-git clone https://github.com/your-org/simpletask.git
+git clone https://github.com/thaapaniemi/simpletask.git
 cd simpletask
 pip install -e ".[dev]"
 ```
