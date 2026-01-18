@@ -285,6 +285,7 @@ class TestGitOperations:
 
 - Run `pytest` before committing changes
 - Run `black .` and `ruff check .` before committing
+- Bump version in both `pyproject.toml` and `cli/simpletask/__init__.py` for each commit
 - Add type hints to all function signatures
 - Use Pydantic models for data validation
 - Write tests for new functionality
