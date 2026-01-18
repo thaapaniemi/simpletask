@@ -23,6 +23,52 @@ AI-friendly task definition manager for branch-based development workflows.
 | ruff | Linting |
 | mypy | Static type checking |
 
+## Git Hooks
+
+Development hooks enforce code quality. Install them after cloning:
+
+```bash
+./scripts/install-hooks.sh
+```
+
+| Hook | Purpose |
+|------|---------|
+| `pre-commit` | Verifies version bump when code changes |
+| `commit-msg` | Enforces [Conventional Commits](https://conventionalcommits.org/) format |
+| `pre-push` | Runs pytest before push |
+
+### Bypassing Hooks
+
+```bash
+git commit --no-verify    # Skip pre-commit and commit-msg
+git push --no-verify      # Skip pre-push
+```
+
+### Conventional Commit Types
+
+| Type | Use for |
+|------|---------|
+| `feat` | New feature |
+| `fix` | Bug fix |
+| `docs` | Documentation only |
+| `style` | Formatting, no code change |
+| `refactor` | Code restructuring |
+| `perf` | Performance improvement |
+| `test` | Adding/updating tests |
+| `build` | Build system changes |
+| `ci` | CI configuration |
+| `chore` | Maintenance tasks |
+
+### Commit Examples
+
+```bash
+feat: add git hooks for development workflow
+fix(cli): resolve crash on empty task file
+docs: update README with hook installation
+refactor(core): simplify yaml parsing logic
+test: add unit tests for version validation
+```
+
 ## Project Structure
 
 ```

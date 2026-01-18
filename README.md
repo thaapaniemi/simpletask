@@ -199,6 +199,17 @@ cd simpletask
 pip install -e ".[dev]"
 ```
 
+### Install Git Hooks
+
+```sh
+./scripts/install-hooks.sh
+```
+
+This installs hooks that:
+- Enforce version bumping when code changes
+- Require [Conventional Commits](https://conventionalcommits.org/) format
+- Run tests before push
+
 ### Run tests
 
 ```sh
