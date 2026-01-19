@@ -18,6 +18,7 @@ CLI tool for managing AI-friendly task definitions in branch-based development w
 - [Task File Format](#task-file-format)
 - [Commands](#commands)
 - [Configuration](#configuration)
+- [AI Integration](#ai-integration)
 - [Development](#development)
 - [License](#license)
 
@@ -188,6 +189,27 @@ Add the schema reference to your YAML files for editor validation and autocomple
 ```sh
 ajv validate -s schema/simpletask.schema.json -d .tasks/my-task.yml --spec=draft2020 -c ajv-formats
 ```
+
+## AI Integration
+
+### MCP Server for AI Editors
+
+simpletask includes a Model Context Protocol (MCP) server for integration with AI editors like OpenCode and Qwen-CLI. The MCP server exposes task file operations as structured tools that AI assistants can use to read task definitions, check status, and understand project context.
+
+**Benefits:**
+- **Structured responses**: AI gets typed JSON instead of parsing CLI output
+- **Automatic context**: AI can query task files without manual copy/paste
+- **Better planning**: AI understands acceptance criteria and constraints
+- **Progress tracking**: AI sees task status and completion metrics
+
+**Quick start:**
+
+```sh
+# Start the MCP server
+simpletask serve
+```
+
+Then configure your AI editor to connect to the server. For detailed setup instructions including configuration for OpenCode, Qwen-CLI, Claude Desktop, and other MCP clients, see the [MCP Integration Guide](docs/MCP.md).
 
 ## Development
 
