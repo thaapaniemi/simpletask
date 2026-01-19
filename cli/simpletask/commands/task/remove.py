@@ -2,8 +2,7 @@
 
 import typer
 
-from simpletask.core.project import get_task_file_path
-from simpletask.core.task_ops import remove_implementation_task
+from simpletask.mcp.server import simpletask_task
 from simpletask.utils.console import confirm, error, success
 
 
@@ -27,11 +26,12 @@ def remove_command(
             if not confirm(f"Remove task {task_id}?"):
                 raise typer.Abort()
 
-        # Get file path
-        file_path = get_task_file_path(branch)
-
-        # Remove task
-        remove_implementation_task(file_path, task_id)
+        # Call MCP tool directly
+        simpletask_task(
+            action="remove",
+            branch=branch,
+            task_id=task_id,
+        )
 
         success(f"Removed task {task_id}")
 

@@ -256,12 +256,15 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS)
 
 ### Available Tools
 
-The MCP server exposes 2 read-only tools:
+The MCP server exposes 5 tools for task management:
 
 | Tool | Description | Parameters |
 |------|-------------|------------|
 | `simpletask_get` | Get complete task specification with status summary | `branch` (str, optional): Branch name or None for current<br>`validate` (bool, optional): Include schema validation (default: false) |
 | `simpletask_list` | List all task file branch names in the project | None |
+| `simpletask_new` | Create a new task file | `branch` (str): Branch identifier<br>`title` (str): Task title<br>`prompt` (str): Original user request<br>`criteria` (list[str] \| None, optional): Acceptance criteria |
+| `simpletask_task` | Manage implementation tasks (add/update/remove) | `action` (str): 'add', 'update', or 'remove'<br>`branch` (str, optional): Branch name or None for current<br>`task_id` (str, optional): Task ID (required for update/remove)<br>`name` (str, optional): Task name (required for add)<br>`goal` (str, optional): Task goal/description<br>`status` (str, optional): Status for update ('not_started', 'in_progress', 'completed', 'blocked') |
+| `simpletask_criteria` | Manage acceptance criteria (add/complete/remove) | `action` (str): 'add', 'complete', or 'remove'<br>`branch` (str, optional): Branch name or None for current<br>`criterion_id` (str, optional): Criterion ID (required for complete/remove)<br>`description` (str, optional): Description (required for add)<br>`completed` (bool, optional): Completion status for 'complete' (default: true) |
 
 ### Tool Details
 
@@ -325,6 +328,142 @@ Returns list of all task branch names (original names, not normalized filenames)
   "refactor/clean-models"
 ]
 ```
+
+#### simpletask_new
+
+Creates a new task file without creating a git branch (atomic MCP operation).
+
+**Parameters:**
+- `branch`: Branch/task identifier (e.g., 'feature/user-auth')
+- `title`: Human-readable task title
+- `prompt`: Original user prompt/request that led to task creation
+- `criteria` (optional): List of acceptance criteria descriptions. If `None`, adds a single placeholder criterion. If provided, must contain at least one item (empty list raises ValidationError).
+
+**Returns:** `SimpleTaskGetResponse` with created spec and summary
+
+**Example Usage:**
+
+```python
+result = simpletask_new(
+    branch="feature/user-auth",
+    title="Add user authentication",
+    prompt="Implement JWT-based auth with login/logout",
+    criteria=[
+        "Users can register with email and password",
+        "Users can log in and receive JWT token",
+        "Protected routes require valid JWT"
+    ]
+)
+```
+
+**Edge Cases:**
+- File already exists → raises `FileExistsError`
+- `criteria=[]` → raises `ValidationError` (schema requires min_length=1)
+- `criteria=None` → creates one placeholder: "Define acceptance criteria"
+
+#### simpletask_task
+
+Unified tool for managing implementation tasks with three actions.
+
+**Parameters:**
+- `action`: Operation to perform ('add', 'update', 'remove')
+- `branch` (optional): Branch name, or None for current git branch
+- `task_id` (optional): Task ID (required for update/remove, e.g., 'T001')
+- `name` (optional): Task name (required for add)
+- `goal` (optional): Task goal/description
+- `status` (optional): Task status for update only. Valid values: 'not_started', 'in_progress', 'completed', 'blocked'. **Note:** 'add' action ignores this parameter - new tasks always start as `not_started`.
+
+**Returns:** `SimpleTaskGetResponse` with updated spec and summary
+
+**Example Usage:**
+
+```python
+# Add a new task
+result = simpletask_task(
+    action="add",
+    branch="feature/user-auth",
+    task_id="T001",
+    name="Create User model",
+    goal="Define database schema for user accounts"
+)
+
+# Update task status
+result = simpletask_task(
+    action="update",
+    branch="feature/user-auth",
+    task_id="T001",
+    status="completed"
+)
+
+# Update task name/goal
+result = simpletask_task(
+    action="update",
+    task_id="T001",  # Uses current branch
+    name="Updated task name",
+    goal="Updated description"
+)
+
+# Remove task
+result = simpletask_task(
+    action="remove",
+    task_id="T001"
+)
+```
+
+**Edge Cases:**
+- Missing required params → raises `ValueError`
+- Task ID not found → raises `ValueError`
+- Invalid status value → raises `ValueError`
+- Status provided with action='add' → status is ignored, task created as `not_started`
+
+#### simpletask_criteria
+
+Unified tool for managing acceptance criteria with three actions.
+
+**Parameters:**
+- `action`: Operation to perform ('add', 'complete', 'remove')
+- `branch` (optional): Branch name, or None for current git branch
+- `criterion_id` (optional): Criterion ID (required for complete/remove, e.g., 'AC1')
+- `description` (optional): Criterion description (required for add)
+- `completed` (optional): Completion status for 'complete' action (default: true). Set to false to mark as incomplete.
+
+**Returns:** `SimpleTaskGetResponse` with updated spec and summary
+
+**Example Usage:**
+
+```python
+# Add a new criterion
+result = simpletask_criteria(
+    action="add",
+    branch="feature/user-auth",
+    description="Users can reset forgotten passwords"
+)
+
+# Mark criterion as completed
+result = simpletask_criteria(
+    action="complete",
+    criterion_id="AC2",
+    completed=True
+)
+
+# Mark criterion as incomplete
+result = simpletask_criteria(
+    action="complete",
+    criterion_id="AC2",
+    completed=False
+)
+
+# Remove criterion
+result = simpletask_criteria(
+    action="remove",
+    criterion_id="AC3"
+)
+```
+
+**Edge Cases:**
+- Missing required params → raises `ValueError`
+- Criterion ID not found → raises `ValueError`
+- Removing last criterion → raises `InvalidTaskFileError` (schema constraint: min_length=1)
 
 ### Error Handling
 

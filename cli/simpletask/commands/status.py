@@ -62,9 +62,7 @@ def status() -> None:
                     else (
                         "yellow"
                         if spec.status.value == "in_progress"
-                        else "red"
-                        if spec.status.value == "blocked"
-                        else "white"
+                        else "red" if spec.status.value == "blocked" else "white"
                     )
                 )
 

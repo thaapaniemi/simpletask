@@ -2,8 +2,7 @@
 
 import typer
 
-from simpletask.core.criteria_ops import remove_acceptance_criterion
-from simpletask.core.project import get_task_file_path
+from simpletask.mcp.server import simpletask_criteria
 from simpletask.utils.console import confirm, error, success
 
 
@@ -27,11 +26,12 @@ def remove_command(
             if not confirm(f"Remove criterion {criterion_id}?"):
                 raise typer.Abort()
 
-        # Get file path
-        file_path = get_task_file_path(branch)
-
-        # Remove criterion
-        remove_acceptance_criterion(file_path, criterion_id)
+        # Call MCP tool directly
+        simpletask_criteria(
+            action="remove",
+            branch=branch,
+            criterion_id=criterion_id,
+        )
 
         success(f"Removed criterion {criterion_id}")
 

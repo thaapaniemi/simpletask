@@ -2,9 +2,7 @@
 
 import typer
 
-from simpletask.core.models import TaskStatus
-from simpletask.core.project import get_task_file_path
-from simpletask.core.task_ops import add_implementation_task
+from simpletask.mcp.server import simpletask_task
 from simpletask.utils.console import error, success
 
 
@@ -23,17 +21,16 @@ def add_command(
         simpletask task add "Update docs" --branch feature-123
     """
     try:
-        # Get file path
-        file_path = get_task_file_path(branch)
-
-        # Add task
-        new_id = add_implementation_task(
-            file_path=file_path,
+        # Call MCP tool directly
+        result = simpletask_task(
+            action="add",
+            branch=branch,
             name=name,
             goal=goal,
-            status=TaskStatus.NOT_STARTED,
         )
 
+        # Extract task ID from result
+        new_id = result.spec.tasks[-1].id
         success(f"Added task {new_id}: {name}")
 
     except ValueError as e:

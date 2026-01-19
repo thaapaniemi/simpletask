@@ -2,9 +2,7 @@
 
 import typer
 
-from simpletask.core.models import TaskStatus
-from simpletask.core.project import get_task_file_path
-from simpletask.core.task_ops import update_implementation_task
+from simpletask.mcp.server import simpletask_task
 from simpletask.utils.console import error, success
 
 
@@ -27,26 +25,14 @@ def update_command(
         simpletask task update T003 --status in_progress --branch feature-123
     """
     try:
-        # Get file path
-        file_path = get_task_file_path(branch)
-
-        # Parse status if provided
-        status_enum = None
-        if status:
-            try:
-                status_enum = TaskStatus(status)
-            except ValueError:
-                error(
-                    f"Invalid status: {status}. Valid values: not_started, in_progress, completed, blocked"
-                )
-
-        # Update task
-        update_implementation_task(
-            file_path=file_path,
+        # Call MCP tool directly
+        simpletask_task(
+            action="update",
+            branch=branch,
             task_id=task_id,
             name=name,
             goal=goal,
-            status=status_enum,
+            status=status,
         )
 
         success(f"Updated task {task_id}")

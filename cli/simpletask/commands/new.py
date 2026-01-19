@@ -1,13 +1,10 @@
 """New command - Create a new task file and git branch."""
 
-from datetime import UTC, datetime
-
 import typer
 
 from ..core.git import create_branch, current_branch, is_main_branch
-from ..core.models import AcceptanceCriterion, SimpleTaskSpec, TaskStatus
 from ..core.project import ensure_project
-from ..core.yaml_parser import write_task_file
+from ..core.task_file_ops import create_task_file
 from ..utils.console import confirm, error, info, success, warning
 
 
@@ -48,31 +45,18 @@ def new(
                     info("Cancelled")
                     raise typer.Exit(0)
 
-        # Create task spec
-        spec = SimpleTaskSpec(
-            schema_version="1.0",
+        # Create task file using shared function
+        title = prompt.split("\n")[0] if "\n" in prompt else prompt  # First line as title
+        create_task_file(
+            project=project,
             branch=branch,
-            title=prompt.split("\n")[0] if "\n" in prompt else prompt,  # First line as title
-            original_prompt=prompt,
-            status=TaskStatus.NOT_STARTED,
-            created=datetime.now(UTC),
-            updated=datetime.now(UTC),
-            acceptance_criteria=[
-                AcceptanceCriterion(
-                    id="AC1", description="Task completion criteria (to be filled)", completed=False
-                )
-            ],
-            constraints=None,
-            context=None,
-            tasks=None,
+            title=title,
+            prompt=prompt,
+            criteria=None,  # Will add placeholder AC1
         )
 
-        # Ensure tasks directory exists
-        project.ensure_tasks_dir()
-
-        # Write task file
+        # Get task file path for display
         task_file = project.get_task_file(branch)
-        write_task_file(task_file, spec, update_timestamp=False)
         success(f"Created task file: {task_file.relative_to(project.root)}")
 
         # Create git branch

@@ -2,8 +2,7 @@
 
 import typer
 
-from simpletask.core.criteria_ops import mark_criterion_complete
-from simpletask.core.project import get_task_file_path
+from simpletask.mcp.server import simpletask_criteria
 from simpletask.utils.console import error, success
 
 
@@ -24,11 +23,13 @@ def complete_command(
         simpletask criteria complete AC1 --uncomplete
     """
     try:
-        # Get file path
-        file_path = get_task_file_path(branch)
-
-        # Mark criterion
-        mark_criterion_complete(file_path, criterion_id, completed=not uncomplete)
+        # Call MCP tool directly
+        simpletask_criteria(
+            action="complete",
+            branch=branch,
+            criterion_id=criterion_id,
+            completed=not uncomplete,
+        )
 
         if uncomplete:
             success(f"Marked {criterion_id} as not completed")

@@ -5,7 +5,6 @@ across the entire workflow, addressing issue #4.
 """
 
 import subprocess
-from pathlib import Path
 
 import pytest
 
@@ -21,7 +20,7 @@ class TestBranchNormalizationIntegration:
         - File: .tasks/feature-mcp-server-support.yml
         - Command: simpletask show (should work without manual path construction)
         """
-        project_root, branch_name, task_file = tmp_git_project_with_task
+        project_root, _branch_name, task_file = tmp_git_project_with_task
 
         # Verify file exists with normalized name
         assert task_file.exists(), f"Task file should exist at {task_file}"
@@ -55,7 +54,7 @@ class TestBranchNormalizationIntegration:
         ls .tasks/$(git branch --show-current).yml fails because
         it doesn't normalize the branch name.
         """
-        project_root, branch_name, task_file = tmp_git_project_with_task
+        project_root, _branch_name, _task_file = tmp_git_project_with_task
 
         # This bash command represents the OLD broken approach
         bash_cmd = "ls .tasks/$(git branch --show-current).yml"
@@ -77,7 +76,7 @@ class TestBranchNormalizationIntegration:
 
     def test_cli_commands_all_work_with_slash_branches(self, tmp_git_project_with_task):
         """Test that all major CLI commands work with slash-containing branches."""
-        project_root, branch_name, task_file = tmp_git_project_with_task
+        project_root, _branch_name, _task_file = tmp_git_project_with_task
 
         # Test 'simpletask show'
         result = subprocess.run(

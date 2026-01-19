@@ -2,8 +2,7 @@
 
 import typer
 
-from simpletask.core.criteria_ops import add_acceptance_criterion
-from simpletask.core.project import get_task_file_path
+from simpletask.mcp.server import simpletask_criteria
 from simpletask.utils.console import error, success
 
 
@@ -20,12 +19,15 @@ def add_command(
         simpletask criteria add "Documentation updated" --branch feature-123
     """
     try:
-        # Get file path
-        file_path = get_task_file_path(branch)
+        # Call MCP tool directly
+        result = simpletask_criteria(
+            action="add",
+            branch=branch,
+            description=description,
+        )
 
-        # Add criterion
-        new_id = add_acceptance_criterion(file_path, description)
-
+        # Extract criterion ID from result
+        new_id = result.spec.acceptance_criteria[-1].id
         success(f"Added criterion {new_id}: {description}")
 
     except ValueError as e:

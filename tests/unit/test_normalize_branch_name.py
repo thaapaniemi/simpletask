@@ -1,7 +1,6 @@
 """Tests for branch name normalization."""
 
 import pytest
-
 from simpletask.core.project import normalize_branch_name
 
 

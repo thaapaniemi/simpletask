@@ -67,22 +67,32 @@ User input: $ARGUMENTS
    git branch --show-current
    ```
 
-2. Check if already on a feature branch with existing task file:
+2. Check if already on a feature branch with existing task file using MCP tools (with CLI fallback):
+   
+   **Preferred: Use MCP tool** (if simpletask MCP server is available)
+   ```
+   Use simpletask_get() MCP tool to check for existing task:
+   - Call simpletask_get(branch=None) to use current git branch
+   - If successful, task file exists - analyze spec.tasks to see if empty/minimal
+   - If error (FileNotFoundError), task file does not exist
+   ```
+   
+   **Fallback: Use CLI** (if MCP tools not available)
    ```bash
    simpletask show 2>/dev/null
    ```
 
-3. If command succeeds (file exists for current branch):
+3. If task file exists for current branch:
    - Analyze output to see if tasks are empty or minimal
    - If tasks already exist, analyze and report current state
    - If tasks are empty/minimal, proceed to Step 4 to add detailed tasks
    - Use current branch name as `[branch-name]`
    
-4. If command fails (file does NOT exist):
+4. If task file does NOT exist:
    - If on main/master/develop: proceed to Step 2 to create new branch
    - If on other branch: ask user if they want to create task file for current branch or create new branch
 
-**Note:** Branch names with slashes (e.g., `feature/user-auth`) are automatically normalized to filenames with hyphens (e.g., `.tasks/feature-user-auth.yml`). Always use `simpletask` commands instead of manually constructing `.tasks/` paths.
+**Note:** Branch names with slashes (e.g., `feature/user-auth`) are automatically normalized to filenames with hyphens (e.g., `.tasks/feature-user-auth.yml`). The MCP tools and CLI commands handle normalization automatically.
 
 **Step 2: Create Git Branch (if needed)**
 
@@ -100,7 +110,22 @@ git checkout -b refactor/database-queries
 
 **Step 3: Create Task File**
 
-Use simpletask CLI to create the task file:
+Create task file using MCP tools (with CLI fallback):
+
+**Preferred: Use MCP tool** (if simpletask MCP server is available)
+```
+Use simpletask_new() MCP tool to create the task file:
+- Call simpletask_new(
+    branch="[branch-name]",
+    title="[Short title extracted from prompt]",
+    prompt="[original prompt from $ARGUMENTS]",
+    criteria=None  # Will add placeholder AC1
+  )
+- Returns SimpleTaskGetResponse with created spec
+- Task file is created at .tasks/[normalized-branch-name].yml
+```
+
+**Fallback: Use CLI** (if MCP tools not available)
 ```bash
 simpletask new [branch-name] "[original prompt from $ARGUMENTS]" -y
 ```
@@ -111,11 +136,24 @@ This creates a task file with the basic structure.
 
 **Step 4: Plan Acceptance Criteria**
 
-Add acceptance criteria using simpletask CLI. Each criterion should be:
+Add acceptance criteria using MCP tools (with CLI fallback). Each criterion should be:
 - Specific and verifiable
 - Independent (can be tested individually)
 - Focused on WHAT, not HOW
 
+**Preferred: Use MCP tool** (if simpletask MCP server is available)
+```
+Use simpletask_criteria() MCP tool to add each criterion:
+- Call simpletask_criteria(
+    action="add",
+    branch="[branch-name]",
+    description="[Criterion description]"
+  )
+- Returns SimpleTaskGetResponse with updated spec
+- Repeat for each acceptance criterion
+```
+
+**Fallback: Use CLI** (if MCP tools not available)
 ```bash
 simpletask criteria add "Criterion description" -b [branch-name]
 ```
@@ -128,12 +166,25 @@ Example acceptance criteria:
 
 **Step 5: Plan Implementation Tasks**
 
-Add detailed implementation tasks. Each task MUST be:
+Add detailed implementation tasks using MCP tools (with CLI fallback). Each task MUST be:
 - Completable in 5-30 minutes
 - Detailed enough for ANY LLM to execute without clarification
 - Include specific file paths, function names, and code patterns
 
-For each task, use:
+**Preferred: Use MCP tool** (if simpletask MCP server is available)
+```
+Use simpletask_task() MCP tool to add each task:
+- Call simpletask_task(
+    action="add",
+    branch="[branch-name]",
+    name="Task name",
+    goal="Detailed goal description"
+  )
+- Returns SimpleTaskGetResponse with updated spec
+- Repeat for each implementation task
+```
+
+**Fallback: Use CLI** (if MCP tools not available)
 ```bash
 simpletask task add "Task name" -g "Detailed goal description" -b [branch-name]
 ```
@@ -199,11 +250,32 @@ Edit `.tasks/[branch-name].yml` directly to add:
 **Step 7: Validate and Summarize**
 
 1. Validate the task file:
+   
+   **Preferred: Use MCP tool** (if simpletask MCP server is available)
+   ```
+   Use simpletask_get() MCP tool with validation:
+   - Call simpletask_get(branch="[branch-name]", validate=True)
+   - Check validation.valid in response
+   - If validation.valid is False, check validation.errors for details
+   ```
+   
+   **Fallback: Use CLI** (if MCP tools not available)
    ```bash
    simpletask schema validate
    ```
 
 2. Show the complete task:
+   
+   **Preferred: Use MCP tool** (if simpletask MCP server is available)
+   ```
+   Use simpletask_get() MCP tool:
+   - Call simpletask_get(branch="[branch-name]")
+   - Display spec.branch, spec.title, spec.status
+   - Display summary.criteria_total, summary.tasks_total
+   - List spec.acceptance_criteria and spec.tasks
+   ```
+   
+   **Fallback: Use CLI** (if MCP tools not available)
    ```bash
    simpletask show
    ```
@@ -400,4 +472,4 @@ The planning phase is complete when:
 1. Task file exists at `.tasks/[normalized-branch-name].yml` (branch name converted to lowercase with special chars as hyphens)
 2. All acceptance criteria are defined
 3. All implementation tasks are detailed with steps, done_when, and prerequisites
-4. `simpletask schema validate` passes
+4. Validation passes (check via `simpletask_get(validate=True)` MCP tool or `simpletask schema validate` CLI)
