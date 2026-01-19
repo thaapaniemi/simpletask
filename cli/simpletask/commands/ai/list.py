@@ -1,8 +1,11 @@
 """List OpenCode and Qwen command templates."""
 
+from pathlib import Path
+
 import typer
 
 from simpletask.core.ai_templates import (
+    EDITOR_CONFIGS,
     get_bundled_qwen_templates,
     get_bundled_templates,
     get_global_commands_dir,
@@ -13,6 +16,46 @@ from simpletask.core.ai_templates import (
     get_qwen_installed_status,
 )
 from simpletask.utils.console import console, create_table
+
+
+def _render_editor_table(
+    title: str,
+    editor_name: str,
+    templates: list[Path],
+    status: dict[str, dict[str, bool]],
+    global_dir: Path,
+    local_dir: Path,
+) -> None:
+    """Render a table showing template installation status.
+
+    Args:
+        title: Table title (e.g., "OpenCode Commands" or "Qwen Commands").
+        editor_name: Display name for the editor (e.g., "OpenCode" or "Qwen").
+        templates: List of template file paths.
+        status: Installation status dict mapping filename to global/local bools.
+        global_dir: Path to global installation directory.
+        local_dir: Path to local installation directory.
+    """
+    table = create_table(
+        title=title,
+        columns=["Command", "Global", "Local"],
+    )
+
+    for template_path in templates:
+        name = template_path.stem  # Remove file extension
+        template_status = status[template_path.name]
+
+        global_icon = "[green]✓[/green]" if template_status["global"] else "[dim]-[/dim]"
+        local_icon = "[green]✓[/green]" if template_status["local"] else "[dim]-[/dim]"
+
+        table.add_row(name, global_icon, local_icon)
+
+    console.print(table)
+
+    # Show locations
+    console.print(f"\n[bold]{editor_name} Locations:[/bold]")
+    console.print(f"  Global: {global_dir}")
+    console.print(f"  Local:  {local_dir}\n")
 
 
 def list_command() -> None:
@@ -39,55 +82,25 @@ def list_command() -> None:
 
         # OpenCode table
         if opencode_templates:
-            table = create_table(
+            _render_editor_table(
                 title="OpenCode Commands",
-                columns=["Command", "Global", "Local"],
+                editor_name=EDITOR_CONFIGS["opencode"].display_name,
+                templates=opencode_templates,
+                status=opencode_status,
+                global_dir=get_global_commands_dir(),
+                local_dir=get_local_commands_dir(),
             )
-
-            for template_path in opencode_templates:
-                name = template_path.stem  # Remove .md extension
-                template_status = opencode_status[template_path.name]
-
-                global_icon = "[green]✓[/green]" if template_status["global"] else "[dim]-[/dim]"
-                local_icon = "[green]✓[/green]" if template_status["local"] else "[dim]-[/dim]"
-
-                table.add_row(name, global_icon, local_icon)
-
-            console.print(table)
-
-            # Show OpenCode locations
-            global_dir = get_global_commands_dir()
-            local_dir = get_local_commands_dir()
-
-            console.print("\n[bold]OpenCode Locations:[/bold]")
-            console.print(f"  Global: {global_dir}")
-            console.print(f"  Local:  {local_dir}\n")
 
         # Qwen table
         if qwen_templates:
-            table = create_table(
+            _render_editor_table(
                 title="Qwen Commands",
-                columns=["Command", "Global", "Local"],
+                editor_name=EDITOR_CONFIGS["qwen"].display_name,
+                templates=qwen_templates,
+                status=qwen_status,
+                global_dir=get_global_qwen_commands_dir(),
+                local_dir=get_local_qwen_commands_dir(),
             )
-
-            for template_path in qwen_templates:
-                name = template_path.stem  # Remove .toml extension
-                template_status = qwen_status[template_path.name]
-
-                global_icon = "[green]✓[/green]" if template_status["global"] else "[dim]-[/dim]"
-                local_icon = "[green]✓[/green]" if template_status["local"] else "[dim]-[/dim]"
-
-                table.add_row(name, global_icon, local_icon)
-
-            console.print(table)
-
-            # Show Qwen locations
-            global_dir = get_global_qwen_commands_dir()
-            local_dir = get_local_qwen_commands_dir()
-
-            console.print("\n[bold]Qwen Locations:[/bold]")
-            console.print(f"  Global: {global_dir}")
-            console.print(f"  Local:  {local_dir}\n")
 
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")

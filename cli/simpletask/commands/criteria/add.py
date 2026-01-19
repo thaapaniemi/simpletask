@@ -1,7 +1,5 @@
 """Add acceptance criterion command."""
 
-from typing import Optional
-
 import typer
 
 from simpletask.core.criteria_ops import add_acceptance_criterion
@@ -11,7 +9,7 @@ from simpletask.utils.console import error, success
 
 def add_command(
     description: str = typer.Argument(..., help="Criterion description"),
-    branch: Optional[str] = typer.Option(
+    branch: str | None = typer.Option(
         None, "--branch", "-b", help="Branch name (defaults to current git branch)"
     ),
 ) -> None:

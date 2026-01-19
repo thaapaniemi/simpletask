@@ -1,8 +1,6 @@
 """simpletask: A Python CLI for managing AI-friendly task definition YAML files."""
 
-__version__ = "0.1.5"
-
-from typing import Optional
+__version__ = "0.1.6"
 
 import typer
 
@@ -30,7 +28,7 @@ app = typer.Typer(
 # Add version option
 @app.callback()
 def main(
-    version: Optional[bool] = typer.Option(
+    version: bool | None = typer.Option(
         None,
         "--version",
         "-v",
@@ -40,7 +38,6 @@ def main(
     ),
 ):
     """simpletask: Manage AI-friendly task definition YAML files."""
-    pass
 
 
 # Register top-level commands

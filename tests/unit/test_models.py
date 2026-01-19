@@ -8,7 +8,7 @@ Tests cover:
 - Cross-field validation (prerequisite task IDs)
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 from pydantic import ValidationError
@@ -173,7 +173,7 @@ class TestSimpleTaskSpec:
 
     def test_valid_minimal_spec(self):
         """Valid minimal task spec validates correctly."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         spec = SimpleTaskSpec(
             branch="test-feature",
             title="Test Feature",
@@ -190,7 +190,7 @@ class TestSimpleTaskSpec:
 
     def test_valid_complete_spec(self):
         """Valid complete task spec validates correctly."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         spec = SimpleTaskSpec(
             schema_version="1.0",
             branch="test-feature",
@@ -218,7 +218,7 @@ class TestSimpleTaskSpec:
 
     def test_empty_acceptance_criteria(self):
         """Empty acceptance_criteria list raises ValidationError."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         with pytest.raises(ValidationError):
             SimpleTaskSpec(
                 branch="test",
@@ -231,7 +231,7 @@ class TestSimpleTaskSpec:
 
     def test_invalid_prerequisite_reference(self):
         """Prerequisite referencing non-existent task raises ValidationError."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         with pytest.raises(ValidationError) as exc_info:
             SimpleTaskSpec(
                 branch="test",
@@ -256,7 +256,7 @@ class TestSimpleTaskSpec:
 
     def test_valid_prerequisites(self):
         """Valid prerequisites validate correctly."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         spec = SimpleTaskSpec(
             branch="test",
             title="Test",
@@ -288,7 +288,7 @@ class TestSimpleTaskSpec:
 
     def test_missing_required_fields(self):
         """Missing required fields raises ValidationError."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Missing branch
         with pytest.raises(ValidationError):

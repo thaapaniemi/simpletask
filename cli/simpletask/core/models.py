@@ -122,10 +122,10 @@ class SimpleTaskSpec(BaseModel):
 
 # Export all models
 __all__ = [
-    "TaskStatus",
     "AcceptanceCriterion",
-    "FileAction",
     "CodeExample",
-    "Task",
+    "FileAction",
     "SimpleTaskSpec",
+    "Task",
+    "TaskStatus",
 ]

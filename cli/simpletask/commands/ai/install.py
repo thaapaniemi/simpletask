@@ -13,6 +13,43 @@ from simpletask.core.ai_templates import (
 from simpletask.utils.console import error, info, success, warning
 
 
+def _report_installation_results(
+    installed: list[str],
+    skipped: list[str],
+    overwritten: list[str],
+) -> bool:
+    """Report installation results with colored output.
+
+    Args:
+        installed: List of installed template names.
+        skipped: List of skipped template names.
+        overwritten: List of overwritten template names.
+
+    Returns:
+        True if any templates were skipped (useful for showing tip message).
+    """
+    # Report results
+    for name in overwritten:
+        warning(f"  Overwriting: {name}")
+
+    for name in installed:
+        success(f"  Installed: {name}")
+
+    for name in skipped:
+        warning(f"  Skipped (already exists): {name}")
+
+    # Summary
+    total = len(installed) + len(skipped) + len(overwritten)
+    overwrite_count = len(overwritten)
+
+    if overwrite_count > 0:
+        info(f"  Summary: {total} processed ({overwrite_count} overwritten)\n")
+    else:
+        info(f"  Summary: {total} processed\n")
+
+    return bool(skipped)
+
+
 def install_command(
     local: bool = typer.Option(
         False,
@@ -65,27 +102,9 @@ def install_command(
                 no_overwrite=no_overwrite,
             )
 
-            any_skipped = any_skipped or bool(skipped)
-
-            # Report results
-            for name in overwritten:
-                warning(f"  Overwriting: {name}")
-
-            for name in installed:
-                if name not in overwritten:
-                    success(f"  Installed: {name}")
-
-            for name in skipped:
-                warning(f"  Skipped (already exists): {name}")
-
-            # Summary
-            total = len(installed) + len(skipped)
-            overwrite_count = len(overwritten)
-
-            if overwrite_count > 0:
-                info(f"  Summary: {total} processed ({overwrite_count} overwritten)\n")
-            else:
-                info(f"  Summary: {total} processed\n")
+            any_skipped = (
+                _report_installation_results(installed, skipped, overwritten) or any_skipped
+            )
 
         # Install Qwen templates
         if install_qwen:
@@ -98,27 +117,9 @@ def install_command(
                 no_overwrite=no_overwrite,
             )
 
-            any_skipped = any_skipped or bool(skipped)
-
-            # Report results
-            for name in overwritten:
-                warning(f"  Overwriting: {name}")
-
-            for name in installed:
-                if name not in overwritten:
-                    success(f"  Installed: {name}")
-
-            for name in skipped:
-                warning(f"  Skipped (already exists): {name}")
-
-            # Summary
-            total = len(installed) + len(skipped)
-            overwrite_count = len(overwritten)
-
-            if overwrite_count > 0:
-                info(f"  Summary: {total} processed ({overwrite_count} overwritten)\n")
-            else:
-                info(f"  Summary: {total} processed\n")
+            any_skipped = (
+                _report_installation_results(installed, skipped, overwritten) or any_skipped
+            )
 
         if any_skipped:
             info("Tip: Use --no-overwrite to preserve existing files")

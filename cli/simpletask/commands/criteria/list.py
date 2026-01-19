@@ -1,7 +1,5 @@
 """List acceptance criteria command."""
 
-from typing import Optional
-
 import typer
 
 from simpletask.core.project import get_task_file_path
@@ -16,7 +14,7 @@ def list_command(
     incomplete_only: bool = typer.Option(
         False, "--incomplete", "-i", help="Show only incomplete criteria"
     ),
-    branch: Optional[str] = typer.Option(
+    branch: str | None = typer.Option(
         None, "--branch", "-b", help="Branch name (defaults to current git branch)"
     ),
 ) -> None:

@@ -331,7 +331,11 @@ class TestGitOperations:
 
 - Run `pytest` before committing changes
 - Run `black .` and `ruff check .` before committing
-- Bump version in both `pyproject.toml` and `cli/simpletask/__init__.py` for each commit
+- **Version bumping strategy:**
+  - **On feature branches:** Bump version ONCE at the end, just before merging to main
+  - **On main branch:** Bump version for each commit with code changes
+  - Always bump in BOTH `pyproject.toml` and `cli/simpletask/__init__.py`
+  - Use `git commit --no-verify` for intermediate commits on feature branches
 - Add type hints to all function signatures
 - Use Pydantic models for data validation
 - Write tests for new functionality

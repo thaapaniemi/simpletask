@@ -10,9 +10,10 @@ class Project:
 
     def __init__(self, root: Path | None = None):
         """Initialize project with root path."""
-        self.root = root or self._find_root()
-        if not self.root:
+        resolved_root = root or self._find_root()
+        if not resolved_root:
             raise ValueError("Could not find project root. Not in a git repository.")
+        self.root: Path = resolved_root
 
     @staticmethod
     def _find_root() -> Path | None:
@@ -109,7 +110,7 @@ def get_task_file_path(branch: str | None = None) -> Path:
 # Export public API
 __all__ = [
     "Project",
-    "find_project",
     "ensure_project",
+    "find_project",
     "get_task_file_path",
 ]

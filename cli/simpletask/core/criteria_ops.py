@@ -1,13 +1,12 @@
 """Criteria operations for CRUD on acceptance criteria in task files."""
 
 from pathlib import Path
-from typing import List
 
 from .models import AcceptanceCriterion
 from .yaml_parser import parse_task_file, write_task_file
 
 
-def get_next_criterion_id(criteria: List[AcceptanceCriterion]) -> str:
+def get_next_criterion_id(criteria: list[AcceptanceCriterion]) -> str:
     """Generate next sequential criterion ID.
 
     Args:

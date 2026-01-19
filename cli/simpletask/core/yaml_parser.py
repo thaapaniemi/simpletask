@@ -1,6 +1,6 @@
 """YAML parsing for task files with auto-timestamp management."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import yaml
@@ -11,8 +11,6 @@ from .models import SimpleTaskSpec, TaskStatus
 
 class InvalidTaskFileError(Exception):
     """Raised when task file format is invalid or doesn't match schema."""
-
-    pass
 
 
 def parse_task_file(path: Path) -> SimpleTaskSpec:
@@ -37,7 +35,7 @@ def parse_task_file(path: Path) -> SimpleTaskSpec:
     try:
         data = yaml.safe_load(content)
     except yaml.YAMLError as e:
-        raise InvalidTaskFileError(f"Invalid YAML syntax:\n{str(e)}\n\nFile: {path}") from e
+        raise InvalidTaskFileError(f"Invalid YAML syntax:\n{e!s}\n\nFile: {path}") from e
 
     # Validate that YAML parsed to a dict
     if not isinstance(data, dict):
@@ -81,7 +79,7 @@ def write_task_file(path: Path, spec: SimpleTaskSpec, update_timestamp: bool = T
 
     # Update timestamp if requested
     if update_timestamp:
-        spec.updated = datetime.now(timezone.utc)
+        spec.updated = datetime.now(UTC)
 
     # Convert spec to dict (mode='json' for datetime serialization)
     data = spec.model_dump(mode="json", exclude_none=True)
@@ -171,7 +169,7 @@ def update_criterion_status(path: Path, criterion_id: str, completed: bool) -> N
 __all__ = [
     "InvalidTaskFileError",
     "parse_task_file",
-    "write_task_file",
-    "update_task_status",
     "update_criterion_status",
+    "update_task_status",
+    "write_task_file",
 ]

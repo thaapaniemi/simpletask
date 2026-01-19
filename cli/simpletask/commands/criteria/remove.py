@@ -1,7 +1,5 @@
 """Remove acceptance criterion command."""
 
-from typing import Optional
-
 import typer
 
 from simpletask.core.criteria_ops import remove_acceptance_criterion
@@ -12,7 +10,7 @@ from simpletask.utils.console import confirm, error, success
 def remove_command(
     criterion_id: str = typer.Argument(..., help="Criterion ID (e.g., AC1)"),
     force: bool = typer.Option(False, "--force", "-f", help="Skip confirmation prompt"),
-    branch: Optional[str] = typer.Option(
+    branch: str | None = typer.Option(
         None, "--branch", "-b", help="Branch name (defaults to current git branch)"
     ),
 ) -> None:

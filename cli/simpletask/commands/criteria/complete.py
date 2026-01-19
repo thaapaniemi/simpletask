@@ -1,7 +1,5 @@
 """Mark acceptance criteria as complete command."""
 
-from typing import Optional
-
 import typer
 
 from simpletask.core.criteria_ops import mark_criterion_complete
@@ -14,7 +12,7 @@ def complete_command(
     uncomplete: bool = typer.Option(
         False, "--uncomplete", "-u", help="Mark as not completed instead"
     ),
-    branch: Optional[str] = typer.Option(
+    branch: str | None = typer.Option(
         None, "--branch", "-b", help="Branch name (defaults to current git branch)"
     ),
 ) -> None:

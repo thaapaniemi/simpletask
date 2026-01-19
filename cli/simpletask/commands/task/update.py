@@ -1,7 +1,5 @@
 """Update implementation task command."""
 
-from typing import Optional
-
 import typer
 
 from simpletask.core.models import TaskStatus
@@ -12,12 +10,12 @@ from simpletask.utils.console import error, success
 
 def update_command(
     task_id: str = typer.Argument(..., help="Task ID (e.g., T001)"),
-    status: Optional[str] = typer.Option(
+    status: str | None = typer.Option(
         None, "--status", "-s", help="New status (not_started, in_progress, completed, blocked)"
     ),
-    name: Optional[str] = typer.Option(None, "--name", "-n", help="New task name"),
-    goal: Optional[str] = typer.Option(None, "--goal", "-g", help="New task goal"),
-    branch: Optional[str] = typer.Option(
+    name: str | None = typer.Option(None, "--name", "-n", help="New task name"),
+    goal: str | None = typer.Option(None, "--goal", "-g", help="New task goal"),
+    branch: str | None = typer.Option(
         None, "--branch", "-b", help="Branch name (defaults to current git branch)"
     ),
 ) -> None:

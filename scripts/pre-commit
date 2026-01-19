@@ -77,6 +77,49 @@ fi
 if [ "$STAGED_INIT_VERSION" != "$CURRENT_VERSION" ]; then
     # Version changed - verify it increased (simple string comparison for semver)
     echo -e "${GREEN}Version bumped: ${CURRENT_VERSION} -> ${STAGED_INIT_VERSION}${NC}"
+    
+    # Run code quality checks after version bump is confirmed
+    echo -e "${YELLOW}Running code quality checks...${NC}"
+    
+    # Check if .venv exists and activate it
+    if [ -d ".venv" ]; then
+        source .venv/bin/activate
+    fi
+    
+    # Run ruff
+    echo -n "  - Running ruff... "
+    RUFF_OUTPUT=$(ruff check . 2>&1) || {
+        echo -e "${RED}✗${NC}"
+        echo -e "${RED}Ruff check failed:${NC}"
+        echo "$RUFF_OUTPUT" | head -30
+        echo -e "To skip this check: ${YELLOW}git commit --no-verify${NC}"
+        exit 1
+    }
+    echo -e "${GREEN}✓${NC}"
+    
+    # Run ruff format check
+    echo -n "  - Running ruff format... "
+    FORMAT_OUTPUT=$(ruff format --check . 2>&1) || {
+        echo -e "${RED}✗${NC}"
+        echo -e "${RED}Code formatting issues found:${NC}"
+        echo "$FORMAT_OUTPUT" | head -30
+        echo -e "${YELLOW}Run 'ruff format .' to fix formatting.${NC}"
+        echo -e "To skip this check: ${YELLOW}git commit --no-verify${NC}"
+        exit 1
+    }
+    echo -e "${GREEN}✓${NC}"
+    
+    # Run mypy (allow to fail with warning, since repo has pre-existing issues)
+    echo -n "  - Running mypy... "
+    MYPY_OUTPUT=$(mypy cli/simpletask 2>&1) && {
+        echo -e "${GREEN}✓${NC}"
+    } || {
+        echo -e "${YELLOW}⚠${NC}"
+        echo -e "${YELLOW}Note: mypy found issues:${NC}"
+        echo "$MYPY_OUTPUT" | head -20
+        # Don't exit - mypy issues won't block commits
+    }
+    
     exit 0
 fi
 

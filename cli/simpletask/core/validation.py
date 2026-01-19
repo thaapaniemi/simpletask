@@ -3,6 +3,7 @@
 import json
 from importlib import resources
 from pathlib import Path
+from typing import Any, cast
 
 import jsonschema
 import yaml
@@ -26,7 +27,7 @@ def get_bundled_schema() -> dict:
 
         schema_text = pkg_resources.read_text("simpletask.schema", "simpletask.schema.json")
 
-    return json.loads(schema_text)
+    return cast(dict[Any, Any], json.loads(schema_text))
 
 
 def validate_task_file(path: Path) -> list[str]:
@@ -50,7 +51,7 @@ def validate_task_file(path: Path) -> list[str]:
 
     # Load YAML
     try:
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             data = yaml.safe_load(f)
     except yaml.YAMLError as e:
         errors.append(f"Invalid YAML syntax: {e}")

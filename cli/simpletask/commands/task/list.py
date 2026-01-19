@@ -1,7 +1,5 @@
 """List implementation tasks command."""
 
-from typing import Optional
-
 import typer
 
 from simpletask.core.models import TaskStatus
@@ -23,13 +21,13 @@ def _get_status_icon(status: TaskStatus) -> str:
 
 
 def list_command(
-    status: Optional[str] = typer.Option(
+    status: str | None = typer.Option(
         None,
         "--status",
         "-s",
         help="Filter by status (not_started, in_progress, completed, blocked)",
     ),
-    branch: Optional[str] = typer.Option(
+    branch: str | None = typer.Option(
         None, "--branch", "-b", help="Branch name (defaults to current git branch)"
     ),
 ) -> None:

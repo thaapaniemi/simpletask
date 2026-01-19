@@ -88,12 +88,12 @@ def create_table(title: str, columns: list[str]) -> Table:
 
 # Export public API
 __all__ = [
-    "console",
-    "error_console",
-    "error",
-    "success",
-    "info",
-    "warning",
     "confirm",
+    "console",
     "create_table",
+    "error",
+    "error_console",
+    "info",
+    "success",
+    "warning",
 ]

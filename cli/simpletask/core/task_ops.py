@@ -1,13 +1,12 @@
 """Task operations for CRUD on implementation tasks in task files."""
 
 from pathlib import Path
-from typing import List, Optional
 
 from .models import Task, TaskStatus
 from .yaml_parser import parse_task_file, write_task_file
 
 
-def get_next_task_id(tasks: List[Task]) -> str:
+def get_next_task_id(tasks: list[Task]) -> str:
     """Generate next sequential task ID.
 
     Args:
@@ -25,7 +24,7 @@ def get_next_task_id(tasks: List[Task]) -> str:
 def add_implementation_task(
     file_path: Path,
     name: str,
-    goal: Optional[str] = None,
+    goal: str | None = None,
     status: TaskStatus = TaskStatus.NOT_STARTED,
 ) -> str:
     """Add a new implementation task to the task file.
@@ -76,9 +75,9 @@ def add_implementation_task(
 def update_implementation_task(
     file_path: Path,
     task_id: str,
-    name: Optional[str] = None,
-    goal: Optional[str] = None,
-    status: Optional[TaskStatus] = None,
+    name: str | None = None,
+    goal: str | None = None,
+    status: TaskStatus | None = None,
 ) -> None:
     """Update an existing implementation task.
 

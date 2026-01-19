@@ -63,7 +63,9 @@ def show(
                     else (
                         "yellow"
                         if task.status.value == "in_progress"
-                        else "red" if task.status.value == "blocked" else "white"
+                        else "red"
+                        if task.status.value == "blocked"
+                        else "white"
                     )
                 )
                 console.print(

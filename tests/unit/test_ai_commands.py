@@ -106,7 +106,7 @@ class TestInstallTemplates:
         existing_file = target_dir / "simpletask.plan.md"
         existing_file.write_text("old content")
 
-        installed, skipped, overwritten = install_templates(target_dir, no_overwrite=False)
+        installed, _skipped, overwritten = install_templates(target_dir, no_overwrite=False)
 
         # Should report one overwrite
         assert "simpletask.plan.md" in overwritten
@@ -160,7 +160,15 @@ class TestInstallTemplates:
 
 
 class TestGetInstalledStatus:
-    """Tests for get_installed_status function."""
+    """Tests for get_installed_status function.
+
+    Note: These tests patch internal functions (_get_global_commands_dir,
+    _get_local_commands_dir) rather than the public API. This is intentional
+    as it provides fine-grained control over directory locations for both
+    OpenCode and Qwen editors independently, which is necessary for testing
+    the status checking logic. The trade-off is tighter coupling to the
+    implementation, but this is acceptable for these specific tests.
+    """
 
     def test_no_installations(self, tmp_path: Path, monkeypatch):
         """Should report nothing installed when directories don't exist."""
@@ -169,10 +177,12 @@ class TestGetInstalledStatus:
         fake_local = tmp_path / "local"
 
         monkeypatch.setattr(
-            "simpletask.core.ai_templates.get_global_commands_dir", lambda: fake_global
+            "simpletask.core.ai_templates._get_global_commands_dir",
+            lambda editor: fake_global,
         )
         monkeypatch.setattr(
-            "simpletask.core.ai_templates.get_local_commands_dir", lambda: fake_local
+            "simpletask.core.ai_templates._get_local_commands_dir",
+            lambda editor: fake_local,
         )
 
         status = get_installed_status()
@@ -192,10 +202,12 @@ class TestGetInstalledStatus:
         install_templates(fake_global, no_overwrite=False)
 
         monkeypatch.setattr(
-            "simpletask.core.ai_templates.get_global_commands_dir", lambda: fake_global
+            "simpletask.core.ai_templates._get_global_commands_dir",
+            lambda editor: fake_global,
         )
         monkeypatch.setattr(
-            "simpletask.core.ai_templates.get_local_commands_dir", lambda: fake_local
+            "simpletask.core.ai_templates._get_local_commands_dir",
+            lambda editor: fake_local,
         )
 
         status = get_installed_status()
@@ -215,10 +227,12 @@ class TestGetInstalledStatus:
         install_templates(fake_local, no_overwrite=False)
 
         monkeypatch.setattr(
-            "simpletask.core.ai_templates.get_global_commands_dir", lambda: fake_global
+            "simpletask.core.ai_templates._get_global_commands_dir",
+            lambda editor: fake_global,
         )
         monkeypatch.setattr(
-            "simpletask.core.ai_templates.get_local_commands_dir", lambda: fake_local
+            "simpletask.core.ai_templates._get_local_commands_dir",
+            lambda editor: fake_local,
         )
 
         status = get_installed_status()
@@ -240,10 +254,12 @@ class TestGetInstalledStatus:
         install_templates(fake_local, no_overwrite=False)
 
         monkeypatch.setattr(
-            "simpletask.core.ai_templates.get_global_commands_dir", lambda: fake_global
+            "simpletask.core.ai_templates._get_global_commands_dir",
+            lambda editor: fake_global,
         )
         monkeypatch.setattr(
-            "simpletask.core.ai_templates.get_local_commands_dir", lambda: fake_local
+            "simpletask.core.ai_templates._get_local_commands_dir",
+            lambda editor: fake_local,
         )
 
         status = get_installed_status()
@@ -344,7 +360,7 @@ class TestInstallQwenTemplates:
         existing_file = target_dir / "simpletask.plan.toml"
         existing_file.write_text("old content")
 
-        installed, skipped, overwritten = install_qwen_templates(target_dir, no_overwrite=False)
+        installed, _skipped, overwritten = install_qwen_templates(target_dir, no_overwrite=False)
 
         # Should report one overwrite
         assert "simpletask.plan.toml" in overwritten
@@ -407,10 +423,12 @@ class TestGetQwenInstalledStatus:
         fake_local = tmp_path / "local"
 
         monkeypatch.setattr(
-            "simpletask.core.ai_templates.get_global_qwen_commands_dir", lambda: fake_global
+            "simpletask.core.ai_templates._get_global_commands_dir",
+            lambda editor: fake_global,
         )
         monkeypatch.setattr(
-            "simpletask.core.ai_templates.get_local_qwen_commands_dir", lambda: fake_local
+            "simpletask.core.ai_templates._get_local_commands_dir",
+            lambda editor: fake_local,
         )
 
         status = get_qwen_installed_status()
@@ -430,10 +448,12 @@ class TestGetQwenInstalledStatus:
         install_qwen_templates(fake_global, no_overwrite=False)
 
         monkeypatch.setattr(
-            "simpletask.core.ai_templates.get_global_qwen_commands_dir", lambda: fake_global
+            "simpletask.core.ai_templates._get_global_commands_dir",
+            lambda editor: fake_global,
         )
         monkeypatch.setattr(
-            "simpletask.core.ai_templates.get_local_qwen_commands_dir", lambda: fake_local
+            "simpletask.core.ai_templates._get_local_commands_dir",
+            lambda editor: fake_local,
         )
 
         status = get_qwen_installed_status()
@@ -453,10 +473,12 @@ class TestGetQwenInstalledStatus:
         install_qwen_templates(fake_local, no_overwrite=False)
 
         monkeypatch.setattr(
-            "simpletask.core.ai_templates.get_global_qwen_commands_dir", lambda: fake_global
+            "simpletask.core.ai_templates._get_global_commands_dir",
+            lambda editor: fake_global,
         )
         monkeypatch.setattr(
-            "simpletask.core.ai_templates.get_local_qwen_commands_dir", lambda: fake_local
+            "simpletask.core.ai_templates._get_local_commands_dir",
+            lambda editor: fake_local,
         )
 
         status = get_qwen_installed_status()
@@ -478,10 +500,12 @@ class TestGetQwenInstalledStatus:
         install_qwen_templates(fake_local, no_overwrite=False)
 
         monkeypatch.setattr(
-            "simpletask.core.ai_templates.get_global_qwen_commands_dir", lambda: fake_global
+            "simpletask.core.ai_templates._get_global_commands_dir",
+            lambda editor: fake_global,
         )
         monkeypatch.setattr(
-            "simpletask.core.ai_templates.get_local_qwen_commands_dir", lambda: fake_local
+            "simpletask.core.ai_templates._get_local_commands_dir",
+            lambda editor: fake_local,
         )
 
         status = get_qwen_installed_status()

@@ -1,6 +1,6 @@
 """New command - Create a new task file and git branch."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import typer
 
@@ -55,8 +55,8 @@ def new(
             title=prompt.split("\n")[0] if "\n" in prompt else prompt,  # First line as title
             original_prompt=prompt,
             status=TaskStatus.NOT_STARTED,
-            created=datetime.now(timezone.utc),
-            updated=datetime.now(timezone.utc),
+            created=datetime.now(UTC),
+            updated=datetime.now(UTC),
             acceptance_criteria=[
                 AcceptanceCriterion(
                     id="AC1", description="Task completion criteria (to be filled)", completed=False

@@ -1,6 +1,6 @@
 [project]
 name = "simpletask"
-version = "0.1.5"
+version = "0.1.6"
 description = "CLI tool for managing AI-friendly task definitions in branch-based development workflows"
 requires-python = ">=3.11"
 license = {text = "MIT"}
@@ -57,6 +57,8 @@ include = '\.pyi?$'
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+
+[tool.ruff.lint]
 select = [
     "E",    # pycodestyle errors
     "W",    # pycodestyle warnings
@@ -64,9 +66,21 @@ select = [
     "I",    # isort
     "C",    # flake8-comprehensions
     "B",    # flake8-bugbear
+    "UP",   # pyupgrade - modernize Python code
+    "SIM",  # flake8-simplify - simplify code
+    "PIE",  # flake8-pie - misc lints
+    "TRY",  # tryceratops - exception handling
+    "RUF",  # ruff-specific rules
 ]
 ignore = [
-    "E501",  # line too long (black handles this)
+    "E501",    # line too long (black handles this)
+    "TRY003",  # avoid specifying long messages outside exception class
+    "SIM102",  # nested if statements - sometimes more readable
+    "SIM117",  # nested with statements - sometimes more readable
+    "TRY300",  # consider moving to else block - often less readable
+    "TRY301",  # abstract raise to inner function - not always beneficial
+    "C901",    # function too complex - pre-existing
+    "RUF001",  # ambiguous unicode character - intentional (info icon)
 ]
 
 [tool.mypy]
@@ -74,6 +88,12 @@ python_version = "3.11"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = false
+plugins = ["pydantic.mypy"]
+
+[tool.pydantic-mypy]
+init_forbid_extra = true
+init_typed = true
+warn_required_dynamic_aliases = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -1,7 +1,5 @@
 """Add implementation task command."""
 
-from typing import Optional
-
 import typer
 
 from simpletask.core.models import TaskStatus
@@ -12,8 +10,8 @@ from simpletask.utils.console import error, success
 
 def add_command(
     name: str = typer.Argument(..., help="Task name"),
-    goal: Optional[str] = typer.Option(None, "--goal", "-g", help="Task goal/description"),
-    branch: Optional[str] = typer.Option(
+    goal: str | None = typer.Option(None, "--goal", "-g", help="Task goal/description"),
+    branch: str | None = typer.Option(
         None, "--branch", "-b", help="Branch name (defaults to current git branch)"
     ),
 ) -> None:

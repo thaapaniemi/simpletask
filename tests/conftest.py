@@ -1,8 +1,8 @@
 """Shared pytest fixtures for simpletask tests."""
 
-from datetime import datetime, timezone
+from collections.abc import Generator
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Generator
 
 import git
 import pytest
@@ -18,7 +18,7 @@ from simpletask.core.yaml_parser import write_task_file
 @pytest.fixture
 def sample_spec() -> SimpleTaskSpec:
     """Create a sample SimpleTaskSpec object for testing."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     return SimpleTaskSpec(
         schema_version="1.0",
         branch="test-feature",

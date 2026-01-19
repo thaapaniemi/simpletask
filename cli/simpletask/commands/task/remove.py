@@ -1,7 +1,5 @@
 """Remove implementation task command."""
 
-from typing import Optional
-
 import typer
 
 from simpletask.core.project import get_task_file_path
@@ -12,7 +10,7 @@ from simpletask.utils.console import confirm, error, success
 def remove_command(
     task_id: str = typer.Argument(..., help="Task ID (e.g., T001)"),
     force: bool = typer.Option(False, "--force", "-f", help="Skip confirmation prompt"),
-    branch: Optional[str] = typer.Option(
+    branch: str | None = typer.Option(
         None, "--branch", "-b", help="Branch name (defaults to current git branch)"
     ),
 ) -> None:

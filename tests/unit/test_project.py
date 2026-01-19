@@ -80,7 +80,7 @@ class TestProjectHasTask:
 
     def test_has_task_exists(self, tmp_project_with_task):
         """Test has_task returns True for existing task file."""
-        project_root, task_file = tmp_project_with_task
+        project_root, _task_file = tmp_project_with_task
         project = Project(root=project_root)
         assert project.has_task("test-feature")
 
@@ -107,7 +107,7 @@ class TestProjectListTasks:
 
     def test_list_tasks_single(self, tmp_project_with_task):
         """Test list_tasks returns single task."""
-        project_root, task_file = tmp_project_with_task
+        project_root, _task_file = tmp_project_with_task
         project = Project(root=project_root)
         tasks = project.list_tasks()
         assert tasks == ["test-feature"]

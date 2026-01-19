@@ -101,10 +101,10 @@ def branch_exists(branch_name: str, repo_path: Path | None = None) -> bool:
 # Export public API
 __all__ = [
     "GIT_AVAILABLE",
-    "is_git_repo",
-    "get_git_repo",
-    "current_branch",
-    "is_main_branch",
-    "create_branch",
     "branch_exists",
+    "create_branch",
+    "current_branch",
+    "get_git_repo",
+    "is_git_repo",
+    "is_main_branch",
 ]

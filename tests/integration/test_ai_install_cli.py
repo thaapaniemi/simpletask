@@ -3,10 +3,8 @@
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
-from typer.testing import CliRunner
-
 from simpletask import app
+from typer.testing import CliRunner
 
 runner = CliRunner()
 
