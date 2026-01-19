@@ -10,7 +10,6 @@ This guide covers how to integrate simpletask with AI editors using the Model Co
 - [Configuration](#configuration)
   - [OpenCode](#opencode)
   - [Qwen-CLI](#qwen-cli)
-  - [Claude Desktop](#claude-desktop)
   - [Other MCP Clients](#other-mcp-clients)
 - [Available Tools](#available-tools)
   - [simpletask_get](#simpletask_get)
@@ -92,17 +91,19 @@ The server runs on stdio transport and waits for MCP client connections.
 OpenCode is an AI code editor with native MCP support.
 
 **Configuration file location:**
-- Linux/macOS: `~/.config/opencode/settings.json`
-- Windows: `%APPDATA%\opencode\settings.json`
+- Linux/macOS: `~/.config/opencode/opencode.json`
+- Windows: `%APPDATA%\opencode\opencode.json`
 
 **Add this configuration:**
 
 ```json
 {
-  "mcpServers": {
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
     "simpletask": {
-      "command": "simpletask",
-      "args": ["serve"]
+      "type": "local",
+      "command": ["simpletask", "serve"],
+      "enabled": true
     }
   }
 }
@@ -112,10 +113,12 @@ OpenCode is an AI code editor with native MCP support.
 
 ```json
 {
-  "mcpServers": {
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
     "simpletask": {
-      "command": "/path/to/venv/bin/simpletask",
-      "args": ["serve"]
+      "type": "local",
+      "command": ["/path/to/venv/bin/simpletask", "serve"],
+      "enabled": true
     }
   }
 }
@@ -179,49 +182,6 @@ Qwen-CLI is a command-line AI assistant with MCP support.
 **Verify connection:**
 ```sh
 qwen-cli "List available MCP tools"
-```
-
-### Claude Desktop
-
-Claude Desktop supports MCP servers on macOS, Windows, and Linux.
-
-**Configuration file location:**
-- macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
-- Windows: `%APPDATA%\Claude\claude_desktop_config.json`
-- Linux: `~/.config/Claude/claude_desktop_config.json`
-
-**Add this configuration:**
-
-```json
-{
-  "mcpServers": {
-    "simpletask": {
-      "command": "simpletask",
-      "args": ["serve"]
-    }
-  }
-}
-```
-
-**If simpletask is installed in a virtualenv**, use the full path:
-
-```json
-{
-  "mcpServers": {
-    "simpletask": {
-      "command": "/home/user/.local/share/uv/tools/simpletask/bin/simpletask",
-      "args": ["serve"]
-    }
-  }
-}
-```
-
-**Restart Claude Desktop** after adding the configuration.
-
-**Verify connection:**
-Ask Claude:
-```
-"What MCP tools do you have access to?"
 ```
 
 ### Other MCP Clients
@@ -555,7 +515,7 @@ Fix these errors and validate again.
 
 1. **Verify configuration syntax:**
    - Check JSON is valid (use `jq` or a JSON validator)
-   - Ensure `"command"` and `"args"` fields are correct
+   - Ensure `"command"` field is a proper array format: `["simpletask", "serve"]`
 
 2. **Check server is configured:**
    Look for `"simpletask"` in your editor's MCP servers config.
@@ -565,7 +525,6 @@ Fix these errors and validate again.
 
 4. **Check editor logs:**
    - OpenCode: Help → Toggle Developer Tools → Console
-   - Claude Desktop: Check application logs
 
 ### Permission Denied
 
@@ -590,7 +549,7 @@ Fix these errors and validate again.
 3. **Use absolute path:**
    In your config, use full path instead of just `"simpletask"`:
    ```json
-   "command": "/home/user/.local/share/uv/tools/simpletask/bin/simpletask"
+   "command": ["/home/user/.local/share/uv/tools/simpletask/bin/simpletask", "serve"]
    ```
 
 ### Invalid Branch Name

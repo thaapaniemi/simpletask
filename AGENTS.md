@@ -189,17 +189,41 @@ Configure your AI editor to connect to the simpletask MCP server.
 
 #### OpenCode Configuration
 
-Add to `~/.config/opencode/settings.json`:
+Add to `~/.config/opencode/opencode.json`:
 
 ```json
 {
-  "mcpServers": {
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
     "simpletask": {
-      "command": "simpletask",
-      "args": ["serve"]
+      "type": "local",
+      "command": ["simpletask", "serve"],
+      "enabled": true
     }
   }
 }
+```
+
+**Note:** If simpletask is installed in a virtualenv, use the full path to the executable:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "simpletask": {
+      "type": "local",
+      "command": ["/path/to/venv/bin/simpletask", "serve"],
+      "enabled": true
+    }
+  }
+}
+```
+
+To find the full path:
+```sh
+which simpletask
+# or
+uv tool dir simpletask
 ```
 
 #### Claude Desktop Configuration
