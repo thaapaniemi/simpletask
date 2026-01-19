@@ -171,6 +171,154 @@ ruff check --fix .
 mypy cli/simpletask
 ```
 
+## MCP Server
+
+simpletask includes a Model Context Protocol (MCP) server for AI editor integration. The server exposes task file operations as tools that AI assistants can use to read and query task definitions.
+
+### Starting the Server
+
+```bash
+simpletask serve
+```
+
+This starts the MCP server on stdio transport. The server runs until the client disconnects or the process is terminated.
+
+### Configuration
+
+Configure your AI editor to connect to the simpletask MCP server.
+
+#### OpenCode Configuration
+
+Add to `~/.config/opencode/settings.json`:
+
+```json
+{
+  "mcpServers": {
+    "simpletask": {
+      "command": "simpletask",
+      "args": ["serve"]
+    }
+  }
+}
+```
+
+#### Claude Desktop Configuration
+
+Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or equivalent:
+
+```json
+{
+  "mcpServers": {
+    "simpletask": {
+      "command": "simpletask",
+      "args": ["serve"]
+    }
+  }
+}
+```
+
+**Note:** If simpletask is installed in a virtualenv, use the full path to the executable:
+
+```json
+{
+  "mcpServers": {
+    "simpletask": {
+      "command": "/path/to/venv/bin/simpletask",
+      "args": ["serve"]
+    }
+  }
+}
+```
+
+### Available Tools
+
+The MCP server exposes 2 read-only tools:
+
+| Tool | Description | Parameters |
+|------|-------------|------------|
+| `simpletask_get` | Get complete task specification with status summary | `branch` (str, optional): Branch name or None for current<br>`validate` (bool, optional): Include schema validation (default: false) |
+| `simpletask_list` | List all task file branch names in the project | None |
+
+### Tool Details
+
+#### simpletask_get
+
+Returns enriched task data with pre-computed status counts:
+
+**Parameters:**
+- `branch` (optional): Branch name, or omit to use current git branch. The branch name will be normalized (e.g., `feature/auth` → `feature-auth.yml`).
+- `validate` (optional): Whether to include schema validation result. Default is `false` to reduce overhead.
+
+**Returns:** `SimpleTaskGetResponse` with:
+- `spec`: Full `SimpleTaskSpec` (branch, title, acceptance_criteria, tasks, etc.)
+- `file_path`: Path to task YAML file
+- `summary`: Pre-computed `StatusSummary` with:
+  - `branch`, `title`, `overall_status`
+  - `criteria_total`, `criteria_completed`
+  - `tasks_total`, `tasks_completed`, `tasks_in_progress`, `tasks_not_started`, `tasks_blocked`
+- `validation` (optional): `ValidationResult` with `valid` (bool) and `errors` (list)
+
+**Example Response Structure:**
+
+```json
+{
+  "spec": {
+    "branch": "feature/mcp-server",
+    "title": "Add MCP server support",
+    "status": "in_progress",
+    "acceptance_criteria": [...],
+    "tasks": [...]
+  },
+  "file_path": ".tasks/feature-mcp-server.yml",
+  "summary": {
+    "branch": "feature/mcp-server",
+    "title": "Add MCP server support",
+    "overall_status": "in_progress",
+    "criteria_total": 8,
+    "criteria_completed": 0,
+    "tasks_total": 11,
+    "tasks_completed": 5,
+    "tasks_in_progress": 1,
+    "tasks_not_started": 5,
+    "tasks_blocked": 0
+  },
+  "validation": null
+}
+```
+
+#### simpletask_list
+
+Returns list of all task branch names (original names, not normalized filenames).
+
+**Returns:** `list[str]` - Branch names sorted alphabetically
+
+**Example:**
+
+```json
+[
+  "feature/mcp-server-support",
+  "bugfix/issue-123",
+  "refactor/clean-models"
+]
+```
+
+### Error Handling
+
+MCP tools raise exceptions for errors:
+- `ValueError`: Not in a git repository, or branch is None and not on a git branch
+- `FileNotFoundError`: Task file doesn't exist for the specified branch
+- `InvalidTaskFileError`: YAML file is malformed or invalid
+
+MCP handles exception-to-error-response conversion automatically.
+
+### Security
+
+Path traversal attacks via the `branch` parameter are prevented:
+- `normalize_branch_name()` converts `..` to `--` (double hyphens)
+- Special characters are replaced with hyphens
+- All paths are constrained to `.tasks/` directory
+- Security tests verify these protections in `tests/unit/test_mcp_tools.py`
+
 ## Code Style
 
 ### Naming Conventions

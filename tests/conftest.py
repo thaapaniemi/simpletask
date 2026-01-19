@@ -201,3 +201,124 @@ def tmp_git_project_with_task(
     write_task_file(task_file, spec, update_timestamp=False)
 
     yield tmp_project, branch_name, task_file
+
+
+@pytest.fixture
+def sample_spec_no_tasks() -> SimpleTaskSpec:
+    """Task spec with no implementation tasks."""
+    now = datetime.now(UTC)
+    return SimpleTaskSpec(
+        schema_version="1.0",
+        branch="test-no-tasks",
+        title="Test No Tasks",
+        original_prompt="Test prompt",
+        status=TaskStatus.NOT_STARTED,
+        created=now,
+        updated=now,
+        acceptance_criteria=[
+            AcceptanceCriterion(id="AC1", description="Criterion 1", completed=False),
+        ],
+        tasks=None,  # No tasks
+    )
+
+
+@pytest.fixture
+def sample_spec_mixed_statuses() -> SimpleTaskSpec:
+    """Task spec with all task statuses represented."""
+    now = datetime.now(UTC)
+    return SimpleTaskSpec(
+        schema_version="1.0",
+        branch="test-mixed",
+        title="Test Mixed Statuses",
+        original_prompt="Test prompt",
+        status=TaskStatus.IN_PROGRESS,
+        created=now,
+        updated=now,
+        acceptance_criteria=[
+            AcceptanceCriterion(id="AC1", description="Done", completed=True),
+            AcceptanceCriterion(id="AC2", description="Not done", completed=False),
+        ],
+        tasks=[
+            Task(
+                id="T001",
+                name="Done",
+                status=TaskStatus.COMPLETED,
+                goal="G",
+                steps=["S"],
+            ),
+            Task(
+                id="T002",
+                name="WIP",
+                status=TaskStatus.IN_PROGRESS,
+                goal="G",
+                steps=["S"],
+            ),
+            Task(
+                id="T003",
+                name="Blocked",
+                status=TaskStatus.BLOCKED,
+                goal="G",
+                steps=["S"],
+            ),
+            Task(
+                id="T004",
+                name="Todo",
+                status=TaskStatus.NOT_STARTED,
+                goal="G",
+                steps=["S"],
+            ),
+        ],
+    )
+
+
+@pytest.fixture
+def sample_spec_all_completed() -> SimpleTaskSpec:
+    """Task spec with all criteria and tasks completed."""
+    now = datetime.now(UTC)
+    return SimpleTaskSpec(
+        schema_version="1.0",
+        branch="test-all-done",
+        title="Test All Completed",
+        original_prompt="Test prompt",
+        status=TaskStatus.COMPLETED,
+        created=now,
+        updated=now,
+        acceptance_criteria=[
+            AcceptanceCriterion(id="AC1", description="Criterion 1", completed=True),
+            AcceptanceCriterion(id="AC2", description="Criterion 2", completed=True),
+        ],
+        tasks=[
+            Task(
+                id="T001",
+                name="Task 1",
+                status=TaskStatus.COMPLETED,
+                goal="G",
+                steps=["S"],
+            ),
+            Task(
+                id="T002",
+                name="Task 2",
+                status=TaskStatus.COMPLETED,
+                goal="G",
+                steps=["S"],
+            ),
+        ],
+    )
+
+
+@pytest.fixture
+def sample_spec_minimal() -> SimpleTaskSpec:
+    """Minimum valid spec."""
+    now = datetime.now(UTC)
+    return SimpleTaskSpec(
+        schema_version="1.0",
+        branch="test-minimal",
+        title="Minimal",
+        original_prompt="Test",
+        status=TaskStatus.NOT_STARTED,
+        created=now,
+        updated=now,
+        acceptance_criteria=[
+            AcceptanceCriterion(id="AC1", description="Done", completed=False),
+        ],
+    )
