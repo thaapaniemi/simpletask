@@ -1,8 +1,80 @@
 """Project management utilities for simpletask."""
 
+import re
+import unicodedata
 from pathlib import Path
 
+from ..utils.console import warning
 from .git import current_branch, is_git_repo
+from .yaml_parser import parse_task_file
+
+# Constants
+TASK_FILE_EXTENSION = ".yml"
+_DOUBLEDOT_MARKER = "\x00DOUBLEDOT\x00"  # Internal: security marker during normalization
+
+
+def normalize_branch_name(branch: str, max_length: int = 200) -> str:
+    """Normalize branch name to a safe filename.
+
+    Converts branch names to filesystem-safe filenames by:
+    - Converting to lowercase
+    - Replacing slashes and special characters with hyphens
+    - Converting unicode to ASCII (NFD decomposition + ASCII filter)
+    - Replacing .. with -- (security: prevent parent traversal)
+    - Collapsing multiple hyphens to single
+    - Trimming leading/trailing hyphens
+    - Limiting length
+
+    Args:
+        branch: Git branch name
+        max_length: Maximum filename length (default: 200)
+
+    Returns:
+        Normalized filename (without .yml extension)
+
+    Raises:
+        ValueError: If branch normalizes to empty string
+
+    Examples:
+        >>> normalize_branch_name("feature/user-auth")
+        'feature-user-auth'
+        >>> normalize_branch_name("Fix: Bug in <Module>")
+        'fix-bug-in-module'
+    """
+    # Convert to lowercase
+    normalized = branch.lower()
+
+    # Convert unicode to ASCII (NFD decomposition + ASCII filter)
+    normalized = unicodedata.normalize("NFD", normalized)
+    normalized = "".join(c for c in normalized if unicodedata.category(c) != "Mn")
+    normalized = normalized.encode("ascii", "ignore").decode("ascii")
+
+    # Replace .. with special marker before other replacements (security: prevent parent traversal)
+    # Use a character that won't be affected by other replacements
+    normalized = normalized.replace("..", _DOUBLEDOT_MARKER)
+
+    # Replace special characters and slashes with hyphens
+    # Keep dots, underscores, and hyphens; replace everything else
+    normalized = re.sub(r'[/\\:*?"<>|\s()[\]{}]', "-", normalized)
+
+    # Collapse multiple hyphens to single
+    normalized = re.sub(r"-+", "-", normalized)
+
+    # Restore double dots as double dashes (after collapsing)
+    normalized = normalized.replace(_DOUBLEDOT_MARKER, "--")
+
+    # Trim leading/trailing hyphens (but not double dashes in middle)
+    normalized = normalized.strip("-")
+
+    # Limit length
+    if len(normalized) > max_length:
+        normalized = normalized[:max_length].rstrip("-")
+
+    # Ensure not empty
+    if not normalized:
+        raise ValueError(f"Branch name '{branch}' normalizes to empty string")
+
+    return normalized
 
 
 class Project:
@@ -31,8 +103,16 @@ class Project:
         return self.root / ".tasks"
 
     def get_task_file(self, branch: str) -> Path:
-        """Get task file path for a branch."""
-        return self.tasks_dir / f"{branch}.yml"
+        """Get task file path for a branch.
+
+        Args:
+            branch: Original branch name (will be normalized)
+
+        Returns:
+            Path to normalized task file (.tasks/<normalized-branch>.yml)
+        """
+        normalized = normalize_branch_name(branch)
+        return self.tasks_dir / f"{normalized}{TASK_FILE_EXTENSION}"
 
     def has_task(self, branch: str) -> bool:
         """Check if task file exists for branch."""
@@ -41,17 +121,27 @@ class Project:
     def list_tasks(self) -> list[str]:
         """List all task branch names in project.
 
+        Reads the 'branch' field from each YAML file to return original branch names,
+        not normalized filenames.
+
         Returns:
-            List of branch names (without .yml extension)
+            List of branch names (original, not normalized), sorted alphabetically
         """
         if not self.tasks_dir.exists():
             return []
 
         tasks = []
         for item in sorted(self.tasks_dir.iterdir()):
-            if item.is_file() and item.suffix == ".yml":
-                tasks.append(item.stem)  # Remove .yml extension
-        return tasks
+            if item.is_file() and item.suffix == TASK_FILE_EXTENSION:
+                try:
+                    spec = parse_task_file(item)
+                    tasks.append(spec.branch)
+                except Exception as e:
+                    # Warn about invalid task files instead of silently skipping
+                    warning(f"Skipping invalid task file {item.name}: {e}")
+                    continue
+
+        return sorted(tasks)
 
     def is_git_project(self) -> bool:
         """Check if project uses Git."""
@@ -113,4 +203,5 @@ __all__ = [
     "ensure_project",
     "find_project",
     "get_task_file_path",
+    "normalize_branch_name",
 ]

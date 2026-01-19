@@ -103,9 +103,9 @@ Use simpletask CLI to create the task file:
 simpletask new [branch-name] "[original prompt from $ARGUMENTS]" -y
 ```
 
-This creates `.tasks/[branch-name].yml` with the basic structure.
+This creates a task file with the basic structure.
 
-**Note:** The branch name becomes both the git branch and the task file name. For `feature/user-authentication`, the file will be `.tasks/feature/user-authentication.yml` (with directory) or `.tasks/feature-user-authentication.yml` (flattened, depending on simpletask behavior).
+**Note:** The branch name is normalized for the filename - slashes and special characters become hyphens, and it's converted to lowercase. For `feature/user-authentication`, the file will be `.tasks/feature-user-authentication.yml` (flat structure, normalized).
 
 **Step 4: Plan Acceptance Criteria**
 
@@ -208,7 +208,7 @@ Edit `.tasks/[branch-name].yml` directly to add:
 
 3. Report completion:
    ```
-   Task file created/updated: .tasks/[branch-name].yml
+   Task file created/updated: .tasks/[normalized-branch-name].yml
    
    Summary:
    - Branch: [branch-name]
@@ -395,7 +395,7 @@ Final Verification:
 **STOP HERE. Do NOT proceed to implementation.**
 
 The planning phase is complete when:
-1. Task file exists at `.tasks/[branch-name].yml`
+1. Task file exists at `.tasks/[normalized-branch-name].yml` (branch name converted to lowercase with special chars as hyphens)
 2. All acceptance criteria are defined
 3. All implementation tasks are detailed with steps, done_when, and prerequisites
 4. `simpletask schema validate` passes

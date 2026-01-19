@@ -45,6 +45,34 @@ class TestProject:
         assert task_file == tmp_project / ".tasks" / "feature-branch.yml"
 
 
+class TestProjectGetTaskFileNormalized:
+    """Tests for get_task_file with normalization."""
+
+    def test_get_task_file_with_slash(self, tmp_project):
+        """Test get_task_file normalizes slashes."""
+        project = Project(root=tmp_project)
+        task_file = project.get_task_file("feature/auth")
+        assert task_file == tmp_project / ".tasks" / "feature-auth.yml"
+
+    def test_get_task_file_with_special_chars(self, tmp_project):
+        """Test get_task_file normalizes special characters."""
+        project = Project(root=tmp_project)
+        task_file = project.get_task_file("feat: add auth")
+        assert task_file == tmp_project / ".tasks" / "feat-add-auth.yml"
+
+    def test_get_task_file_with_uppercase(self, tmp_project):
+        """Test get_task_file converts to lowercase."""
+        project = Project(root=tmp_project)
+        task_file = project.get_task_file("Feature/Auth")
+        assert task_file == tmp_project / ".tasks" / "feature-auth.yml"
+
+    def test_get_task_file_complex_normalization(self, tmp_project):
+        """Test get_task_file with complex branch names."""
+        project = Project(root=tmp_project)
+        task_file = project.get_task_file("refactor/dry-violations-cleanup")
+        assert task_file == tmp_project / ".tasks" / "refactor-dry-violations-cleanup.yml"
+
+
 class TestProjectFindRoot:
     """Tests for Project._find_root() static method."""
 
@@ -112,32 +140,95 @@ class TestProjectListTasks:
         tasks = project.list_tasks()
         assert tasks == ["test-feature"]
 
-    def test_list_tasks_multiple(self, tmp_project, sample_yaml_content):
+    def test_list_tasks_multiple(self, tmp_project):
         """Test list_tasks returns multiple tasks sorted."""
         tasks_dir = tmp_project / ".tasks"
-        (tasks_dir / "feature-a.yml").write_text(sample_yaml_content)
-        (tasks_dir / "feature-b.yml").write_text(sample_yaml_content)
-        (tasks_dir / "bugfix-x.yml").write_text(sample_yaml_content)
+
+        # Create YAML files with branch field matching expected names
+        yaml_a = """schema_version: '1.0'
+branch: feature-a
+title: Feature A
+original_prompt: Test
+status: not_started
+acceptance_criteria:
+  - id: AC1
+    description: Test
+    completed: false
+"""
+        yaml_b = """schema_version: '1.0'
+branch: feature-b
+title: Feature B
+original_prompt: Test
+status: not_started
+acceptance_criteria:
+  - id: AC1
+    description: Test
+    completed: false
+"""
+        yaml_x = """schema_version: '1.0'
+branch: bugfix-x
+title: Bugfix X
+original_prompt: Test
+status: not_started
+acceptance_criteria:
+  - id: AC1
+    description: Test
+    completed: false
+"""
+        (tasks_dir / "feature-a.yml").write_text(yaml_a)
+        (tasks_dir / "feature-b.yml").write_text(yaml_b)
+        (tasks_dir / "bugfix-x.yml").write_text(yaml_x)
 
         project = Project(root=tmp_project)
         tasks = project.list_tasks()
         assert tasks == ["bugfix-x", "feature-a", "feature-b"]
 
-    def test_list_tasks_ignores_non_yml(self, tmp_project, sample_yaml_content):
-        """Test list_tasks ignores non-yml files."""
+    def test_list_tasks_warns_on_invalid_files(self, tmp_project, capsys):
+        """Test that list_tasks warns about invalid task files instead of silently skipping."""
         tasks_dir = tmp_project / ".tasks"
-        (tasks_dir / "feature.yml").write_text(sample_yaml_content)
-        (tasks_dir / "README.md").write_text("# Notes")
-        (tasks_dir / "backup.txt").write_text("backup")
+
+        # Create invalid YAML file
+        (tasks_dir / "invalid.yml").write_text("this is: not: valid: yaml:::")
+
+        # Create valid YAML file
+        valid_yaml = """schema_version: '1.0'
+branch: valid-task
+title: Valid Task
+original_prompt: Test
+status: not_started
+acceptance_criteria:
+  - id: AC1
+    description: Test
+    completed: false
+"""
+        (tasks_dir / "valid-task.yml").write_text(valid_yaml)
 
         project = Project(root=tmp_project)
         tasks = project.list_tasks()
-        assert tasks == ["feature"]
 
-    def test_list_tasks_ignores_directories(self, tmp_project, sample_yaml_content):
+        # Should only include the valid task
+        assert tasks == ["valid-task"]
+
+        # Should have warned about the invalid file
+        captured = capsys.readouterr()
+        assert "Skipping invalid task file invalid.yml" in captured.out
+
+    def test_list_tasks_ignores_directories(self, tmp_project):
         """Test list_tasks ignores directories."""
         tasks_dir = tmp_project / ".tasks"
-        (tasks_dir / "feature.yml").write_text(sample_yaml_content)
+
+        # Create YAML with branch matching expected name
+        yaml_content = """schema_version: '1.0'
+branch: feature
+title: Feature
+original_prompt: Test
+status: not_started
+acceptance_criteria:
+  - id: AC1
+    description: Test
+    completed: false
+"""
+        (tasks_dir / "feature.yml").write_text(yaml_content)
         (tasks_dir / "subdir").mkdir()
 
         project = Project(root=tmp_project)
