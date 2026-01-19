@@ -98,26 +98,15 @@ ruff check src/
 simpletask task update [TASK_ID] --status completed
 ```
 
-### 3.6 Commit Changes
+**Note:** Do NOT commit changes yet. All changes will be committed in a single commit after all tasks are complete.
 
-Commit BOTH the implementation AND the updated task file:
-```bash
-git add -A
-git commit -m "[branch-name] [TASK_ID]: [task name or brief description]"
-```
-
-Example commit messages:
-- `[001-user-auth] T001: Create User model`
-- `[001-user-auth] T002: Implement auth routes`
-- `[001-user-auth] T003: Add authentication tests`
-
-### 3.7 Repeat for Next Task
+### 3.6 Repeat for Next Task
 
 Continue with the next task in the execution order until all tasks are complete.
 
 **Step 4: Update Acceptance Criteria - THIS IS MANDATORY**
 
-After completing tasks, evaluate which acceptance criteria are now satisfied.
+After completing ALL tasks, evaluate which acceptance criteria are now satisfied.
 
 1. List current criteria status:
    ```bash
@@ -141,7 +130,9 @@ After completing tasks, evaluate which acceptance criteria are now satisfied.
    simpletask criteria list --completed
    ```
 
-**Step 5: Final Verification**
+**Note:** Do NOT commit changes yet. Criteria updates will be committed along with implementation.
+
+**Step 5: Final Verification and Commit**
 
 1. Validate the task file schema:
    ```bash
@@ -165,11 +156,29 @@ After completing tasks, evaluate which acceptance criteria are now satisfied.
    simpletask task list --status blocked
    ```
 
-5. Final commit if needed:
+5. Create a single commit with ALL implementation changes:
+   
+   First, determine what the feature accomplishes by reading the task file goal/title.
+   
    ```bash
+   # Stage implementation changes (exclude .tasks/ as it's gitignored)
    git add -A
-   git commit -m "[branch-name] Complete implementation"
+   
+   # Commit using conventional commit format
+   # Format: feat: <description of what was implemented>
+   # Example: feat: add user authentication system
+   # Example: feat: implement JWT-based login flow
+   # Example: fix: resolve race condition in task scheduler
+   git commit -m "feat: <describe the implemented feature based on branch goal>"
    ```
+   
+   **Commit message guidelines:**
+   - Use `feat:` for new features
+   - Use `fix:` for bug fixes
+   - Use `refactor:` for code restructuring
+   - Use `test:` for adding tests
+   - Keep description concise but meaningful
+   - Focus on WHAT was implemented, not HOW
 
 **Step 6: Report Progress**
 
@@ -189,8 +198,8 @@ Acceptance Criteria:
 Files Modified:
   - [list key files]
 
-Commits Created:
-  - [list commit messages]
+Commit:
+  - feat: [description of implemented feature]
 
 Next Steps:
   - Run /simpletask.review to verify implementation quality
@@ -318,26 +327,22 @@ Updated task T001
 $ python -c "from src.models.user import User; print('Import OK')"
 Import OK
 
-# 5. Mark task complete
+# 5. Mark task complete (no commit yet)
 $ simpletask task update T001 --status completed
 Updated task T001
 
-# 6. Commit changes
-$ git add -A
-$ git commit -m "[001-user-auth] T001: Create User model"
-
-# 7. Continue with T002...
+# 6. Continue with T002...
 $ simpletask task update T002 --status in_progress
 
 # [... implement remaining tasks ...]
 
-# 8. After all tasks, mark acceptance criteria
+# 7. After all tasks, mark acceptance criteria
 $ simpletask criteria complete AC1
 Marked AC1 as completed
 $ simpletask criteria complete AC2
 Marked AC2 as completed
 
-# 9. Final verification
+# 8. Final verification
 $ simpletask schema validate
 Validation passed
 $ simpletask show
@@ -345,6 +350,12 @@ Branch: 001-user-auth
 Status: completed
 Tasks: 3 (3 completed)
 Criteria: 4 (4 completed)
+
+# 9. Create single commit with all changes
+$ git add -A
+$ git commit -m "feat: add user authentication system"
+[001-user-auth abc1234] feat: add user authentication system
+ 3 files changed, 150 insertions(+)
 ```
 
 ---
@@ -381,17 +392,22 @@ After `/simpletask.review`, if you see "ACCEPTANCE CRITERIA INCOMPLETE":
 
 **MANDATORY after EACH task:**
 1. `simpletask task update [ID] --status completed`
-2. `git add -A && git commit -m "[branch] [ID]: description"`
+
+**Note:** Changes are NOT committed until all tasks are complete. This allows for a clean, atomic commit.
 
 **MANDATORY after ALL tasks:**
 1. `simpletask criteria complete [ID]` for each satisfied criterion
 2. `simpletask schema validate`
-3. Final commit if task file was updated
+3. Create ONE commit with all implementation changes using conventional commit format
 
-**Why this matters:** `/simpletask.review` checks the task file for completion status. If tasks remain `status: not_started` or criteria remain `completed: false`, the review will report "NOT READY" or "NEEDS CHANGES".
+**Why this matters:** 
+- One feature branch = one PR = one commit keeps git history clean
+- `/simpletask.review` checks the task file for completion status
+- If tasks remain `status: not_started` or criteria remain `completed: false`, the review will report "NOT READY" or "NEEDS CHANGES"
+- Single atomic commits are easier to review, revert, and understand
 
 **DO NOT:**
-- Skip status updates
-- Forget to commit after each task
+- Skip status updates during implementation
+- Commit after individual tasks (wait until all tasks complete)
 - Leave acceptance criteria unmarked when satisfied
 - Proceed without verifying `done_when` conditions
