@@ -98,13 +98,29 @@ schema/                   # Schema documentation
 └── examples/
 
 .tasks/                   # Task YAML files (git-ignored)
-└── *.yaml
+└── *.yml                 # Normalized branch names (feature/auth → feature-auth.yml)
 
 tests/                    # Test suite
 ├── conftest.py           # Shared fixtures
 ├── unit/                 # Unit tests
 └── integration/          # Integration tests
 ```
+
+## Branch Name Normalization
+
+Task files are stored in `.tasks/` with normalized filenames derived from branch names:
+
+- **Branch:** `feature/user-auth` → **File:** `.tasks/feature-user-auth.yml`
+- **Branch:** `bugfix/issue-123` → **File:** `.tasks/bugfix-issue-123.yml`
+
+The `normalize_branch_name()` function in `cli/simpletask/core/project.py` converts:
+- Slashes (`/`) → Hyphens (`-`)
+- Special characters → Hyphens
+- Uppercase → Lowercase
+- Unicode → ASCII
+- Double dots (`..`) → Double hyphens (`--`) for security
+
+**Important:** Always use `simpletask` CLI commands instead of manually constructing `.tasks/` paths in bash. The CLI handles normalization automatically.
 
 ## Commands
 

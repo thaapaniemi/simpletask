@@ -144,3 +144,60 @@ def tmp_project_with_task(
     write_task_file(task_file, sample_spec, update_timestamp=False)
 
     yield tmp_project, task_file
+
+
+@pytest.fixture
+def tmp_git_project_with_task(
+    tmp_project: Path,
+) -> Generator[tuple[Path, str, Path], None, None]:
+    """Create a git project with a branch containing slashes and its task file.
+
+    This fixture specifically tests issue #4: branch names with slashes.
+
+    Args:
+        tmp_project: Temporary project root
+
+    Yields:
+        Tuple of (project_root, branch_name, task_file_path)
+    """
+    branch_name = "feature/mcp-server-support"
+    normalized_filename = "feature-mcp-server-support.yml"
+
+    # Create and checkout the branch
+    repo = git.Repo(tmp_project)
+    new_branch = repo.create_head(branch_name)
+    new_branch.checkout()
+
+    # Create a task file with the normalized filename
+    task_file = tmp_project / ".tasks" / normalized_filename
+
+    # Create task spec with the original branch name (with slash)
+    now = datetime.now(UTC)
+    spec = SimpleTaskSpec(
+        schema_version="1.0",
+        branch=branch_name,  # Original branch name with slash
+        title="Test Task",
+        original_prompt="Test task for branch normalization",
+        status=TaskStatus.NOT_STARTED,
+        created=now,
+        updated=now,
+        acceptance_criteria=[
+            AcceptanceCriterion(id="AC1", description="Task file is found", completed=False),
+        ],
+        constraints=[],
+        context={},
+        tasks=[
+            Task(
+                id="T001",
+                name="Test task",
+                status=TaskStatus.NOT_STARTED,
+                goal="Verify branch normalization works",
+                steps=["Run simpletask show"],
+                prerequisites=None,
+            ),
+        ],
+    )
+
+    write_task_file(task_file, spec, update_timestamp=False)
+
+    yield tmp_project, branch_name, task_file

@@ -69,18 +69,20 @@ User input: $ARGUMENTS
 
 2. Check if already on a feature branch with existing task file:
    ```bash
-   ls .tasks/$(git branch --show-current).yml 2>/dev/null
+   simpletask show 2>/dev/null
    ```
 
-3. If file exists for current branch:
-   - Load and analyze: `simpletask show`
-   - If tasks are empty or minimal, proceed to Step 4 to add detailed tasks
+3. If command succeeds (file exists for current branch):
+   - Analyze output to see if tasks are empty or minimal
    - If tasks already exist, analyze and report current state
+   - If tasks are empty/minimal, proceed to Step 4 to add detailed tasks
    - Use current branch name as `[branch-name]`
    
-4. If file does NOT exist:
+4. If command fails (file does NOT exist):
    - If on main/master/develop: proceed to Step 2 to create new branch
    - If on other branch: ask user if they want to create task file for current branch or create new branch
+
+**Note:** Branch names with slashes (e.g., `feature/user-auth`) are automatically normalized to filenames with hyphens (e.g., `.tasks/feature-user-auth.yml`). Always use `simpletask` commands instead of manually constructing `.tasks/` paths.
 
 **Step 2: Create Git Branch (if needed)**
 

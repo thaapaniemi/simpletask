@@ -13,19 +13,16 @@ You are conducting a thorough, technically precise code review. Be brutally hone
    git branch --show-current
    ```
 
-2. Verify task file exists:
-   ```bash
-   ls .tasks/$(git branch --show-current).yml
-   ```
-
-3. If task file doesn't exist:
-   - Ask user: "No task file found for current branch. Which branch should I review?"
-   - Do NOT proceed without a task file
-
-4. Load task details:
+2. Load and verify task file exists:
    ```bash
    simpletask show
    ```
+   
+   If this fails with "No task file found":
+   - Ask user: "No task file found for current branch. Which branch should I review?"
+   - Do NOT proceed without a task file
+
+**Note:** Branch names with slashes (e.g., `feature/user-auth`) are automatically normalized to filenames with hyphens (e.g., `.tasks/feature-user-auth.yml`). Always use `simpletask` commands instead of manually constructing `.tasks/` paths.
 
 **Step 2: Analyze Task Completion**
 
