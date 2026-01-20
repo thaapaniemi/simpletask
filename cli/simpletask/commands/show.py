@@ -5,6 +5,7 @@ import typer
 from ..core.project import ensure_project, get_task_file_path
 from ..core.yaml_parser import InvalidTaskFileError, parse_task_file
 from ..utils.console import console, error
+from ..utils.datetime_format import format_datetime
 
 
 def show(
@@ -41,9 +42,9 @@ def show(
         console.print(f"[bold]Branch:[/bold] {spec.branch}")
         console.print(f"[bold]Status:[/bold] {spec.status.value}")
         if spec.created:
-            console.print(f"[bold]Created:[/bold] {spec.created.strftime('%Y-%m-%d %H:%M:%S')}")
+            console.print(f"[bold]Created:[/bold] {format_datetime(spec.created)}")
         if spec.updated:
-            console.print(f"[bold]Updated:[/bold] {spec.updated.strftime('%Y-%m-%d %H:%M:%S')}")
+            console.print(f"[bold]Updated:[/bold] {format_datetime(spec.updated)}")
 
         # Acceptance criteria
         console.print("\n[bold magenta]Acceptance Criteria:[/bold magenta]")
