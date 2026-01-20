@@ -58,16 +58,6 @@ class TestAddAcceptanceCriterion:
         assert spec.acceptance_criteria[2].description == "New criterion"
         assert spec.acceptance_criteria[2].completed is False
 
-    def test_add_criterion_updates_timestamp(self, tmp_task_file):
-        """Verify updated timestamp is modified."""
-        spec_before = parse_task_file(tmp_task_file)
-        updated_before = spec_before.updated
-
-        add_acceptance_criterion(tmp_task_file, description="Test")
-
-        spec_after = parse_task_file(tmp_task_file)
-        assert spec_after.updated > updated_before
-
     def test_add_multiple_criteria(self, tmp_task_file):
         """Add multiple criteria."""
         id1 = add_acceptance_criterion(tmp_task_file, description="Criterion 1")
@@ -136,13 +126,3 @@ class TestRemoveAcceptanceCriterion:
         spec = parse_task_file(tmp_task_file)
         assert len(spec.acceptance_criteria) == 1
         assert spec.acceptance_criteria[0].id == "AC2"
-
-    def test_remove_updates_timestamp(self, tmp_task_file):
-        """Verify updated timestamp is modified."""
-        spec_before = parse_task_file(tmp_task_file)
-        updated_before = spec_before.updated
-
-        remove_acceptance_criterion(tmp_task_file, "AC1")
-
-        spec_after = parse_task_file(tmp_task_file)
-        assert spec_after.updated > updated_before

@@ -149,7 +149,7 @@ class TestProjectListTasks:
 branch: feature-a
 title: Feature A
 original_prompt: Test
-status: not_started
+created: '2024-01-01T00:00:00Z'
 acceptance_criteria:
   - id: AC1
     description: Test
@@ -159,7 +159,7 @@ acceptance_criteria:
 branch: feature-b
 title: Feature B
 original_prompt: Test
-status: not_started
+created: '2024-01-01T00:00:00Z'
 acceptance_criteria:
   - id: AC1
     description: Test
@@ -169,7 +169,7 @@ acceptance_criteria:
 branch: bugfix-x
 title: Bugfix X
 original_prompt: Test
-status: not_started
+created: '2024-01-01T00:00:00Z'
 acceptance_criteria:
   - id: AC1
     description: Test
@@ -195,7 +195,7 @@ acceptance_criteria:
 branch: valid-task
 title: Valid Task
 original_prompt: Test
-status: not_started
+created: '2024-01-01T00:00:00Z'
 acceptance_criteria:
   - id: AC1
     description: Test
@@ -222,7 +222,7 @@ acceptance_criteria:
 branch: feature
 title: Feature
 original_prompt: Test
-status: not_started
+created: '2024-01-01T00:00:00Z'
 acceptance_criteria:
   - id: AC1
     description: Test

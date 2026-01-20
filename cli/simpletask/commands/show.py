@@ -5,7 +5,6 @@ import typer
 from ..core.project import ensure_project, get_task_file_path
 from ..core.yaml_parser import InvalidTaskFileError, parse_task_file
 from ..utils.console import console, error
-from ..utils.datetime_format import format_datetime
 
 
 def show(
@@ -15,7 +14,7 @@ def show(
 
     Displays:
     - Task file location
-    - Title, status, branch
+    - Title and branch
     - Acceptance criteria with completion status
     - Implementation tasks (if defined)
     - Constraints (if defined)
@@ -40,11 +39,7 @@ def show(
         # Display task information
         console.print(f"[bold cyan]Task:[/bold cyan] {spec.title}")
         console.print(f"[bold]Branch:[/bold] {spec.branch}")
-        console.print(f"[bold]Status:[/bold] {spec.status.value}")
-        if spec.created:
-            console.print(f"[bold]Created:[/bold] {format_datetime(spec.created)}")
-        if spec.updated:
-            console.print(f"[bold]Updated:[/bold] {format_datetime(spec.updated)}")
+        console.print(f"[bold]Created:[/bold] {spec.created.strftime('%Y-%m-%d %H:%M:%S UTC')}")
 
         # Acceptance criteria
         console.print("\n[bold magenta]Acceptance Criteria:[/bold magenta]")

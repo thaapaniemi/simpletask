@@ -79,16 +79,14 @@ class SimpleTaskSpec(BaseModel):
     model_config = {"extra": "forbid"}
 
     schema_version: str = Field(
-        default="1.0", description="Schema version for compatibility tracking"
+        default="1.1", description="Schema version for compatibility tracking"
     )
     branch: str = Field(
         ..., description="Branch name / unique task identifier (also git branch name)"
     )
     title: str = Field(..., description="Human-readable task title")
     original_prompt: str = Field(..., description="Verbatim user request that initiated this task")
-    status: TaskStatus = Field(default=TaskStatus.NOT_STARTED, description="Overall task status")
-    created: datetime | None = Field(None, description="When task was created")
-    updated: datetime | None = Field(None, description="Last update timestamp")
+    created: datetime = Field(..., description="Timestamp when the task was created")
     acceptance_criteria: list[AcceptanceCriterion] = Field(
         ..., min_length=1, description="Criteria that define task completion"
     )

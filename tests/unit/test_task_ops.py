@@ -82,16 +82,6 @@ class TestAddImplementationTask:
         spec = parse_task_file(tmp_task_file)
         assert spec.tasks[2].status == TaskStatus.IN_PROGRESS
 
-    def test_add_task_updates_timestamp(self, tmp_task_file):
-        """Verify updated timestamp is modified."""
-        spec_before = parse_task_file(tmp_task_file)
-        updated_before = spec_before.updated
-
-        add_implementation_task(tmp_task_file, name="New task")
-
-        spec_after = parse_task_file(tmp_task_file)
-        assert spec_after.updated > updated_before
-
     def test_add_task_to_empty_tasks_list(self, tmp_path, sample_spec):
         """Add task when tasks list is None."""
         # Create spec with no tasks
@@ -99,7 +89,7 @@ class TestAddImplementationTask:
         task_file = tmp_path / "test.yml"
         from simpletask.core.yaml_parser import write_task_file
 
-        write_task_file(task_file, sample_spec, update_timestamp=False)
+        write_task_file(task_file, sample_spec)
 
         # Add first task
         new_id = add_implementation_task(task_file, name="First task")
@@ -160,7 +150,7 @@ class TestUpdateImplementationTask:
         task_file = tmp_path / "test.yml"
         from simpletask.core.yaml_parser import write_task_file
 
-        write_task_file(task_file, sample_spec, update_timestamp=False)
+        write_task_file(task_file, sample_spec)
 
         with pytest.raises(ValueError, match="No tasks defined"):
             update_implementation_task(task_file, "T001", name="Test")
@@ -188,7 +178,7 @@ class TestRemoveImplementationTask:
         task_file = tmp_path / "test.yml"
         from simpletask.core.yaml_parser import write_task_file
 
-        write_task_file(task_file, sample_spec, update_timestamp=False)
+        write_task_file(task_file, sample_spec)
 
         with pytest.raises(ValueError, match="No tasks defined"):
             remove_implementation_task(task_file, "T001")
@@ -200,13 +190,3 @@ class TestRemoveImplementationTask:
         spec = parse_task_file(tmp_task_file)
         assert len(spec.tasks) == 1
         assert spec.tasks[0].id == "T002"
-
-    def test_remove_updates_timestamp(self, tmp_task_file):
-        """Verify updated timestamp is modified."""
-        spec_before = parse_task_file(tmp_task_file)
-        updated_before = spec_before.updated
-
-        remove_implementation_task(tmp_task_file, "T001")
-
-        spec_after = parse_task_file(tmp_task_file)
-        assert spec_after.updated > updated_before

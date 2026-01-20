@@ -90,7 +90,7 @@ class TestWriteTaskFile:
     def test_write_valid_file(self, tmp_path, sample_spec):
         """Write valid task file successfully."""
         task_file = tmp_path / "test.yml"
-        write_task_file(task_file, sample_spec, update_timestamp=False)
+        write_task_file(task_file, sample_spec)
 
         assert task_file.exists()
         content = task_file.read_text()
@@ -100,7 +100,7 @@ class TestWriteTaskFile:
     def test_write_creates_parent_directories(self, tmp_path, sample_spec):
         """write_task_file creates parent directories if needed."""
         nested_file = tmp_path / "nested" / "path" / "task.yml"
-        write_task_file(nested_file, sample_spec, update_timestamp=False)
+        write_task_file(nested_file, sample_spec)
 
         assert nested_file.exists()
         assert nested_file.parent.exists()
@@ -110,7 +110,7 @@ class TestWriteTaskFile:
         task_file = tmp_path / "test.yml"
 
         # Write
-        write_task_file(task_file, sample_spec, update_timestamp=False)
+        write_task_file(task_file, sample_spec)
 
         # Parse
         parsed_spec = parse_task_file(task_file)
@@ -118,31 +118,8 @@ class TestWriteTaskFile:
         # Verify metadata preserved
         assert parsed_spec.branch == sample_spec.branch
         assert parsed_spec.title == sample_spec.title
-        assert parsed_spec.status == sample_spec.status
         assert len(parsed_spec.tasks) == len(sample_spec.tasks)
         assert len(parsed_spec.acceptance_criteria) == len(sample_spec.acceptance_criteria)
-
-    def test_update_timestamp_default(self, tmp_path, sample_spec):
-        """Timestamp is updated by default."""
-        task_file = tmp_path / "test.yml"
-        original_updated = sample_spec.updated
-
-        # Write with update_timestamp=True (default)
-        write_task_file(task_file, sample_spec)
-
-        # Check that timestamp was updated
-        assert sample_spec.updated > original_updated
-
-    def test_update_timestamp_disabled(self, tmp_path, sample_spec):
-        """Timestamp not updated when update_timestamp=False."""
-        task_file = tmp_path / "test.yml"
-        original_updated = sample_spec.updated
-
-        # Write with update_timestamp=False
-        write_task_file(task_file, sample_spec, update_timestamp=False)
-
-        # Check that timestamp was NOT updated
-        assert sample_spec.updated == original_updated
 
 
 class TestUpdateTaskStatus:
@@ -178,7 +155,7 @@ class TestUpdateTaskStatus:
         """Raise ValueError when no tasks defined."""
         sample_spec.tasks = None
         task_file = tmp_path / "test.yml"
-        write_task_file(task_file, sample_spec, update_timestamp=False)
+        write_task_file(task_file, sample_spec)
 
         with pytest.raises(ValueError, match="No tasks defined"):
             update_task_status(task_file, "T001", TaskStatus.COMPLETED)

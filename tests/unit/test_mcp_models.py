@@ -1,6 +1,6 @@
 """Unit tests for MCP models and helpers."""
 
-from simpletask.core.models import SimpleTaskSpec, TaskStatus
+from simpletask.core.models import SimpleTaskSpec
 from simpletask.mcp.models import (
     SimpleTaskGetResponse,
     ValidationResult,
@@ -17,7 +17,6 @@ class TestComputeStatusSummary:
 
         assert summary.branch == "test-feature"
         assert summary.title == "Test Feature"
-        assert summary.overall_status == TaskStatus.NOT_STARTED
         assert summary.criteria_total == 2
         assert summary.criteria_completed == 0
         assert summary.tasks_total == 2

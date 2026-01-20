@@ -18,15 +18,12 @@ from simpletask.core.yaml_parser import write_task_file
 @pytest.fixture
 def sample_spec() -> SimpleTaskSpec:
     """Create a sample SimpleTaskSpec object for testing."""
-    now = datetime.now(UTC)
     return SimpleTaskSpec(
         schema_version="1.0",
         branch="test-feature",
         title="Test Feature",
         original_prompt="Implement a test feature for testing",
-        status=TaskStatus.NOT_STARTED,
-        created=now,
-        updated=now,
+        created=datetime.now(UTC),
         acceptance_criteria=[
             AcceptanceCriterion(id="AC1", description="Feature works correctly", completed=False),
             AcceptanceCriterion(id="AC2", description="Tests pass", completed=False),
@@ -40,7 +37,10 @@ def sample_spec() -> SimpleTaskSpec:
                 status=TaskStatus.NOT_STARTED,
                 goal="Configure development environment",
                 steps=["Install dependencies", "Setup config"],
+                done_when=None,
+                code_examples=None,
                 prerequisites=None,
+                files=None,
             ),
             Task(
                 id="T002",
@@ -48,7 +48,10 @@ def sample_spec() -> SimpleTaskSpec:
                 status=TaskStatus.NOT_STARTED,
                 goal="Build the core feature",
                 steps=["Write code", "Add tests"],
+                done_when=None,
+                code_examples=None,
                 prerequisites=["T001"],
+                files=None,
             ),
         ],
     )
@@ -61,9 +64,6 @@ def sample_yaml_content() -> str:
 branch: test-feature
 title: Test Feature
 original_prompt: Implement a test feature for testing
-status: not_started
-created: '2026-01-13T10:00:00Z'
-updated: '2026-01-13T10:00:00Z'
 acceptance_criteria:
   - id: AC1
     description: Feature works correctly
@@ -93,7 +93,7 @@ def tmp_task_file(tmp_path: Path, sample_spec: SimpleTaskSpec) -> Path:
         Path to the created task file
     """
     task_file = tmp_path / "test-feature.yml"
-    write_task_file(task_file, sample_spec, update_timestamp=False)
+    write_task_file(task_file, sample_spec)
     return task_file
 
 
@@ -141,7 +141,7 @@ def tmp_project_with_task(
         Tuple of (project_root, task_file_path)
     """
     task_file = tmp_project / ".tasks" / "test-feature.yml"
-    write_task_file(task_file, sample_spec, update_timestamp=False)
+    write_task_file(task_file, sample_spec)
 
     yield tmp_project, task_file
 
@@ -172,15 +172,12 @@ def tmp_git_project_with_task(
     task_file = tmp_project / ".tasks" / normalized_filename
 
     # Create task spec with the original branch name (with slash)
-    now = datetime.now(UTC)
     spec = SimpleTaskSpec(
         schema_version="1.0",
         branch=branch_name,  # Original branch name with slash
         title="Test Task",
         original_prompt="Test task for branch normalization",
-        status=TaskStatus.NOT_STARTED,
-        created=now,
-        updated=now,
+        created=datetime.now(UTC),
         acceptance_criteria=[
             AcceptanceCriterion(id="AC1", description="Task file is found", completed=False),
         ],
@@ -193,12 +190,15 @@ def tmp_git_project_with_task(
                 status=TaskStatus.NOT_STARTED,
                 goal="Verify branch normalization works",
                 steps=["Run simpletask show"],
+                done_when=None,
+                code_examples=None,
                 prerequisites=None,
+                files=None,
             ),
         ],
     )
 
-    write_task_file(task_file, spec, update_timestamp=False)
+    write_task_file(task_file, spec)
 
     yield tmp_project, branch_name, task_file
 
@@ -206,18 +206,17 @@ def tmp_git_project_with_task(
 @pytest.fixture
 def sample_spec_no_tasks() -> SimpleTaskSpec:
     """Task spec with no implementation tasks."""
-    now = datetime.now(UTC)
     return SimpleTaskSpec(
         schema_version="1.0",
         branch="test-no-tasks",
         title="Test No Tasks",
         original_prompt="Test prompt",
-        status=TaskStatus.NOT_STARTED,
-        created=now,
-        updated=now,
+        created=datetime.now(UTC),
         acceptance_criteria=[
             AcceptanceCriterion(id="AC1", description="Criterion 1", completed=False),
         ],
+        constraints=None,
+        context=None,
         tasks=None,  # No tasks
     )
 
@@ -225,19 +224,18 @@ def sample_spec_no_tasks() -> SimpleTaskSpec:
 @pytest.fixture
 def sample_spec_mixed_statuses() -> SimpleTaskSpec:
     """Task spec with all task statuses represented."""
-    now = datetime.now(UTC)
     return SimpleTaskSpec(
         schema_version="1.0",
         branch="test-mixed",
         title="Test Mixed Statuses",
         original_prompt="Test prompt",
-        status=TaskStatus.IN_PROGRESS,
-        created=now,
-        updated=now,
+        created=datetime.now(UTC),
         acceptance_criteria=[
             AcceptanceCriterion(id="AC1", description="Done", completed=True),
             AcceptanceCriterion(id="AC2", description="Not done", completed=False),
         ],
+        constraints=None,
+        context=None,
         tasks=[
             Task(
                 id="T001",
@@ -245,6 +243,10 @@ def sample_spec_mixed_statuses() -> SimpleTaskSpec:
                 status=TaskStatus.COMPLETED,
                 goal="G",
                 steps=["S"],
+                done_when=None,
+                code_examples=None,
+                prerequisites=None,
+                files=None,
             ),
             Task(
                 id="T002",
@@ -252,6 +254,10 @@ def sample_spec_mixed_statuses() -> SimpleTaskSpec:
                 status=TaskStatus.IN_PROGRESS,
                 goal="G",
                 steps=["S"],
+                done_when=None,
+                code_examples=None,
+                prerequisites=None,
+                files=None,
             ),
             Task(
                 id="T003",
@@ -259,6 +265,10 @@ def sample_spec_mixed_statuses() -> SimpleTaskSpec:
                 status=TaskStatus.BLOCKED,
                 goal="G",
                 steps=["S"],
+                done_when=None,
+                code_examples=None,
+                prerequisites=None,
+                files=None,
             ),
             Task(
                 id="T004",
@@ -266,6 +276,10 @@ def sample_spec_mixed_statuses() -> SimpleTaskSpec:
                 status=TaskStatus.NOT_STARTED,
                 goal="G",
                 steps=["S"],
+                done_when=None,
+                code_examples=None,
+                prerequisites=None,
+                files=None,
             ),
         ],
     )
@@ -274,19 +288,18 @@ def sample_spec_mixed_statuses() -> SimpleTaskSpec:
 @pytest.fixture
 def sample_spec_all_completed() -> SimpleTaskSpec:
     """Task spec with all criteria and tasks completed."""
-    now = datetime.now(UTC)
     return SimpleTaskSpec(
         schema_version="1.0",
         branch="test-all-done",
         title="Test All Completed",
         original_prompt="Test prompt",
-        status=TaskStatus.COMPLETED,
-        created=now,
-        updated=now,
+        created=datetime.now(UTC),
         acceptance_criteria=[
             AcceptanceCriterion(id="AC1", description="Criterion 1", completed=True),
             AcceptanceCriterion(id="AC2", description="Criterion 2", completed=True),
         ],
+        constraints=None,
+        context=None,
         tasks=[
             Task(
                 id="T001",
@@ -294,6 +307,10 @@ def sample_spec_all_completed() -> SimpleTaskSpec:
                 status=TaskStatus.COMPLETED,
                 goal="G",
                 steps=["S"],
+                done_when=None,
+                code_examples=None,
+                prerequisites=None,
+                files=None,
             ),
             Task(
                 id="T002",
@@ -301,6 +318,10 @@ def sample_spec_all_completed() -> SimpleTaskSpec:
                 status=TaskStatus.COMPLETED,
                 goal="G",
                 steps=["S"],
+                done_when=None,
+                code_examples=None,
+                prerequisites=None,
+                files=None,
             ),
         ],
     )
@@ -309,16 +330,16 @@ def sample_spec_all_completed() -> SimpleTaskSpec:
 @pytest.fixture
 def sample_spec_minimal() -> SimpleTaskSpec:
     """Minimum valid spec."""
-    now = datetime.now(UTC)
     return SimpleTaskSpec(
         schema_version="1.0",
         branch="test-minimal",
         title="Minimal",
         original_prompt="Test",
-        status=TaskStatus.NOT_STARTED,
-        created=now,
-        updated=now,
+        created=datetime.now(UTC),
         acceptance_criteria=[
             AcceptanceCriterion(id="AC1", description="Done", completed=False),
         ],
+        constraints=None,
+        context=None,
+        tasks=None,
     )

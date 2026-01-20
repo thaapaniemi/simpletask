@@ -153,9 +153,6 @@ schema_version: "1.0"
 branch: feature/add-auth
 title: Add user authentication
 original_prompt: "Users should be able to log in with email and password"
-status: in_progress
-created: "2026-01-18T10:00:00Z"
-updated: "2026-01-18T14:30:00Z"
 
 acceptance_criteria:
   - id: AC1

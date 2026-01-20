@@ -4,12 +4,12 @@
   "title": "SimpleTask Schema",
   "description": "Schema for AI-friendly task definitions with acceptance criteria, implementation tasks, and context. Designed for branch-based development workflows.",
   "type": "object",
-  "required": ["schema_version", "branch", "title", "original_prompt", "acceptance_criteria"],
+  "required": ["schema_version", "branch", "title", "original_prompt", "created", "acceptance_criteria"],
   "properties": {
     "schema_version": {
       "type": "string",
       "description": "Schema version for compatibility tracking",
-      "examples": ["1.0"]
+      "examples": ["1.1"]
     },
     "branch": {
       "type": "string",
@@ -26,21 +26,11 @@
       "description": "The verbatim user request that initiated this task. Preserved for context recovery and human verification.",
       "examples": ["Add list and show commands so users can see available tasks and their details"]
     },
-    "status": {
-      "type": "string",
-      "enum": ["not_started", "in_progress", "completed", "blocked"],
-      "default": "not_started",
-      "description": "Overall task status"
-    },
     "created": {
       "type": "string",
       "format": "date-time",
-      "description": "ISO 8601 timestamp when task was created"
-    },
-    "updated": {
-      "type": "string",
-      "format": "date-time",
-      "description": "ISO 8601 timestamp when task was last updated"
+      "description": "Timestamp when the task was created (ISO 8601 format)",
+      "examples": ["2024-01-15T14:30:00Z"]
     },
     "acceptance_criteria": {
       "type": "array",

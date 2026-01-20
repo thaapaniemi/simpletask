@@ -24,9 +24,9 @@ class TestBranchNormalizationIntegration:
 
         # Verify file exists with normalized name
         assert task_file.exists(), f"Task file should exist at {task_file}"
-        assert task_file.name == "feature-mcp-server-support.yml", (
-            "File should have normalized name with hyphens"
-        )
+        assert (
+            task_file.name == "feature-mcp-server-support.yml"
+        ), "File should have normalized name with hyphens"
 
         # Run simpletask show command
         result = subprocess.run(
@@ -40,9 +40,9 @@ class TestBranchNormalizationIntegration:
         assert result.returncode == 0, f"simpletask show failed: {result.stderr}\n{result.stdout}"
 
         # Output should contain the original branch name (not normalized)
-        assert "feature/mcp-server-support" in result.stdout, (
-            f"Output should show original branch name with slash, got: {result.stdout}"
-        )
+        assert (
+            "feature/mcp-server-support" in result.stdout
+        ), f"Output should show original branch name with slash, got: {result.stdout}"
 
         # Output should show the task title
         assert "Test Task" in result.stdout, f"Output should contain task title: {result.stdout}"
@@ -67,9 +67,9 @@ class TestBranchNormalizationIntegration:
         )
 
         # This SHOULD fail because bash doesn't normalize branch names
-        assert result.returncode != 0, (
-            "Manual path construction should fail with slash-containing branches"
-        )
+        assert (
+            result.returncode != 0
+        ), "Manual path construction should fail with slash-containing branches"
         assert (
             "No such file or directory" in result.stderr or "cannot access" in result.stderr.lower()
         ), f"Should get file-not-found error, got: {result.stderr}"
@@ -140,6 +140,6 @@ class TestBranchNormalizationIntegration:
         normalized = normalize_branch_name(branch_name)
         expected = expected_filename.replace(".yml", "")
 
-        assert normalized == expected, (
-            f"Branch '{branch_name}' should normalize to '{expected}', got '{normalized}'"
-        )
+        assert (
+            normalized == expected
+        ), f"Branch '{branch_name}' should normalize to '{expected}', got '{normalized}'"

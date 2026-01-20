@@ -11,7 +11,6 @@ def status() -> None:
     Shows a table with:
     - Branch name
     - Title
-    - Overall status
     - Acceptance criteria progress
     - Task progress (if tasks defined)
 
@@ -29,9 +28,7 @@ def status() -> None:
             return
 
         # Create table
-        table = create_table(
-            "Task Status Summary", ["Branch", "Title", "Status", "AC Progress", "Tasks"]
-        )
+        table = create_table("Task Status Summary", ["Branch", "Title", "AC Progress", "Tasks"])
 
         # Populate table
         for branch in tasks:
@@ -55,28 +52,16 @@ def status() -> None:
                 # Truncate title if too long
                 title = spec.title if len(spec.title) <= 40 else spec.title[:37] + "..."
 
-                # Color status
-                status_color = (
-                    "green"
-                    if spec.status.value == "completed"
-                    else (
-                        "yellow"
-                        if spec.status.value == "in_progress"
-                        else "red" if spec.status.value == "blocked" else "white"
-                    )
-                )
-
                 table.add_row(
                     branch,
                     title,
-                    f"[{status_color}]{spec.status.value}[/{status_color}]",
                     ac_progress,
                     task_progress,
                 )
 
             except (FileNotFoundError, InvalidTaskFileError):
                 # Skip invalid task files
-                table.add_row(branch, "[red]Error[/red]", "-", "-", "-")
+                table.add_row(branch, "[red]Error[/red]", "-", "-")
 
         from ..utils.console import console
 

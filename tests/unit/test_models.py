@@ -8,9 +8,8 @@ Tests cover:
 - Cross-field validation (prerequisite task IDs)
 """
 
-from datetime import UTC, datetime
-
 import pytest
+from datetime import UTC, datetime
 from pydantic import ValidationError
 from simpletask.core.models import (
     AcceptanceCriterion,
@@ -173,32 +172,26 @@ class TestSimpleTaskSpec:
 
     def test_valid_minimal_spec(self):
         """Valid minimal task spec validates correctly."""
-        now = datetime.now(UTC)
         spec = SimpleTaskSpec(
             branch="test-feature",
             title="Test Feature",
             original_prompt="Build a test feature",
-            created=now,
-            updated=now,
+            created=datetime.now(UTC),
             acceptance_criteria=[AcceptanceCriterion(id="AC1", description="Works correctly")],
         )
         assert spec.branch == "test-feature"
-        assert spec.schema_version == "1.0"
-        assert spec.status == TaskStatus.NOT_STARTED
+        assert spec.schema_version == "1.1"
         assert len(spec.acceptance_criteria) == 1
         assert spec.tasks is None
 
     def test_valid_complete_spec(self):
         """Valid complete task spec validates correctly."""
-        now = datetime.now(UTC)
         spec = SimpleTaskSpec(
-            schema_version="1.0",
+            schema_version="1.1",
             branch="test-feature",
             title="Test Feature",
             original_prompt="Build a test feature",
-            status=TaskStatus.IN_PROGRESS,
-            created=now,
-            updated=now,
+            created=datetime.now(UTC),
             acceptance_criteria=[
                 AcceptanceCriterion(id="AC1", description="Works", completed=True),
                 AcceptanceCriterion(id="AC2", description="Tests pass", completed=False),
@@ -206,11 +199,28 @@ class TestSimpleTaskSpec:
             constraints=["Must work offline"],
             context={"env": "production"},
             tasks=[
-                Task(id="T001", name="Task 1", goal="Build", steps=["Do it"]),
-                Task(id="T002", name="Task 2", goal="Test", steps=["Test it"]),
+                Task(
+                    id="T001",
+                    name="Task 1",
+                    goal="Build",
+                    steps=["Do it"],
+                    done_when=None,
+                    code_examples=None,
+                    prerequisites=None,
+                    files=None,
+                ),
+                Task(
+                    id="T002",
+                    name="Task 2",
+                    goal="Test",
+                    steps=["Test it"],
+                    done_when=None,
+                    code_examples=None,
+                    prerequisites=None,
+                    files=None,
+                ),
             ],
         )
-        assert spec.status == TaskStatus.IN_PROGRESS
         assert len(spec.acceptance_criteria) == 2
         assert len(spec.tasks) == 2
         assert spec.constraints == ["Must work offline"]
@@ -218,36 +228,42 @@ class TestSimpleTaskSpec:
 
     def test_empty_acceptance_criteria(self):
         """Empty acceptance_criteria list raises ValidationError."""
-        now = datetime.now(UTC)
         with pytest.raises(ValidationError):
             SimpleTaskSpec(
                 branch="test",
                 title="Test",
                 original_prompt="Test",
-                created=now,
-                updated=now,
                 acceptance_criteria=[],  # Empty not allowed
             )
 
     def test_invalid_prerequisite_reference(self):
         """Prerequisite referencing non-existent task raises ValidationError."""
-        now = datetime.now(UTC)
         with pytest.raises(ValidationError) as exc_info:
             SimpleTaskSpec(
                 branch="test",
                 title="Test",
                 original_prompt="Test",
-                created=now,
-                updated=now,
                 acceptance_criteria=[AcceptanceCriterion(id="AC1", description="Works")],
                 tasks=[
-                    Task(id="T001", name="Task 1", goal="Build", steps=["Do it"]),
+                    Task(
+                        id="T001",
+                        name="Task 1",
+                        goal="Build",
+                        steps=["Do it"],
+                        done_when=None,
+                        code_examples=None,
+                        prerequisites=None,
+                        files=None,
+                    ),
                     Task(
                         id="T002",
                         name="Task 2",
                         goal="Build",
                         steps=["Do it"],
+                        done_when=None,
+                        code_examples=None,
                         prerequisites=["T999"],  # T999 doesn't exist!
+                        files=None,
                     ),
                 ],
             )
@@ -256,29 +272,42 @@ class TestSimpleTaskSpec:
 
     def test_valid_prerequisites(self):
         """Valid prerequisites validate correctly."""
-        now = datetime.now(UTC)
         spec = SimpleTaskSpec(
             branch="test",
             title="Test",
             original_prompt="Test",
-            created=now,
-            updated=now,
+            created=datetime.now(UTC),
             acceptance_criteria=[AcceptanceCriterion(id="AC1", description="Works")],
             tasks=[
-                Task(id="T001", name="Task 1", goal="Build", steps=["Do it"]),
+                Task(
+                    id="T001",
+                    name="Task 1",
+                    goal="Build",
+                    steps=["Do it"],
+                    done_when=None,
+                    code_examples=None,
+                    prerequisites=None,
+                    files=None,
+                ),
                 Task(
                     id="T002",
                     name="Task 2",
                     goal="Build",
                     steps=["Do it"],
+                    done_when=None,
+                    code_examples=None,
                     prerequisites=["T001"],  # T001 exists
+                    files=None,
                 ),
                 Task(
                     id="T003",
                     name="Task 3",
                     goal="Build",
                     steps=["Do it"],
+                    done_when=None,
+                    code_examples=None,
                     prerequisites=["T001", "T002"],  # Both exist
+                    files=None,
                 ),
             ],
         )
@@ -288,15 +317,12 @@ class TestSimpleTaskSpec:
 
     def test_missing_required_fields(self):
         """Missing required fields raises ValidationError."""
-        now = datetime.now(UTC)
 
         # Missing branch
         with pytest.raises(ValidationError):
             SimpleTaskSpec(
                 title="Test",
                 original_prompt="Test",
-                created=now,
-                updated=now,
                 acceptance_criteria=[AcceptanceCriterion(id="AC1", description="Works")],
             )
 
@@ -305,8 +331,6 @@ class TestSimpleTaskSpec:
             SimpleTaskSpec(
                 branch="test",
                 original_prompt="Test",
-                created=now,
-                updated=now,
                 acceptance_criteria=[AcceptanceCriterion(id="AC1", description="Works")],
             )
 
@@ -315,7 +339,5 @@ class TestSimpleTaskSpec:
             SimpleTaskSpec(
                 branch="test",
                 title="Test",
-                created=now,
-                updated=now,
                 acceptance_criteria=[AcceptanceCriterion(id="AC1", description="Works")],
             )

@@ -1,6 +1,5 @@
-"""YAML parsing for task files with auto-timestamp management."""
+"""YAML parsing for task files."""
 
-from datetime import UTC, datetime
 from pathlib import Path
 
 import yaml
@@ -66,20 +65,15 @@ def parse_task_file(path: Path) -> SimpleTaskSpec:
     return spec
 
 
-def write_task_file(path: Path, spec: SimpleTaskSpec, update_timestamp: bool = True) -> None:
-    """Write task YAML file with auto-timestamp management.
+def write_task_file(path: Path, spec: SimpleTaskSpec) -> None:
+    """Write task YAML file.
 
     Args:
         path: Path to task file (will be created/overwritten)
         spec: SimpleTaskSpec instance to serialize to YAML
-        update_timestamp: Whether to update the 'updated' timestamp (default: True)
     """
     # Ensure parent directory exists
     path.parent.mkdir(parents=True, exist_ok=True)
-
-    # Update timestamp if requested
-    if update_timestamp:
-        spec.updated = datetime.now(UTC)
 
     # Convert spec to dict (mode='json' for datetime serialization)
     data = spec.model_dump(mode="json", exclude_none=True)
@@ -129,7 +123,7 @@ def update_task_status(path: Path, task_id: str, new_status: TaskStatus) -> None
         task_ids = [t.id for t in spec.tasks]
         raise ValueError(f"Task '{task_id}' not found. Available tasks: {task_ids}")
 
-    # Write back to file (with auto-timestamp update)
+    # Write back to file
     write_task_file(path, spec)
 
 
@@ -161,7 +155,7 @@ def update_criterion_status(path: Path, criterion_id: str, completed: bool) -> N
         criterion_ids = [c.id for c in spec.acceptance_criteria]
         raise ValueError(f"Criterion '{criterion_id}' not found. Available: {criterion_ids}")
 
-    # Write back to file (with auto-timestamp update)
+    # Write back to file
     write_task_file(path, spec)
 
 

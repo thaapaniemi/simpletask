@@ -2,7 +2,7 @@
 
 from datetime import UTC, datetime
 
-from .models import AcceptanceCriterion, SimpleTaskSpec, TaskStatus
+from .models import AcceptanceCriterion, SimpleTaskSpec
 from .project import Project
 from .yaml_parser import write_task_file
 
@@ -55,9 +55,7 @@ def create_task_file(
         branch=branch,
         title=title,
         original_prompt=prompt,
-        status=TaskStatus.NOT_STARTED,
         created=datetime.now(UTC),
-        updated=datetime.now(UTC),
         acceptance_criteria=ac_list,
         constraints=None,
         context=None,
@@ -66,6 +64,6 @@ def create_task_file(
 
     project.ensure_tasks_dir()
     task_file = project.get_task_file(branch)
-    write_task_file(task_file, spec, update_timestamp=False)
+    write_task_file(task_file, spec)
 
     return spec

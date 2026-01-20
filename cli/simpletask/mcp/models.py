@@ -23,7 +23,7 @@ class StatusSummary(BaseModel):
 
     branch: str = Field(..., description="Branch/task identifier")
     title: str = Field(..., description="Task title")
-    overall_status: TaskStatus = Field(..., description="Overall task status")
+    overall_status: TaskStatus = Field(..., description="Computed overall task status")
     criteria_total: int = Field(..., description="Total acceptance criteria")
     criteria_completed: int = Field(..., description="Completed criteria count")
     tasks_total: int = Field(0, description="Total implementation tasks")
@@ -62,7 +62,7 @@ def compute_status_summary(spec: SimpleTaskSpec) -> StatusSummary:
         spec: Task specification to analyze.
 
     Returns:
-        StatusSummary with pre-computed counts.
+        StatusSummary with pre-computed counts and overall status.
     """
     # Count acceptance criteria
     criteria_total = len(spec.acceptance_criteria)
@@ -88,10 +88,20 @@ def compute_status_summary(spec: SimpleTaskSpec) -> StatusSummary:
                 case TaskStatus.BLOCKED:
                     tasks_blocked += 1
 
+    # Derive overall status
+    if tasks_blocked > 0:
+        overall_status = TaskStatus.BLOCKED
+    elif tasks_in_progress > 0:
+        overall_status = TaskStatus.IN_PROGRESS
+    elif tasks_total > 0 and tasks_completed == tasks_total:
+        overall_status = TaskStatus.COMPLETED
+    else:
+        overall_status = TaskStatus.NOT_STARTED
+
     return StatusSummary(
         branch=spec.branch,
         title=spec.title,
-        overall_status=spec.status,
+        overall_status=overall_status,
         criteria_total=criteria_total,
         criteria_completed=criteria_completed,
         tasks_total=tasks_total,

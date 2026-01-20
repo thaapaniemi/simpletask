@@ -56,9 +56,6 @@ class TestValidateTaskFile:
 schema_version: '1.0'
 branch: test
 original_prompt: Test
-status: not_started
-created: '2026-01-13T10:00:00Z'
-updated: '2026-01-13T10:00:00Z'
 acceptance_criteria:
   - id: AC1
     description: Test
@@ -69,27 +66,6 @@ acceptance_criteria:
         # Should have validation error about missing 'title'
         assert any("title" in err.lower() or "required" in err.lower() for err in errors)
 
-    def test_validate_invalid_status_value(self, tmp_path):
-        """Test validating file with invalid enum value."""
-        invalid_status = tmp_path / "invalid_status.yml"
-        invalid_status.write_text("""
-schema_version: '1.0'
-branch: test
-title: Test
-original_prompt: Test
-status: invalid_status
-created: '2026-01-13T10:00:00Z'
-updated: '2026-01-13T10:00:00Z'
-acceptance_criteria:
-  - id: AC1
-    description: Test
-    completed: false
-""")
-        errors = validate_task_file(invalid_status)
-        assert len(errors) > 0
-        # Should have validation error about status
-        assert any("status" in err.lower() for err in errors)
-
     def test_validate_empty_acceptance_criteria(self, tmp_path):
         """Test validating file with empty acceptance criteria."""
         empty_ac = tmp_path / "empty_ac.yml"
@@ -98,9 +74,6 @@ schema_version: '1.0'
 branch: test
 title: Test
 original_prompt: Test
-status: not_started
-created: '2026-01-13T10:00:00Z'
-updated: '2026-01-13T10:00:00Z'
 acceptance_criteria: []
 """)
         errors = validate_task_file(empty_ac)
@@ -115,9 +88,6 @@ schema_version: '1.0'
 branch: test
 title: Test
 original_prompt: Test
-status: not_started
-created: '2026-01-13T10:00:00Z'
-updated: '2026-01-13T10:00:00Z'
 acceptance_criteria:
   - id: AC1
     description: Test
@@ -138,9 +108,6 @@ schema_version: '1.0'
 branch: test
 title: Test
 original_prompt: Test
-status: not_started
-created: '2026-01-13T10:00:00Z'
-updated: '2026-01-13T10:00:00Z'
 acceptance_criteria:
   - id: AC1
     description: Test
@@ -182,9 +149,6 @@ schema_version: '1.0'
 branch: test
 title: Test
 original_prompt: Test
-status: not_started
-created: '2026-01-13T10:00:00Z'
-updated: '2026-01-13T10:00:00Z'
 acceptance_criteria:
   - id: AC1
     description: Test

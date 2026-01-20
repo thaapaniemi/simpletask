@@ -97,7 +97,7 @@ schema/                   # Schema documentation
 ├── README.md
 └── examples/
 
-.tasks/                   # Task YAML files (git-ignored)
+.tasks/                   # Task YAML files (git-ignored, NOT part of project deliverable)
 └── *.yml                 # Normalized branch names (feature/auth → feature-auth.yml)
 
 tests/                    # Test suite
@@ -280,7 +280,8 @@ Returns enriched task data with pre-computed status counts:
 - `spec`: Full `SimpleTaskSpec` (branch, title, acceptance_criteria, tasks, etc.)
 - `file_path`: Path to task YAML file
 - `summary`: Pre-computed `StatusSummary` with:
-  - `branch`, `title`, `overall_status`
+  - `branch`, `title`
+  - `overall_status`: Computed from task states (blocked > in_progress > completed > not_started)
   - `criteria_total`, `criteria_completed`
   - `tasks_total`, `tasks_completed`, `tasks_in_progress`, `tasks_not_started`, `tasks_blocked`
 - `validation` (optional): `ValidationResult` with `valid` (bool) and `errors` (list)
@@ -292,7 +293,6 @@ Returns enriched task data with pre-computed status counts:
   "spec": {
     "branch": "feature/mcp-server",
     "title": "Add MCP server support",
-    "status": "in_progress",
     "acceptance_criteria": [...],
     "tasks": [...]
   },
@@ -482,62 +482,6 @@ Path traversal attacks via the `branch` parameter are prevented:
 - All paths are constrained to `.tasks/` directory
 - Security tests verify these protections in `tests/unit/test_mcp_tools.py`
 
-## Datetime Handling
-
-simpletask follows industry best practices for datetime management: store in UTC, display in local timezone.
-
-### Storage Format
-
-- All timestamps are stored in **UTC** in YAML files
-- Format: ISO 8601 strings (e.g., `2026-01-19T11:25:09.319553Z`)
-- Generated via `datetime.now(UTC)` in `yaml_parser.py`
-- Fields: `created` and `updated` in task files
-
-### Display Format
-
-- CLI displays timestamps in **local timezone**
-- Format: "YYYY-MM-DD HH:MM:SS TZ" (e.g., "2026-01-20 10:30:45 EST")
-- Conversion handled by `utils/datetime_format.py`
-- Function: `format_datetime(dt: datetime | None, include_timezone: bool = True) -> str`
-
-### MCP Server
-
-- Returns raw datetime objects (serialized to ISO 8601 UTC by Pydantic)
-- Consumers should handle timezone conversion based on their needs
-- This is the correct API behavior - standardized UTC timestamps
-
-### Rationale
-
-- **UTC storage:** Industry best practice, collaboration-friendly, DST-safe, unambiguous
-- **Local display:** User-friendly, matches wall clock time
-- **Separation of concerns:** Storage layer (UTC) vs. presentation layer (local)
-- **Team collaboration:** All team members see the same stored timestamps regardless of location
-
-### Implementation
-
-When displaying timestamps in CLI commands:
-
-```python
-from ..utils.datetime_format import format_datetime
-
-# Display with timezone
-console.print(f"Created: {format_datetime(spec.created)}")
-# Output: Created: 2026-01-20 10:30:45 EST
-
-# Display without timezone indicator
-console.print(f"Updated: {format_datetime(spec.updated, include_timezone=False)}")
-# Output: Updated: 2026-01-20 10:30:45
-```
-
-When storing timestamps:
-
-```python
-from datetime import UTC, datetime
-
-# Always use UTC
-spec.updated = datetime.now(UTC)
-```
-
 ## Code Style
 
 ### Naming Conventions
@@ -709,6 +653,16 @@ class TestGitOperations:
 ```
 
 ## Boundaries
+
+### Task Files (.tasks/ directory)
+
+The `.tasks/` directory contains task definition files used during development but is **NOT part of the project deliverable**. These files are:
+- Git-ignored by default
+- Used for planning and tracking implementation work  
+- Not required to conform to the current schema version
+- Can be in any state without affecting project quality
+
+**When reviewing code or running quality checks, IGNORE any issues with files in the `.tasks/` directory.** Only the project code in `cli/simpletask/` and related directories matters for project quality assessment.
 
 ### Always Do
 

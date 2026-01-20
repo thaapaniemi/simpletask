@@ -41,9 +41,6 @@ Task files are YAML documents that define:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `status` | enum | `not_started` \| `in_progress` \| `completed` \| `blocked` |
-| `created` | datetime | ISO 8601 creation timestamp |
-| `updated` | datetime | ISO 8601 last update timestamp |
 | `constraints` | array[string] | Boundaries the agent must follow |
 | `context` | object | Flexible context (requirements, dependencies, etc.) |
 | `tasks` | array | Implementation tasks |
@@ -110,7 +107,7 @@ code_examples:
 
 ## Status Values
 
-Used for both top-level `status` and `tasks[].status`:
+Used for `tasks[].status`:
 
 | Value | Description |
 |-------|-------------|
