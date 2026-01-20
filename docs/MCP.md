@@ -4,8 +4,6 @@ This guide covers how to integrate simpletask with AI editors using the Model Co
 
 ## Table of Contents
 
-- [What is MCP?](#what-is-mcp)
-- [Why Use MCP with simpletask?](#why-use-mcp-with-simpletask)
 - [Quick Start](#quick-start)
 - [Configuration](#configuration)
   - [OpenCode](#opencode)
@@ -14,11 +12,14 @@ This guide covers how to integrate simpletask with AI editors using the Model Co
 - [Available Tools](#available-tools)
   - [simpletask_get](#simpletask_get)
   - [simpletask_list](#simpletask_list)
+  - [simpletask_new](#simpletask_new)
+  - [simpletask_task](#simpletask_task)
+  - [simpletask_criteria](#simpletask_criteria)
 - [Usage Examples](#usage-examples)
   - [Example 1: Understanding Task Context](#example-1-understanding-task-context)
   - [Example 2: Checking Progress](#example-2-checking-progress)
-  - [Example 3: Multi-Branch Development](#example-3-multi-branch-development)
-  - [Example 4: Validating Task Files](#example-4-validating-task-files)
+  - [Example 3: Creating a New Task](#example-3-creating-a-new-task)
+  - [Example 4: Managing Task Progress](#example-4-managing-task-progress)
 - [Troubleshooting](#troubleshooting)
   - [Server Not Responding](#server-not-responding)
   - [Tool Not Found](#tool-not-found)
@@ -26,38 +27,6 @@ This guide covers how to integrate simpletask with AI editors using the Model Co
   - [Invalid Branch Name](#invalid-branch-name)
   - [Validation Errors](#validation-errors)
 - [Technical Details](#technical-details)
-
-## What is MCP?
-
-The Model Context Protocol (MCP) is an open standard for connecting AI assistants to external tools and data sources. MCP enables AI editors to:
-
-- Query structured data from external tools
-- Execute operations through well-defined APIs
-- Receive typed responses instead of parsing text output
-
-simpletask implements an MCP server that exposes task file operations, allowing AI assistants to read task definitions, check completion status, and understand project requirements without requiring users to manually copy/paste content.
-
-## Why Use MCP with simpletask?
-
-**Without MCP:**
-- AI needs task content copy/pasted into chat
-- Status updates require manual CLI commands → copy output
-- AI cannot independently check task progress
-- Responses are unstructured CLI text
-
-**With MCP:**
-- AI automatically queries task files when needed
-- Structured JSON responses with typed data
-- AI can check status, criteria, and constraints independently
-- Pre-computed summaries (no arithmetic needed)
-- Better context awareness during development
-
-**Use Cases:**
-- AI understands acceptance criteria before writing code
-- AI checks which tasks are completed/in-progress
-- AI reads constraints to avoid invalid implementations
-- AI validates task files during development
-- AI switches between tasks in multi-branch workflows
 
 ## Quick Start
 
@@ -211,7 +180,7 @@ Refer to your MCP client's documentation for specific configuration file locatio
 
 ## Available Tools
 
-The simpletask MCP server exposes 2 read-only tools for querying task information.
+The simpletask MCP server exposes 5 tools for task management.
 
 ### simpletask_get
 
@@ -326,6 +295,161 @@ branches = simpletask_list()
 - "What tasks are available?"
 - "Show me all branches with task files"
 
+### simpletask_new
+
+Create a new task file without creating a git branch.
+
+**Parameters:**
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `branch` | string | Yes | - | Branch/task identifier (e.g., `feature/user-auth`) |
+| `title` | string | Yes | - | Human-readable task title |
+| `prompt` | string | Yes | - | Original user prompt/request |
+| `criteria` | array | No | placeholder | List of acceptance criteria descriptions |
+
+**Returns:**
+
+A `SimpleTaskGetResponse` object with the created spec and summary.
+
+**Example usage:**
+
+```python
+# Create task with criteria
+result = simpletask_new(
+    branch="feature/user-auth",
+    title="Add user authentication",
+    prompt="Implement JWT-based auth with login/logout",
+    criteria=[
+        "Users can register with email and password",
+        "Users can log in and receive JWT token",
+        "Protected routes require valid JWT"
+    ]
+)
+
+# Create task with placeholder criterion
+result = simpletask_new(
+    branch="bugfix/login-error",
+    title="Fix login error handling",
+    prompt="Login should show error message on invalid credentials"
+)
+```
+
+**AI prompts:**
+- "Create a new task for user authentication"
+- "Start a task for fixing the login bug"
+- "Set up a new feature task for notifications"
+
+### simpletask_task
+
+Manage implementation tasks (add, update, remove).
+
+**Parameters:**
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `action` | string | Yes | - | Operation: `add`, `update`, or `remove` |
+| `branch` | string | No | current branch | Branch name or omit for current git branch |
+| `task_id` | string | Conditional | - | Task ID (required for update/remove, e.g., `T001`) |
+| `name` | string | Conditional | - | Task name (required for add) |
+| `goal` | string | No | - | Task goal/description |
+| `status` | string | No | - | Status for update: `not_started`, `in_progress`, `completed`, `blocked` |
+
+**Returns:**
+
+A `SimpleTaskGetResponse` object with the updated spec and summary.
+
+**Example usage:**
+
+```python
+# Add a new task
+result = simpletask_task(
+    action="add",
+    name="Create User model",
+    goal="Define database schema for user accounts"
+)
+
+# Update task status
+result = simpletask_task(
+    action="update",
+    task_id="T001",
+    status="completed"
+)
+
+# Update task name/goal
+result = simpletask_task(
+    action="update",
+    task_id="T001",
+    name="Updated task name",
+    goal="Updated description"
+)
+
+# Remove task
+result = simpletask_task(
+    action="remove",
+    task_id="T001"
+)
+```
+
+**AI prompts:**
+- "Add a task for setting up the database"
+- "Mark task T001 as completed"
+- "Update T002 status to in progress"
+- "Remove task T003"
+
+### simpletask_criteria
+
+Manage acceptance criteria (add, complete, remove).
+
+**Parameters:**
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `action` | string | Yes | - | Operation: `add`, `complete`, or `remove` |
+| `branch` | string | No | current branch | Branch name or omit for current git branch |
+| `criterion_id` | string | Conditional | - | Criterion ID (required for complete/remove, e.g., `AC1`) |
+| `description` | string | Conditional | - | Description (required for add) |
+| `completed` | boolean | No | `true` | Completion status for `complete` action |
+
+**Returns:**
+
+A `SimpleTaskGetResponse` object with the updated spec and summary.
+
+**Example usage:**
+
+```python
+# Add a new criterion
+result = simpletask_criteria(
+    action="add",
+    description="Users can reset forgotten passwords"
+)
+
+# Mark criterion as completed
+result = simpletask_criteria(
+    action="complete",
+    criterion_id="AC2"
+)
+
+# Mark criterion as incomplete
+result = simpletask_criteria(
+    action="complete",
+    criterion_id="AC2",
+    completed=False
+)
+
+# Remove criterion
+result = simpletask_criteria(
+    action="remove",
+    criterion_id="AC3"
+)
+```
+
+**AI prompts:**
+- "Add a criterion for error handling"
+- "Mark AC1 as completed"
+- "Complete the first acceptance criterion"
+- "Remove criterion AC3"
+
 ## Usage Examples
 
 ### Example 1: Understanding Task Context
@@ -393,81 +517,108 @@ Task breakdown:
 You're making good progress! Focus on completing T006, then tackle the 2 remaining tasks.
 ```
 
-### Example 3: Multi-Branch Development
+### Example 3: Creating a New Task
 
-**Scenario:** You're working on multiple features and want to switch context.
+**Scenario:** You want to start working on a new feature.
 
 **User:**
 ```
-"List all my active tasks"
+"Create a task for adding email notifications"
 ```
 
 **AI workflow:**
-1. Calls `simpletask_list()` to get all branch names
-2. Optionally calls `simpletask_get(branch=...)` for each to get status
-3. Responds with task list
+1. Calls `simpletask_new()` to create task file
+2. Returns created spec with summary
+3. Responds with confirmation and next steps
 
 **AI response:**
 ```
-Active tasks in this project:
+Created task file: .tasks/feature-email-notifications.yml
 
-1. feature/auth - "Add user authentication" (in_progress)
-   - 1/3 criteria complete, 5/8 tasks done
+Task: "Add email notifications"
+Branch: feature/email-notifications
 
-2. feature/notifications - "Email notifications" (not_started)
-   - 0/4 criteria complete, 0/5 tasks done
+Acceptance criteria:
+○ AC1: Define acceptance criteria (placeholder)
 
-3. bugfix/login-redirect - "Fix login redirect loop" (completed)
-   - 2/2 criteria complete, 3/3 tasks done
+Next steps:
+1. Create the git branch: git checkout -b feature/email-notifications
+2. Add specific acceptance criteria
+3. Break down into implementation tasks
 
-You're currently on: feature/auth
+Would you like me to add acceptance criteria or implementation tasks?
 ```
 
 **User:**
 ```
-"Switch to the notifications task and tell me what needs to be done"
+"Add criteria: users receive email on signup, emails have unsubscribe link"
 ```
 
 **AI workflow:**
-1. Suggests: `git checkout feature/notifications`
-2. Calls `simpletask_get(branch="feature/notifications")`
-3. Summarizes task requirements
+1. Calls `simpletask_criteria(action="add", ...)` twice
+2. Returns updated spec
 
-### Example 4: Validating Task Files
+**AI response:**
+```
+Added 2 acceptance criteria:
 
-**Scenario:** You manually edited a task YAML file and want to verify it's valid.
+○ AC2: Users receive email on signup
+○ AC3: Emails have unsubscribe link
+
+Current progress: 0/3 criteria complete
+```
+
+### Example 4: Managing Task Progress
+
+**Scenario:** You completed a task and want to update its status.
 
 **User:**
 ```
-"Validate the current task file"
+"I finished the login form, mark T001 as done"
 ```
 
 **AI workflow:**
-1. Calls `simpletask_get(validate=True)`
-2. Checks `validation.valid` field
-3. Reports errors if any
+1. Calls `simpletask_task(action="update", task_id="T001", status="completed")`
+2. Returns updated summary
+3. Suggests next steps
 
-**AI response (valid):**
+**AI response:**
 ```
-✓ Task file is valid!
+✓ Marked T001 as completed
 
-File: .tasks/feature-auth.yml
-Schema version: 1.0
-All required fields present, no validation errors.
+Task: "Add user authentication" (feature/auth)
+
+Progress update:
+- Tasks: 6/8 completed (was 5/8)
+- Criteria: 1/3 completed
+
+Remaining tasks:
+○ T007: Add password reset flow (not_started)
+○ T008: Write integration tests (not_started)
+
+Would you like to start working on T007?
 ```
 
-**AI response (invalid):**
+**User:**
 ```
-✗ Task file validation failed
+"Yes, and also mark AC1 as complete since login works now"
+```
 
-File: .tasks/feature-auth.yml
+**AI workflow:**
+1. Calls `simpletask_task(action="update", task_id="T007", status="in_progress")`
+2. Calls `simpletask_criteria(action="complete", criterion_id="AC1")`
+3. Returns updated summary
 
-Errors:
-1. Missing required field: acceptance_criteria
-2. Invalid status value: "done" (must be one of: not_started, in_progress, completed, blocked)
-3. Task T003: Invalid prerequisites format (expected array, got string)
+**AI response:**
+```
+Updated task status:
 
-Fix these errors and validate again.
+✓ AC1: Users can log in with email and password (completed)
+⚙ T007: Add password reset flow (in_progress)
+
+Progress: 2/3 criteria complete, 6/8 tasks complete
+
+Ready to work on T007. The task goal is: "Allow users to reset forgotten passwords via email link"
 ```
 
 ## Troubleshooting
@@ -609,7 +760,7 @@ Fix these errors and validate again.
    ```
 
 6. **Reference schema:**
-   See [schema/README.md](../schema/README.md) for complete schema documentation.
+   See [Schema Reference](SCHEMA.md) for complete schema documentation.
 
 ## Technical Details
 
@@ -637,15 +788,8 @@ Fix these errors and validate again.
 - `ValueError`: Not in a git repository or invalid parameters
 
 **Limitations:**
-- Read-only operations (Phase 1)
-- Cannot create or modify task files via MCP
-- Cannot create git branches
+- Cannot create git branches (use git CLI)
 - No real-time file watching (must call tools to get updates)
-
-**Future enhancements (Phase 2):**
-- Write operations: `simpletask_new`, `simpletask_task_add`, etc.
-- Real-time updates via MCP notifications
-- Batch operations for multi-task queries
 
 ---
 

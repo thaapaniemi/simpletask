@@ -150,7 +150,7 @@ tasks:
       - Returns JWT token on success
 ```
 
-See [schema/README.md](schema/README.md) for the complete schema documentation.
+See [docs/SCHEMA.md](docs/SCHEMA.md) for the complete schema documentation.
 
 ## Commands
 

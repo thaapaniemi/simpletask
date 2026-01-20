@@ -1,30 +1,29 @@
-# SimpleTask Schema v1.0
+# Schema Reference
 
-JSON Schema for AI-friendly task definitions. Designed for branch-based development workflows where AI agents execute structured tasks.
+Task definition schema for simpletask YAML files (JSON Schema Draft 2020-12).
 
-## Files
+## Table of Contents
 
-| File | Description |
-|------|-------------|
-| `simpletask.schema.json` | JSON Schema (Draft 2020-12) |
-| `example.yml` | Valid example task file |
+- [Overview](#overview)
+- [Schema Structure](#schema-structure)
+  - [Required Fields](#required-fields)
+  - [Optional Fields](#optional-fields)
+  - [Acceptance Criterion](#acceptance-criterion)
+  - [Task](#task)
+  - [File Action](#file-action)
+  - [Code Example](#code-example)
+- [Status Values](#status-values)
+- [Example](#example)
 
-## Usage
+## Overview
 
-Add to your YAML file for editor validation:
+SimpleTask uses a JSON Schema to validate task definition files stored in `.tasks/`. The schema ensures consistent structure across all task files and enables tooling support.
 
-```yaml
-# yaml-language-server: $schema=simpletask.schema.json
-schema_version: "1.0"
-branch: feature/my-task
-# ...
-```
-
-Validate with ajv-cli:
-
-```bash
-ajv validate -s simpletask.schema.json -d task.yml --spec=draft2020 -c ajv-formats
-```
+Task files are YAML documents that define:
+- What the task is (title, original prompt)
+- When it's done (acceptance criteria)
+- How to implement it (tasks with steps)
+- What to avoid (constraints)
 
 ## Schema Structure
 
@@ -36,7 +35,7 @@ ajv validate -s simpletask.schema.json -d task.yml --spec=draft2020 -c ajv-forma
 | `branch` | string | Git branch name / task identifier |
 | `title` | string | Human-readable task title |
 | `original_prompt` | string | Verbatim user request that initiated the task |
-| `acceptance_criteria` | array | Criteria defining task completion |
+| `acceptance_criteria` | array | Criteria defining task completion (min 1 item) |
 
 ### Optional Fields
 
@@ -58,7 +57,7 @@ acceptance_criteria:
     completed: false
 ```
 
-All three fields required.
+**Required fields:** `id`, `description`, `completed`
 
 ### Task
 
@@ -85,7 +84,7 @@ tasks:
               pass
 ```
 
-Required: `id`, `name`, `status`, `goal`, `steps`
+**Required fields:** `id`, `name`, `status`, `goal`, `steps`
 
 ### File Action
 
@@ -94,6 +93,8 @@ files:
   - path: src/example.py
     action: create | modify | delete
 ```
+
+**Required fields:** `path`, `action`
 
 ### Code Example
 
@@ -105,19 +106,24 @@ code_examples:
       # code here
 ```
 
+**Required fields:** `language`, `code`
+
 ## Status Values
 
 Used for both top-level `status` and `tasks[].status`:
 
-- `not_started` - Work has not begun
-- `in_progress` - Currently being worked on
-- `blocked` - Cannot proceed (dependency/issue)
-- `completed` - Done
+| Value | Description |
+|-------|-------------|
+| `not_started` | Work has not begun |
+| `in_progress` | Currently being worked on |
+| `blocked` | Cannot proceed (dependency/issue) |
+| `completed` | Done |
 
-## Minimal Example
+## Example
+
+Minimal valid task file:
 
 ```yaml
-# yaml-language-server: $schema=simpletask.schema.json
 schema_version: "1.0"
 branch: fix/typo-readme
 title: Fix typo in README
@@ -128,7 +134,3 @@ acceptance_criteria:
     description: Typo is corrected
     completed: false
 ```
-
-## Full Example
-
-See `example.yml` for a comprehensive task definition.
