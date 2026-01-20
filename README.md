@@ -66,7 +66,44 @@ pip install -e ".[dev]"
 
 ## Usage
 
-### Create a new task
+### With AI Tools (Recommended)
+
+The recommended workflow uses slash commands in supported AI editors. These guide the AI through planning, implementing, and reviewing your feature:
+
+| Command | Description |
+|---------|-------------|
+| `/simpletask.plan <feature>` | Create specification and implementation plan from feature description |
+| `/simpletask.implement` | Execute tasks from the plan, updating status as you go |
+| `/simpletask.review` | Review implementation against acceptance criteria |
+
+**Workflow:**
+
+```
+/simpletask.plan Add user authentication with JWT
+  → Creates branch, task file with acceptance criteria and tasks
+
+/simpletask.implement
+  → AI executes tasks, marks progress, commits changes
+
+/simpletask.review
+  → Reviews code quality, verifies criteria met, adds fix tasks if needed
+```
+
+**Supported AI tools:**
+
+- **[OpenCode](https://opencode.ai)** - Install slash commands:
+  ```sh
+  mkdir -p ~/.config/opencode/commands
+  cp cli/simpletask/templates/opencode/*.md ~/.config/opencode/commands/
+  ```
+
+Also configure the MCP server for structured AI access to task data. See [MCP Integration Guide](docs/MCP.md) for setup instructions.
+
+### With CLI (Manual Verification)
+
+CLI commands are useful for manual verification, scripting, or when AI tools aren't available.
+
+#### Create a new task
 
 ```sh
 simpletask new "Add user authentication" --branch feature/auth
@@ -74,7 +111,7 @@ simpletask new "Add user authentication" --branch feature/auth
 
 This creates a task file in `.tasks/feature-auth.yml` linked to the `feature/auth` branch.
 
-### View current task
+#### View current task
 
 ```sh
 simpletask show
@@ -82,25 +119,25 @@ simpletask show
 
 Shows the task associated with the current git branch.
 
-### List all tasks
+#### List all tasks
 
 ```sh
 simpletask list
 ```
 
-### Add acceptance criteria
+#### Add acceptance criteria
 
 ```sh
 simpletask criteria add "Users can log in with email and password"
 ```
 
-### Mark criteria as complete
+#### Mark criteria as complete
 
 ```sh
 simpletask criteria complete AC1
 ```
 
-### Check task status
+#### Check task status
 
 ```sh
 simpletask status
