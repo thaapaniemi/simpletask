@@ -2,7 +2,7 @@
 
 import typer
 
-from ..core.project import get_task_file_path
+from ..core.project import ensure_project, get_task_file_path
 from ..core.yaml_parser import InvalidTaskFileError, parse_task_file
 from ..utils.console import console, error
 
@@ -13,6 +13,7 @@ def show(
     """Show detailed information about a task.
 
     Displays:
+    - Task file location
     - Title, status, branch
     - Acceptance criteria with completion status
     - Implementation tasks (if defined)
@@ -22,14 +23,21 @@ def show(
         simpletask show                    # Uses current git branch
         simpletask show add-dark-mode      # Explicit branch
     """
+    task_file = None
     try:
         task_file = get_task_file_path(branch)
+        project = ensure_project()
 
         # Parse task file
         spec = parse_task_file(task_file)
 
+        # Display file location (relative to project root)
+        relative_path = task_file.relative_to(project.root)
+        console.print(f"\n[bold]Task File:[/bold] {relative_path}")
+        console.print()
+
         # Display task information
-        console.print(f"\n[bold cyan]Task:[/bold cyan] {spec.title}")
+        console.print(f"[bold cyan]Task:[/bold cyan] {spec.title}")
         console.print(f"[bold]Branch:[/bold] {spec.branch}")
         console.print(f"[bold]Status:[/bold] {spec.status.value}")
         if spec.created:
