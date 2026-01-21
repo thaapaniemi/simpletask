@@ -91,13 +91,25 @@ The recommended workflow uses slash commands in supported AI editors. These guid
 
 **Supported AI tools:**
 
-- **[OpenCode](https://opencode.ai)** - Install slash commands:
+- **[OpenCode](https://opencode.ai)** and **[Qwen](https://github.com/QwenLM/qwen-code)** - Install workflow commands:
   ```sh
-  mkdir -p ~/.config/opencode/commands
-  cp cli/simpletask/templates/opencode/*.md ~/.config/opencode/commands/
+  simpletask ai install              # Both editors
+  simpletask ai install --opencode   # OpenCode only
+  simpletask ai install --qwen       # Qwen only
+  simpletask ai install --local      # Project-local installation
   ```
 
-Also configure the MCP server for structured AI access to task data. See [MCP Integration Guide](docs/MCP.md) for setup instructions.
+The three workflow commands are:
+- `/simpletask.plan` - Create specification and implementation plan
+- `/simpletask.implement` - Execute tasks from the plan
+- `/simpletask.review` - Review implementation against acceptance criteria
+
+See the [MCP Integration Guide](docs/MCP.md) for MCP server configuration and detailed setup instructions.
+
+**Check installation status:**
+```sh
+simpletask ai list
+```
 
 ### With CLI (Manual Verification)
 
@@ -243,7 +255,7 @@ simpletask includes a Model Context Protocol (MCP) server for integration with A
 simpletask serve
 ```
 
-Then configure your AI editor to connect to the server. For detailed setup instructions including configuration for OpenCode, Qwen-CLI, Claude Desktop, and other MCP clients, see the [MCP Integration Guide](docs/MCP.md).
+Then configure your AI editor to connect to the server. For detailed setup instructions including configuration for OpenCode, Qwen-CLI, and other MCP clients, see the [MCP Integration Guide](docs/MCP.md).
 
 ## Development
 

@@ -90,6 +90,12 @@ cli/simpletask/           # Main CLI package
 │   └── task_file_manager.py
 ├── utils/
 │   └── console.py        # Rich console output utilities
+├── mcp/                  # MCP server integration
+│   ├── server.py         # Server implementation
+│   └── models.py         # MCP-specific models
+├── templates/            # AI workflow templates
+│   ├── opencode/         # OpenCode slash commands (.md)
+│   └── qwen/             # Qwen slash commands (.toml)
 └── schema/
     └── task_schema.json  # JSON schema for validation
 
@@ -224,34 +230,6 @@ To find the full path:
 which simpletask
 # or
 uv tool dir simpletask
-```
-
-#### Claude Desktop Configuration
-
-Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or equivalent:
-
-```json
-{
-  "mcpServers": {
-    "simpletask": {
-      "command": "simpletask",
-      "args": ["serve"]
-    }
-  }
-}
-```
-
-**Note:** If simpletask is installed in a virtualenv, use the full path to the executable:
-
-```json
-{
-  "mcpServers": {
-    "simpletask": {
-      "command": "/path/to/venv/bin/simpletask",
-      "args": ["serve"]
-    }
-  }
-}
 ```
 
 ### Available Tools
@@ -703,6 +681,9 @@ The `.tasks/` directory contains task definition files used during development b
 | `cli/simpletask/core/models.py` | Pydantic data models |
 | `cli/simpletask/core/yaml_parser.py` | YAML file read/write operations |
 | `cli/simpletask/core/git.py` | Git repository operations |
+| `cli/simpletask/core/ai_templates.py` | Template installation and management |
+| `cli/simpletask/templates/` | AI workflow templates (slash commands for OpenCode/Qwen) |
+| `cli/simpletask/mcp/server.py` | MCP server implementation |
 | `cli/simpletask/schema/task_schema.json` | JSON schema for task validation |
 | `tests/conftest.py` | Shared test fixtures |
 | `pyproject.toml` | Project configuration, dependencies |

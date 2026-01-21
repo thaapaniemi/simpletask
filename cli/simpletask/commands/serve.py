@@ -7,7 +7,7 @@ def serve() -> None:
     """Start MCP server for AI editor integration.
 
     Runs the Model Context Protocol server on stdio transport.
-    Configure your AI editor (OpenCode, Claude Desktop, Cursor) to connect.
+    Configure your AI editor (OpenCode or other MCP-compatible clients) to connect.
 
     Example OpenCode configuration (~/.config/opencode/settings.json):
 

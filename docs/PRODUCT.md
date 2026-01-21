@@ -51,7 +51,7 @@ Track completion at two levels:
 
 ### AI-Native Integration
 
-simpletask includes an MCP (Model Context Protocol) server that exposes task operations as structured tools. AI editors like Claude Desktop and OpenCode can:
+simpletask includes an MCP (Model Context Protocol) server that exposes task operations as structured tools. AI editors like OpenCode can:
 
 - Query current task status and acceptance criteria
 - Understand implementation steps and constraints
