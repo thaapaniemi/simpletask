@@ -35,6 +35,7 @@ Task files are YAML documents that define:
 | `branch` | string | Git branch name / task identifier |
 | `title` | string | Human-readable task title |
 | `original_prompt` | string | Verbatim user request that initiated the task |
+| `created` | datetime | Task creation timestamp (ISO 8601 format) |
 | `acceptance_criteria` | array | Criteria defining task completion (min 1 item) |
 
 ### Optional Fields

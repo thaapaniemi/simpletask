@@ -156,6 +156,7 @@ def simpletask_task(
     name: str | None = None,
     goal: str | None = None,
     status: str | None = None,
+    steps: list[str] | None = None,
 ) -> SimpleTaskWriteResponse | SimpleTaskItemResponse:
     """Manage implementation tasks.
 
@@ -167,6 +168,8 @@ def simpletask_task(
         goal: Task goal/description
         status: Task status for 'update' only: not_started, in_progress, completed, blocked
                Note: 'add' action ignores this - new tasks always start as not_started
+        steps: List of detailed task steps (optional for add). None or [] adds placeholder step ['To be defined'].
+               Only applies to action='add'.
 
     Returns:
         SimpleTaskWriteResponse for write operations (add/update/remove).
@@ -201,7 +204,7 @@ def simpletask_task(
             if not name:
                 raise ValueError("'name' is required for action='add'")
             # Note: status param intentionally ignored for add - new tasks start as not_started
-            add_implementation_task(file_path, name, goal)
+            add_implementation_task(file_path, name, goal, steps=steps)
             spec = parse_task_file(file_path)
             summary = compute_status_summary(spec)
             # Find the newly added task (should be last one)

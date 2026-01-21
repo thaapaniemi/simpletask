@@ -1,6 +1,7 @@
 """YAML parsing for task files."""
 
 from pathlib import Path
+from typing import Any
 
 import yaml
 from pydantic import ValidationError
@@ -63,6 +64,40 @@ def parse_task_file(path: Path) -> SimpleTaskSpec:
         ) from e
 
     return spec
+
+
+def parse_task_file_lenient(path: Path) -> dict[str, Any]:
+    """Parse task YAML without Pydantic validation (for repair).
+
+    Use this when you need to read a potentially broken task file
+    to repair it. Returns raw dict without schema validation.
+
+    Args:
+        path: Path to task YAML file
+
+    Returns:
+        Raw dict from YAML
+
+    Raises:
+        FileNotFoundError: If file doesn't exist
+        InvalidTaskFileError: If YAML syntax is invalid
+    """
+    if not path.exists():
+        raise FileNotFoundError(f"Task file not found: {path}")
+
+    content = path.read_text(encoding="utf-8")
+
+    try:
+        data = yaml.safe_load(content)
+    except yaml.YAMLError as e:
+        raise InvalidTaskFileError(f"Invalid YAML syntax:\n{e!s}\n\nFile: {path}") from e
+
+    if not isinstance(data, dict):
+        raise InvalidTaskFileError(
+            f"Invalid YAML content: Expected dict, got {type(data).__name__}.\nFile: {path}"
+        )
+
+    return data
 
 
 def write_task_file(path: Path, spec: SimpleTaskSpec) -> None:
@@ -163,6 +198,7 @@ def update_criterion_status(path: Path, criterion_id: str, completed: bool) -> N
 __all__ = [
     "InvalidTaskFileError",
     "parse_task_file",
+    "parse_task_file_lenient",
     "update_criterion_status",
     "update_task_status",
     "write_task_file",

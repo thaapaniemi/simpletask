@@ -62,9 +62,7 @@ classDiagram
         +str branch
         +str title
         +str original_prompt
-        +TaskStatus status
         +datetime created
-        +datetime updated
         +list~AcceptanceCriterion~ acceptance_criteria
         +list~str~ constraints
         +dict context

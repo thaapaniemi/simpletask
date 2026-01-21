@@ -339,9 +339,7 @@ schema_version: "1.0"
 branch: feature/user-auth
 title: Add user authentication to the application
 original_prompt: "Add user login and registration with JWT tokens"
-status: not_started
 created: "2026-01-18T10:00:00Z"
-updated: "2026-01-18T10:00:00Z"
 
 acceptance_criteria:
   - id: AC1

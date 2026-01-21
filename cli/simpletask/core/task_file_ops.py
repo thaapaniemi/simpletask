@@ -22,7 +22,7 @@ def create_task_file(
         title: Human-readable task title
         prompt: Original user prompt/request
         criteria: Optional list of acceptance criteria descriptions.
-                 None adds placeholder, empty list skips placeholder.
+                 None or [] adds placeholder.
 
     Returns:
         The created SimpleTaskSpec
@@ -48,7 +48,14 @@ def create_task_file(
             for i, desc in enumerate(criteria)
         ]
     else:
-        ac_list = []
+        # Empty list or explicit [] both get placeholder
+        ac_list = [
+            AcceptanceCriterion(
+                id="AC1",
+                description="Task completion criteria (to be filled)",
+                completed=False,
+            )
+        ]
 
     spec = SimpleTaskSpec(
         schema_version="1.0",

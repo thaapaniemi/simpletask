@@ -55,10 +55,23 @@ class TestSimpletaskNew:
         assert result.summary.criteria_total == 1
         assert "1 criteria" in result.message
 
-    def test_criteria_empty_list_raises(self, temp_project):
-        """Test that criteria=[] raises ValidationError (min_length=1)."""
-        with pytest.raises(Exception):  # Pydantic ValidationError
-            simpletask_new(branch="t", title="T", prompt="P", criteria=[])
+    def test_criteria_empty_list_creates_placeholder(self, temp_project):
+        """Test that criteria=[] creates a placeholder criterion."""
+        from simpletask.core.project import get_task_file_path
+        from simpletask.core.yaml_parser import parse_task_file
+
+        result = simpletask_new(branch="t", title="T", prompt="P", criteria=[])
+
+        # Should succeed and create placeholder
+        assert result.success is True
+        assert result.summary.criteria_total == 1
+
+        # Verify placeholder criterion by reading the file
+        task_path = get_task_file_path("t")
+        spec = parse_task_file(task_path)
+        assert len(spec.acceptance_criteria) == 1
+        assert spec.acceptance_criteria[0].id == "AC1"
+        assert "to be filled" in spec.acceptance_criteria[0].description.lower()
 
     def test_criteria_list_creates_criteria(self, temp_project):
         """Test that criteria list creates criteria with correct IDs."""
@@ -281,3 +294,223 @@ class TestSimpletaskCriteria:
         """Test that getting non-existent criterion raises ValueError."""
         with pytest.raises(ValueError, match="not found"):
             simpletask_criteria(action="get", branch="test", criterion_id="AC999")
+
+
+class TestCriteriaRepair:
+    """Tests for automatic repair of broken task files."""
+
+    def test_repair_empty_criteria(self, temp_project):
+        """Test that empty acceptance_criteria is automatically repaired."""
+        from simpletask.core.project import get_task_file_path
+        from simpletask.core.yaml_parser import parse_task_file
+        import yaml
+
+        # Create task with empty criteria manually
+        task_path = get_task_file_path("repair-test")
+        task_path.parent.mkdir(parents=True, exist_ok=True)
+
+        broken_data = {
+            "schema_version": "1.0",
+            "branch": "repair-test",
+            "title": "Test Repair",
+            "original_prompt": "Test",
+            "created": "2024-01-01T00:00:00Z",
+            "acceptance_criteria": [],  # EMPTY - violates min_length=1
+        }
+
+        task_path.write_text(yaml.dump(broken_data))
+
+        # This should trigger repair and succeed
+        result = simpletask_criteria(
+            action="add", branch="repair-test", description="New criterion"
+        )
+
+        assert result.success is True
+        # Should have placeholder AC1 + new AC2
+        assert result.summary.criteria_total == 2
+
+        # Verify repair happened (placeholder was added) by reading file
+        spec = parse_task_file(task_path)
+        assert spec.acceptance_criteria[0].id == "AC1"
+        assert "to be filled" in spec.acceptance_criteria[0].description.lower()
+        assert spec.acceptance_criteria[1].id == "AC2"
+        assert spec.acceptance_criteria[1].description == "New criterion"
+
+    def test_repair_unknown_fields(self, temp_project):
+        """Test that unknown root fields are automatically stripped."""
+        from simpletask.core.project import get_task_file_path
+        from simpletask.core.yaml_parser import parse_task_file
+        import yaml
+
+        # Create task with invalid root fields
+        task_path = get_task_file_path("repair-test2")
+        task_path.parent.mkdir(parents=True, exist_ok=True)
+
+        broken_data = {
+            "schema_version": "1.0",
+            "branch": "repair-test2",
+            "title": "Test Repair",
+            "original_prompt": "Test",
+            "created": "2024-01-01T00:00:00Z",
+            "status": "in_progress",  # INVALID at root level
+            "updated": "2024-01-02T00:00:00Z",  # INVALID at root level
+            "acceptance_criteria": [{"id": "AC1", "description": "Test", "completed": False}],
+        }
+
+        task_path.write_text(yaml.dump(broken_data))
+
+        # This should trigger repair and succeed
+        result = simpletask_criteria(
+            action="add", branch="repair-test2", description="New criterion"
+        )
+
+        assert result.success is True
+
+        # Verify unknown fields were stripped
+        spec = parse_task_file(task_path)
+        assert not hasattr(spec, "status")
+        assert not hasattr(spec, "updated")
+
+        # Re-read raw YAML to verify fields are gone
+        raw_data = yaml.safe_load(task_path.read_text())
+        assert "status" not in raw_data
+        assert "updated" not in raw_data
+
+    def test_repair_combined(self, temp_project):
+        """Test repair of both empty criteria and unknown fields."""
+        from simpletask.core.project import get_task_file_path
+        from simpletask.core.yaml_parser import parse_task_file
+        import yaml
+
+        # Create task with BOTH issues
+        task_path = get_task_file_path("repair-test3")
+        task_path.parent.mkdir(parents=True, exist_ok=True)
+
+        broken_data = {
+            "schema_version": "1.0",
+            "branch": "repair-test3",
+            "title": "Test Repair Combined",
+            "original_prompt": "Test",
+            "created": "2024-01-01T00:00:00Z",
+            "status": "in_progress",  # INVALID
+            "updated": "2024-01-02T00:00:00Z",  # INVALID
+            "acceptance_criteria": [],  # EMPTY - violates constraint
+        }
+
+        task_path.write_text(yaml.dump(broken_data))
+
+        # This should repair both issues and succeed
+        result = simpletask_criteria(
+            action="add", branch="repair-test3", description="New criterion"
+        )
+
+        assert result.success is True
+        assert result.summary.criteria_total == 2  # Placeholder + new
+
+        # Verify full repair
+        spec = parse_task_file(task_path)
+        assert not hasattr(spec, "status")
+        assert not hasattr(spec, "updated")
+        assert len(spec.acceptance_criteria) == 2
+        assert spec.acceptance_criteria[0].id == "AC1"
+        assert "to be filled" in spec.acceptance_criteria[0].description.lower()
+
+
+class TestTaskStepsParameter:
+    """Tests for steps parameter in simpletask_task."""
+
+    def test_task_add_steps_none(self, temp_project):
+        """Test that steps=None creates placeholder."""
+        from simpletask.core.yaml_parser import parse_task_file
+        from simpletask.core.project import get_task_file_path
+
+        # Create task file first
+        simpletask_new(branch="steps-test", title="Test", prompt="Test", criteria=["AC1"])
+
+        # Add task with steps=None (default)
+        result = simpletask_task(
+            action="add",
+            branch="steps-test",
+            name="Test Task",
+            goal="Test goal",
+            # steps not provided = None
+        )
+
+        assert result.success is True
+
+        # Verify placeholder was created by reading the file
+        task_path = get_task_file_path("steps-test")
+        spec = parse_task_file(task_path)
+        task = spec.tasks[0]
+        assert task.steps == ["To be defined"]
+
+    def test_task_add_steps_empty(self, temp_project):
+        """Test that steps=[] creates placeholder."""
+        from simpletask.core.yaml_parser import parse_task_file
+        from simpletask.core.project import get_task_file_path
+
+        simpletask_new(branch="steps-test2", title="Test", prompt="Test", criteria=["AC1"])
+
+        result = simpletask_task(
+            action="add",
+            branch="steps-test2",
+            name="Test Task",
+            goal="Test goal",
+            steps=[],  # Explicit empty list
+        )
+
+        assert result.success is True
+
+        # Verify placeholder was created by reading the file
+        task_path = get_task_file_path("steps-test2")
+        spec = parse_task_file(task_path)
+        task = spec.tasks[0]
+        assert task.steps == ["To be defined"]
+
+    def test_task_add_steps_provided(self, temp_project):
+        """Test that provided steps are used."""
+        from simpletask.core.yaml_parser import parse_task_file
+        from simpletask.core.project import get_task_file_path
+
+        simpletask_new(branch="steps-test3", title="Test", prompt="Test", criteria=["AC1"])
+
+        custom_steps = ["Step 1", "Step 2", "Step 3"]
+        result = simpletask_task(
+            action="add",
+            branch="steps-test3",
+            name="Test Task",
+            goal="Test goal",
+            steps=custom_steps,
+        )
+
+        assert result.success is True
+
+        # Verify custom steps were used by reading the file
+        task_path = get_task_file_path("steps-test3")
+        spec = parse_task_file(task_path)
+        task = spec.tasks[0]
+        assert task.steps == custom_steps
+        assert len(task.steps) == 3
+
+    def test_task_add_steps_in_yaml(self, temp_project):
+        """Test that steps are properly serialized in YAML."""
+        from simpletask.core.project import get_task_file_path
+        import yaml
+
+        simpletask_new(branch="steps-test4", title="Test", prompt="Test", criteria=["AC1"])
+
+        simpletask_task(
+            action="add",
+            branch="steps-test4",
+            name="Test Task",
+            steps=["First step", "Second step"],
+        )
+
+        # Read raw YAML to verify serialization
+        task_path = get_task_file_path("steps-test4")
+        raw_data = yaml.safe_load(task_path.read_text())
+
+        assert "tasks" in raw_data
+        assert len(raw_data["tasks"]) == 1
+        assert "steps" in raw_data["tasks"][0]
+        assert raw_data["tasks"][0]["steps"] == ["First step", "Second step"]

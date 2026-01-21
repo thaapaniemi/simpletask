@@ -3,7 +3,8 @@
 from pathlib import Path
 
 from .models import AcceptanceCriterion
-from .yaml_parser import parse_task_file, write_task_file
+from .repair import repair_task_file
+from .yaml_parser import InvalidTaskFileError, parse_task_file, write_task_file
 
 
 def get_next_criterion_id(criteria: list[AcceptanceCriterion]) -> str:
@@ -27,6 +28,8 @@ def add_acceptance_criterion(
 ) -> str:
     """Add a new acceptance criterion to the task file.
 
+    Automatically repairs broken task files with empty criteria or unknown fields.
+
     Args:
         file_path: Path to task YAML file
         description: Criterion description
@@ -36,9 +39,14 @@ def add_acceptance_criterion(
 
     Raises:
         FileNotFoundError: If task file doesn't exist
+        InvalidTaskFileError: If task file cannot be repaired
     """
-    # Parse existing file
-    spec = parse_task_file(file_path)
+    # Parse existing file (with automatic repair if needed)
+    try:
+        spec = parse_task_file(file_path)
+    except InvalidTaskFileError:
+        # Attempt automatic repair for common issues
+        spec = repair_task_file(file_path)
 
     # Generate new ID
     new_id = get_next_criterion_id(spec.acceptance_criteria)

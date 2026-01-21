@@ -3,7 +3,8 @@
 from pathlib import Path
 
 from .models import Task, TaskStatus
-from .yaml_parser import parse_task_file, write_task_file
+from .repair import repair_task_file
+from .yaml_parser import InvalidTaskFileError, parse_task_file, write_task_file
 
 
 def get_next_task_id(tasks: list[Task]) -> str:
@@ -26,6 +27,7 @@ def add_implementation_task(
     name: str,
     goal: str | None = None,
     status: TaskStatus = TaskStatus.NOT_STARTED,
+    steps: list[str] | None = None,
 ) -> str:
     """Add a new implementation task to the task file.
 
@@ -34,19 +36,29 @@ def add_implementation_task(
         name: Task name
         goal: Optional task goal/description (defaults to name if not provided)
         status: Initial status (default: not_started)
+        steps: Optional list of task steps. None or [] adds placeholder step.
 
     Returns:
         New task ID
 
     Raises:
         FileNotFoundError: If task file doesn't exist
+        InvalidTaskFileError: If task file cannot be repaired
     """
-    # Parse existing file
-    spec = parse_task_file(file_path)
+    # Parse existing file (with automatic repair if needed)
+    try:
+        spec = parse_task_file(file_path)
+    except InvalidTaskFileError:
+        # Attempt automatic repair for common issues
+        spec = repair_task_file(file_path)
 
     # Default goal to name if not provided
     if goal is None:
         goal = name
+
+    # Default steps to placeholder if not provided or empty
+    if not steps:
+        steps = ["To be defined"]
 
     # Generate new ID
     tasks = spec.tasks or []
@@ -58,7 +70,7 @@ def add_implementation_task(
         name=name,
         goal=goal,
         status=status,
-        steps=["To be defined"],  # Default placeholder step
+        steps=steps,
     )
 
     # Append task
@@ -91,9 +103,14 @@ def update_implementation_task(
     Raises:
         ValueError: If task not found
         FileNotFoundError: If task file doesn't exist
+        InvalidTaskFileError: If task file cannot be repaired
     """
-    # Parse existing file
-    spec = parse_task_file(file_path)
+    # Parse existing file (with automatic repair if needed)
+    try:
+        spec = parse_task_file(file_path)
+    except InvalidTaskFileError:
+        # Attempt automatic repair for common issues
+        spec = repair_task_file(file_path)
 
     if not spec.tasks:
         raise ValueError(f"No tasks defined in {file_path}")
@@ -129,9 +146,14 @@ def remove_implementation_task(
     Raises:
         ValueError: If task not found
         FileNotFoundError: If task file doesn't exist
+        InvalidTaskFileError: If task file cannot be repaired
     """
-    # Parse existing file
-    spec = parse_task_file(file_path)
+    # Parse existing file (with automatic repair if needed)
+    try:
+        spec = parse_task_file(file_path)
+    except InvalidTaskFileError:
+        # Attempt automatic repair for common issues
+        spec = repair_task_file(file_path)
 
     if not spec.tasks:
         raise ValueError(f"No tasks defined in {file_path}")

@@ -241,7 +241,7 @@ The MCP server exposes 5 tools for task management:
 | `simpletask_get` | Get complete task specification with status summary | `branch` (str, optional): Branch name or None for current<br>`validate` (bool, optional): Include schema validation (default: false) |
 | `simpletask_list` | List all task file branch names in the project | None |
 | `simpletask_new` | Create a new task file | `branch` (str): Branch identifier<br>`title` (str): Task title<br>`prompt` (str): Original user request<br>`criteria` (list[str] \| None, optional): Acceptance criteria |
-| `simpletask_task` | Manage implementation tasks (add/update/remove) | `action` (str): 'add', 'update', or 'remove'<br>`branch` (str, optional): Branch name or None for current<br>`task_id` (str, optional): Task ID (required for update/remove)<br>`name` (str, optional): Task name (required for add)<br>`goal` (str, optional): Task goal/description<br>`status` (str, optional): Status for update ('not_started', 'in_progress', 'completed', 'blocked') |
+| `simpletask_task` | Manage implementation tasks (add/update/remove) | `action` (str): 'add', 'update', or 'remove'<br>`branch` (str, optional): Branch name or None for current<br>`task_id` (str, optional): Task ID (required for update/remove)<br>`name` (str, optional): Task name (required for add)<br>`goal` (str, optional): Task goal/description<br>`status` (str, optional): Status for update ('not_started', 'in_progress', 'completed', 'blocked')<br>`steps` (list[str] \| None, optional): Task steps for add action. None or [] adds placeholder ['To be defined'] |
 | `simpletask_criteria` | Manage acceptance criteria (add/complete/remove) | `action` (str): 'add', 'complete', or 'remove'<br>`branch` (str, optional): Branch name or None for current<br>`criterion_id` (str, optional): Criterion ID (required for complete/remove)<br>`description` (str, optional): Description (required for add)<br>`completed` (bool, optional): Completion status for 'complete' (default: true) |
 
 ### Tool Details
@@ -347,8 +347,8 @@ result = simpletask_new(
 
 **Edge Cases:**
 - File already exists → raises `FileExistsError`
-- `criteria=[]` → raises `ValidationError` (schema requires min_length=1)
-- `criteria=None` → creates one placeholder: "Define acceptance criteria"
+- `criteria=[]` → creates placeholder criterion `AC1` with description "Task completion criteria (to be filled)"
+- `criteria=None` → creates placeholder criterion `AC1` with description "Task completion criteria (to be filled)"
 
 #### simpletask_task
 
@@ -361,6 +361,7 @@ Unified tool for managing implementation tasks with four actions.
 - `name` (optional): Task name (required for add)
 - `goal` (optional): Task goal/description
 - `status` (optional): Task status for update only. Valid values: 'not_started', 'in_progress', 'completed', 'blocked'. **Note:** 'add' action ignores this parameter - new tasks always start as `not_started`.
+- `steps` (optional): List of detailed task steps for add action. None or [] adds placeholder step ['To be defined']. Only applies when action='add'.
 
 **Returns:** 
 - `SimpleTaskWriteResponse` for write operations (add/update/remove)
@@ -399,6 +400,16 @@ result = simpletask_task(
     task_id="T001",
     name="Create User model",
     goal="Define database schema for user accounts"
+)
+
+# Add a new task with specific steps
+result = simpletask_task(
+    action="add",
+    branch="feature/user-auth",
+    task_id="T002",
+    name="Implement authentication endpoints",
+    goal="Create login and logout API endpoints",
+    steps=["Define API routes", "Implement JWT generation", "Add password hashing", "Write tests"]
 )
 
 # Update task status

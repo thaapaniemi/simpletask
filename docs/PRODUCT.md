@@ -79,7 +79,6 @@ schema_version: "1.0"
 branch: feature/user-auth
 title: Add user authentication
 original_prompt: "Implement JWT-based login with email/password"
-status: in_progress
 
 acceptance_criteria:
   - id: AC1

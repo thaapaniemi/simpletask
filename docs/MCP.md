@@ -204,9 +204,7 @@ A `SimpleTaskGetResponse` object with:
     branch: string
     title: string
     original_prompt: string
-    status: "not_started" | "in_progress" | "completed" | "blocked"
     created: string (ISO 8601)
-    updated: string (ISO 8601)
     acceptance_criteria: [
       {
         id: string
@@ -748,7 +746,7 @@ Ready to work on T007. The task goal is: "Allow users to reset forgotten passwor
    ```
 
 3. **Validate required fields:**
-   Required: `schema_version`, `branch`, `title`, `original_prompt`, `status`, `created`, `updated`, `acceptance_criteria`
+   Required: `schema_version`, `branch`, `title`, `original_prompt`, `created`, `acceptance_criteria`
 
 4. **Check enum values:**
    - Status: `not_started`, `in_progress`, `completed`, `blocked`
