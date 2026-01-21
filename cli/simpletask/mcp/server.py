@@ -22,7 +22,13 @@ from ..core.task_ops import (
 )
 from ..core.validation import validate_task_file
 from ..core.yaml_parser import parse_task_file
-from .models import SimpleTaskGetResponse, ValidationResult, compute_status_summary
+from .models import (
+    SimpleTaskGetResponse,
+    SimpleTaskItemResponse,
+    SimpleTaskWriteResponse,
+    ValidationResult,
+    compute_status_summary,
+)
 
 # Initialize FastMCP server
 mcp = FastMCP("simpletask")
@@ -108,7 +114,7 @@ def simpletask_new(
     title: str,
     prompt: str,
     criteria: list[str] | None = None,
-) -> SimpleTaskGetResponse:
+) -> SimpleTaskWriteResponse:
     """Create a new task file.
 
     Creates task file at .tasks/<branch>.yml without creating git branch.
@@ -123,7 +129,7 @@ def simpletask_new(
                  If empty list, no criteria added.
 
     Returns:
-        SimpleTaskGetResponse with created spec and summary.
+        SimpleTaskWriteResponse with minimal confirmation and summary.
 
     Raises:
         ValueError: If task already exists or not in git repository.
@@ -133,36 +139,38 @@ def simpletask_new(
     file_path = project.get_task_file(branch)
     summary = compute_status_summary(spec)
 
-    return SimpleTaskGetResponse(
-        spec=spec,
+    return SimpleTaskWriteResponse(
+        success=True,
+        action="task_file_created",
+        message=f"Created task file for '{title}' with {len(spec.acceptance_criteria)} criteria",
         file_path=str(file_path),
         summary=summary,
-        validation=None,
     )
 
 
 @mcp.tool()
 def simpletask_task(
-    action: Literal["add", "update", "remove"],
+    action: Literal["add", "update", "remove", "get"],
     branch: str | None = None,
     task_id: str | None = None,
     name: str | None = None,
     goal: str | None = None,
     status: str | None = None,
-) -> SimpleTaskGetResponse:
+) -> SimpleTaskWriteResponse | SimpleTaskItemResponse:
     """Manage implementation tasks.
 
     Args:
-        action: Operation to perform ('add', 'update', 'remove')
+        action: Operation to perform ('add', 'update', 'remove', 'get')
         branch: Branch name, or None for current git branch
-        task_id: Task ID (required for update/remove)
+        task_id: Task ID (required for update/remove/get)
         name: Task name (required for add)
         goal: Task goal/description
         status: Task status for 'update' only: not_started, in_progress, completed, blocked
                Note: 'add' action ignores this - new tasks always start as not_started
 
     Returns:
-        SimpleTaskGetResponse with updated spec and summary.
+        SimpleTaskWriteResponse for write operations (add/update/remove).
+        SimpleTaskItemResponse for get operations.
 
     Raises:
         ValueError: If required parameters missing or invalid values provided.
@@ -170,6 +178,21 @@ def simpletask_task(
     file_path = get_task_file_path(branch)
 
     match action:
+        case "get":
+            if not task_id:
+                raise ValueError("'task_id' is required for action='get'")
+            spec = parse_task_file(file_path)
+            task = next((t for t in spec.tasks or [] if t.id == task_id), None)
+            if not task:
+                raise ValueError(f"Task '{task_id}' not found")
+            summary = compute_status_summary(spec)
+            return SimpleTaskItemResponse(
+                task=task,
+                criterion=None,
+                file_path=str(file_path),
+                summary=summary,
+            )
+
         case "add":
             if task_id is not None:
                 raise ValueError(
@@ -179,6 +202,17 @@ def simpletask_task(
                 raise ValueError("'name' is required for action='add'")
             # Note: status param intentionally ignored for add - new tasks start as not_started
             add_implementation_task(file_path, name, goal)
+            spec = parse_task_file(file_path)
+            summary = compute_status_summary(spec)
+            # Find the newly added task (should be last one)
+            new_task = spec.tasks[-1] if spec.tasks else None
+            return SimpleTaskWriteResponse(
+                success=True,
+                action="task_added",
+                message=f"Added task '{name}' ({new_task.id if new_task else 'unknown'})",
+                file_path=str(file_path),
+                summary=summary,
+            )
 
         case "update":
             if not task_id:
@@ -191,43 +225,51 @@ def simpletask_task(
                     valid = [s.value for s in TaskStatus]
                     raise ValueError(f"Invalid status '{status}'. Valid: {valid}") from None
             update_implementation_task(file_path, task_id, name, goal, task_status)
+            spec = parse_task_file(file_path)
+            summary = compute_status_summary(spec)
+            return SimpleTaskWriteResponse(
+                success=True,
+                action="task_updated",
+                message=f"Updated task {task_id}",
+                file_path=str(file_path),
+                summary=summary,
+            )
 
         case "remove":
             if not task_id:
                 raise ValueError("'task_id' is required for action='remove'")
             remove_implementation_task(file_path, task_id)
-
-    # Re-read and return updated spec
-    spec = parse_task_file(file_path)
-    summary = compute_status_summary(spec)
-
-    return SimpleTaskGetResponse(
-        spec=spec,
-        file_path=str(file_path),
-        summary=summary,
-        validation=None,
-    )
+            spec = parse_task_file(file_path)
+            summary = compute_status_summary(spec)
+            return SimpleTaskWriteResponse(
+                success=True,
+                action="task_removed",
+                message=f"Removed task {task_id}",
+                file_path=str(file_path),
+                summary=summary,
+            )
 
 
 @mcp.tool()
 def simpletask_criteria(
-    action: Literal["add", "complete", "remove"],
+    action: Literal["add", "complete", "remove", "get"],
     branch: str | None = None,
     criterion_id: str | None = None,
     description: str | None = None,
     completed: bool = True,
-) -> SimpleTaskGetResponse:
+) -> SimpleTaskWriteResponse | SimpleTaskItemResponse:
     """Manage acceptance criteria.
 
     Args:
-        action: Operation to perform ('add', 'complete', 'remove')
+        action: Operation to perform ('add', 'complete', 'remove', 'get')
         branch: Branch name, or None for current git branch
-        criterion_id: Criterion ID (required for complete/remove)
+        criterion_id: Criterion ID (required for complete/remove/get)
         description: Criterion description (required for add)
         completed: Completion status for 'complete' action (default: True)
 
     Returns:
-        SimpleTaskGetResponse with updated spec and summary.
+        SimpleTaskWriteResponse for write operations (add/complete/remove).
+        SimpleTaskItemResponse for get operations.
 
     Raises:
         ValueError: If required parameters missing or criterion not found.
@@ -236,31 +278,65 @@ def simpletask_criteria(
     file_path = get_task_file_path(branch)
 
     match action:
+        case "get":
+            if not criterion_id:
+                raise ValueError("'criterion_id' is required for action='get'")
+            spec = parse_task_file(file_path)
+            criterion = next((c for c in spec.acceptance_criteria if c.id == criterion_id), None)
+            if not criterion:
+                raise ValueError(f"Criterion '{criterion_id}' not found")
+            summary = compute_status_summary(spec)
+            return SimpleTaskItemResponse(
+                task=None,
+                criterion=criterion,
+                file_path=str(file_path),
+                summary=summary,
+            )
+
         case "add":
             if not description:
                 raise ValueError("'description' is required for action='add'")
             add_acceptance_criterion(file_path, description)
+            spec = parse_task_file(file_path)
+            summary = compute_status_summary(spec)
+            # Find the newly added criterion (should be last one)
+            new_criterion = spec.acceptance_criteria[-1] if spec.acceptance_criteria else None
+            return SimpleTaskWriteResponse(
+                success=True,
+                action="criterion_added",
+                message=f"Added criterion ({new_criterion.id if new_criterion else 'unknown'}): {description}",
+                file_path=str(file_path),
+                summary=summary,
+            )
 
         case "complete":
             if not criterion_id:
                 raise ValueError("'criterion_id' is required for action='complete'")
             mark_criterion_complete(file_path, criterion_id, completed)
+            spec = parse_task_file(file_path)
+            summary = compute_status_summary(spec)
+            status_word = "completed" if completed else "incomplete"
+            return SimpleTaskWriteResponse(
+                success=True,
+                action="criterion_completed" if completed else "criterion_uncompleted",
+                message=f"Marked criterion {criterion_id} as {status_word}",
+                file_path=str(file_path),
+                summary=summary,
+            )
 
         case "remove":
             if not criterion_id:
                 raise ValueError("'criterion_id' is required for action='remove'")
             remove_acceptance_criterion(file_path, criterion_id)
-
-    # Re-read and return updated spec
-    spec = parse_task_file(file_path)
-    summary = compute_status_summary(spec)
-
-    return SimpleTaskGetResponse(
-        spec=spec,
-        file_path=str(file_path),
-        summary=summary,
-        validation=None,
-    )
+            spec = parse_task_file(file_path)
+            summary = compute_status_summary(spec)
+            return SimpleTaskWriteResponse(
+                success=True,
+                action="criterion_removed",
+                message=f"Removed criterion {criterion_id}",
+                file_path=str(file_path),
+                summary=summary,
+            )
 
 
 def run_server() -> None:

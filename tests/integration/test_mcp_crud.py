@@ -64,7 +64,13 @@ class TestTaskCRUDCycle:
         )
         assert result.summary.tasks_total == 1
         assert result.summary.tasks_not_started == 1
-        task_t001 = next(t for t in result.spec.tasks if t.id == "T001")
+        # Get task details using action='get'
+        task_result = simpletask_task(
+            action="get",
+            branch="feature/crud-test",
+            task_id="T001",
+        )
+        task_t001 = task_result.task
         assert task_t001.name == "First task"
         assert task_t001.status == TaskStatus.NOT_STARTED
 
@@ -87,8 +93,13 @@ class TestTaskCRUDCycle:
         )
         assert result.summary.tasks_in_progress == 1
         assert result.summary.tasks_not_started == 1
-        task_t001 = next(t for t in result.spec.tasks if t.id == "T001")
-        assert task_t001.status == TaskStatus.IN_PROGRESS
+        # Get task details using action='get'
+        task_result = simpletask_task(
+            action="get",
+            branch="feature/crud-test",
+            task_id="T001",
+        )
+        assert task_result.task.status == TaskStatus.IN_PROGRESS
 
         # UPDATE: Mark first task as completed
         result = simpletask_task(
@@ -100,8 +111,13 @@ class TestTaskCRUDCycle:
         assert result.summary.tasks_completed == 1
         assert result.summary.tasks_in_progress == 0
         assert result.summary.tasks_not_started == 1
-        task_t001 = next(t for t in result.spec.tasks if t.id == "T001")
-        assert task_t001.status == TaskStatus.COMPLETED
+        # Get task details using action='get'
+        task_result = simpletask_task(
+            action="get",
+            branch="feature/crud-test",
+            task_id="T001",
+        )
+        assert task_result.task.status == TaskStatus.COMPLETED
 
         # UPDATE: Change name of second task
         result = simpletask_task(
@@ -110,7 +126,13 @@ class TestTaskCRUDCycle:
             task_id="T002",
             name="Updated second task name",
         )
-        task_t002 = next(t for t in result.spec.tasks if t.id == "T002")
+        # Get task details using action='get'
+        task_result = simpletask_task(
+            action="get",
+            branch="feature/crud-test",
+            task_id="T002",
+        )
+        task_t002 = task_result.task
         assert task_t002.name == "Updated second task name"
         assert task_t002.status == TaskStatus.NOT_STARTED  # Status unchanged
 
@@ -123,8 +145,10 @@ class TestTaskCRUDCycle:
         assert result.summary.tasks_total == 1
         assert result.summary.tasks_completed == 0
         assert result.summary.tasks_not_started == 1
-        assert len(result.spec.tasks) == 1
-        assert result.spec.tasks[0].id == "T002"
+        # Verify using simpletask_get to check task list
+        get_result = simpletask_get(branch="feature/crud-test")
+        assert len(get_result.spec.tasks) == 1
+        assert get_result.spec.tasks[0].id == "T002"
 
         # VERIFY: Final state via simpletask_get
         result = simpletask_get(branch="feature/crud-test")
@@ -148,7 +172,13 @@ class TestCriteriaCRUDCycle:
         )
         assert result.summary.criteria_total == 1
         assert result.summary.criteria_completed == 0
-        ac1 = result.spec.acceptance_criteria[0]
+        # Get criterion details using action='get'
+        criterion_result = simpletask_criteria(
+            action="get",
+            branch="feature/crud-test",
+            criterion_id="AC1",
+        )
+        ac1 = criterion_result.criterion
         assert ac1.id == "AC1"
         assert ac1.description == "Initial criterion"
         assert ac1.completed is False
@@ -161,7 +191,13 @@ class TestCriteriaCRUDCycle:
         )
         assert result.summary.criteria_total == 2
         assert result.summary.criteria_completed == 0
-        ac2 = next(c for c in result.spec.acceptance_criteria if c.id == "AC2")
+        # Get criterion details using action='get'
+        criterion_result = simpletask_criteria(
+            action="get",
+            branch="feature/crud-test",
+            criterion_id="AC2",
+        )
+        ac2 = criterion_result.criterion
         assert ac2.description == "Second criterion"
         assert ac2.completed is False
 
@@ -172,8 +208,13 @@ class TestCriteriaCRUDCycle:
             description="Third criterion",
         )
         assert result.summary.criteria_total == 3
-        ac3 = next(c for c in result.spec.acceptance_criteria if c.id == "AC3")
-        assert ac3.description == "Third criterion"
+        # Get criterion details using action='get'
+        criterion_result = simpletask_criteria(
+            action="get",
+            branch="feature/crud-test",
+            criterion_id="AC3",
+        )
+        assert criterion_result.criterion.description == "Third criterion"
 
         # COMPLETE: Mark first criterion as completed
         result = simpletask_criteria(
@@ -183,8 +224,13 @@ class TestCriteriaCRUDCycle:
             completed=True,
         )
         assert result.summary.criteria_completed == 1
-        ac1 = next(c for c in result.spec.acceptance_criteria if c.id == "AC1")
-        assert ac1.completed is True
+        # Get criterion details using action='get'
+        criterion_result = simpletask_criteria(
+            action="get",
+            branch="feature/crud-test",
+            criterion_id="AC1",
+        )
+        assert criterion_result.criterion.completed is True
 
         # COMPLETE: Mark second criterion as completed
         result = simpletask_criteria(
@@ -194,8 +240,13 @@ class TestCriteriaCRUDCycle:
             completed=True,
         )
         assert result.summary.criteria_completed == 2
-        ac2 = next(c for c in result.spec.acceptance_criteria if c.id == "AC2")
-        assert ac2.completed is True
+        # Get criterion details using action='get'
+        criterion_result = simpletask_criteria(
+            action="get",
+            branch="feature/crud-test",
+            criterion_id="AC2",
+        )
+        assert criterion_result.criterion.completed is True
 
         # COMPLETE: Mark first criterion as incomplete again
         result = simpletask_criteria(
@@ -205,8 +256,13 @@ class TestCriteriaCRUDCycle:
             completed=False,
         )
         assert result.summary.criteria_completed == 1
-        ac1 = next(c for c in result.spec.acceptance_criteria if c.id == "AC1")
-        assert ac1.completed is False
+        # Get criterion details using action='get'
+        criterion_result = simpletask_criteria(
+            action="get",
+            branch="feature/crud-test",
+            criterion_id="AC1",
+        )
+        assert criterion_result.criterion.completed is False
 
         # REMOVE: Remove uncompleted first criterion
         result = simpletask_criteria(
@@ -216,10 +272,12 @@ class TestCriteriaCRUDCycle:
         )
         assert result.summary.criteria_total == 2
         assert result.summary.criteria_completed == 1
-        assert len(result.spec.acceptance_criteria) == 2
+        # Verify using simpletask_get to check criteria list
+        get_result = simpletask_get(branch="feature/crud-test")
+        assert len(get_result.spec.acceptance_criteria) == 2
         # AC2 and AC3 should remain, IDs unchanged
-        assert result.spec.acceptance_criteria[0].id == "AC2"
-        assert result.spec.acceptance_criteria[1].id == "AC3"
+        assert get_result.spec.acceptance_criteria[0].id == "AC2"
+        assert get_result.spec.acceptance_criteria[1].id == "AC3"
 
         # REMOVE: Remove completed second criterion (now first in list)
         result = simpletask_criteria(
@@ -229,8 +287,10 @@ class TestCriteriaCRUDCycle:
         )
         assert result.summary.criteria_total == 1
         assert result.summary.criteria_completed == 0
-        assert len(result.spec.acceptance_criteria) == 1
-        assert result.spec.acceptance_criteria[0].id == "AC3"
+        # Verify using simpletask_get to check criteria list
+        get_result = simpletask_get(branch="feature/crud-test")
+        assert len(get_result.spec.acceptance_criteria) == 1
+        assert get_result.spec.acceptance_criteria[0].id == "AC3"
 
         # VERIFY: Last state before attempted invalid operation
         result = simpletask_get(branch="feature/crud-test")

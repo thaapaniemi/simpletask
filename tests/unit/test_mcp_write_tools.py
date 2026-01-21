@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 from simpletask.core.models import TaskStatus
-from simpletask.mcp.models import SimpleTaskGetResponse
+from simpletask.mcp.models import SimpleTaskItemResponse, SimpleTaskWriteResponse
 from simpletask.mcp.server import simpletask_criteria, simpletask_new, simpletask_task
 
 
@@ -36,8 +36,9 @@ class TestSimpletaskNew:
             title="Test Task",
             prompt="Test prompt",
         )
-        assert isinstance(result, SimpleTaskGetResponse)
-        assert result.spec.branch == "test/branch"
+        assert isinstance(result, SimpleTaskWriteResponse)
+        assert result.success is True
+        assert result.action == "task_file_created"
         assert Path(result.file_path).exists()
         assert result.summary.branch == "test/branch"
         assert result.summary.title == "Test Task"
@@ -51,9 +52,8 @@ class TestSimpletaskNew:
     def test_criteria_none_adds_placeholder(self, temp_project):
         """Test that criteria=None adds a placeholder criterion."""
         result = simpletask_new(branch="t", title="T", prompt="P", criteria=None)
-        assert len(result.spec.acceptance_criteria) == 1
-        assert result.spec.acceptance_criteria[0].id == "AC1"
-        assert "to be filled" in result.spec.acceptance_criteria[0].description
+        assert result.summary.criteria_total == 1
+        assert "1 criteria" in result.message
 
     def test_criteria_empty_list_raises(self, temp_project):
         """Test that criteria=[] raises ValidationError (min_length=1)."""
@@ -63,11 +63,7 @@ class TestSimpletaskNew:
     def test_criteria_list_creates_criteria(self, temp_project):
         """Test that criteria list creates criteria with correct IDs."""
         result = simpletask_new(branch="t", title="T", prompt="P", criteria=["First", "Second"])
-        assert len(result.spec.acceptance_criteria) == 2
-        assert result.spec.acceptance_criteria[0].id == "AC1"
-        assert result.spec.acceptance_criteria[0].description == "First"
-        assert result.spec.acceptance_criteria[1].id == "AC2"
-        assert result.spec.acceptance_criteria[1].description == "Second"
+        assert result.summary.criteria_total == 2
 
     def test_returns_correct_summary(self, temp_project):
         """Test that returned summary has correct counts."""
@@ -83,10 +79,11 @@ class TestSimpletaskTask:
     def test_add_success(self, task_project):
         """Test adding a task successfully."""
         result = simpletask_task(action="add", branch="test", name="Task 1", goal="Do something")
+        assert isinstance(result, SimpleTaskWriteResponse)
+        assert result.success is True
+        assert result.action == "task_added"
         assert result.summary.tasks_total == 1
-        assert result.spec.tasks[0].name == "Task 1"
-        assert result.spec.tasks[0].id == "T001"
-        assert result.spec.tasks[0].goal == "Do something"
+        assert "Task 1" in result.message
 
     def test_add_missing_name_raises(self, task_project):
         """Test that add without name raises ValueError."""
@@ -96,8 +93,9 @@ class TestSimpletaskTask:
     def test_add_ignores_status_param(self, task_project):
         """Test that add action ignores status parameter."""
         result = simpletask_task(action="add", branch="test", name="Task", status="completed")
-        # Status should be not_started despite passing "completed"
-        assert result.spec.tasks[0].status == TaskStatus.NOT_STARTED
+        # Verify task was added as not_started - we need to fetch it to check
+        get_result = simpletask_task(action="get", branch="test", task_id="T001")
+        assert get_result.task.status == TaskStatus.NOT_STARTED
 
     def test_update_status_success(self, task_project):
         """Test updating task status."""
@@ -105,7 +103,12 @@ class TestSimpletaskTask:
         result = simpletask_task(
             action="update", branch="test", task_id="T001", status="in_progress"
         )
-        assert result.spec.tasks[0].status == TaskStatus.IN_PROGRESS
+        assert isinstance(result, SimpleTaskWriteResponse)
+        assert result.success is True
+        assert result.action == "task_updated"
+        # Verify status was updated by getting the task
+        get_result = simpletask_task(action="get", branch="test", task_id="T001")
+        assert get_result.task.status == TaskStatus.IN_PROGRESS
 
     def test_update_name_and_goal(self, task_project):
         """Test updating task name and goal."""
@@ -113,8 +116,11 @@ class TestSimpletaskTask:
         result = simpletask_task(
             action="update", branch="test", task_id="T001", name="New Name", goal="New Goal"
         )
-        assert result.spec.tasks[0].name == "New Name"
-        assert result.spec.tasks[0].goal == "New Goal"
+        assert result.success is True
+        # Verify name and goal were updated by getting the task
+        get_result = simpletask_task(action="get", branch="test", task_id="T001")
+        assert get_result.task.name == "New Name"
+        assert get_result.task.goal == "New Goal"
 
     def test_update_missing_task_id_raises(self, task_project):
         """Test that update without task_id raises ValueError."""
@@ -152,6 +158,30 @@ class TestSimpletaskTask:
         with pytest.raises(ValueError, match="not found"):
             simpletask_task(action="remove", branch="test", task_id="T999")
 
+    def test_get_success(self, task_project):
+        """Test getting a task by ID."""
+        simpletask_task(action="add", branch="test", name="Test Task", goal="Test Goal")
+        result = simpletask_task(action="get", branch="test", task_id="T001")
+        assert isinstance(result, SimpleTaskItemResponse)
+        assert result.task is not None
+        assert result.criterion is None
+        assert result.task.id == "T001"
+        assert result.task.name == "Test Task"
+        assert result.task.goal == "Test Goal"
+        assert result.task.status == TaskStatus.NOT_STARTED
+
+    def test_get_missing_task_id_raises(self, task_project):
+        """Test that get without task_id raises ValueError."""
+        with pytest.raises(ValueError, match="'task_id' is required"):
+            simpletask_task(action="get", branch="test")
+
+    def test_get_task_not_found_raises(self, task_project):
+        """Test that getting non-existent task raises ValueError."""
+        # First add a task so we have tasks defined
+        simpletask_task(action="add", branch="test", name="Task")
+        with pytest.raises(ValueError, match="not found"):
+            simpletask_task(action="get", branch="test", task_id="T999")
+
 
 class TestSimpletaskCriteria:
     """Tests for simpletask_criteria MCP tool."""
@@ -159,10 +189,12 @@ class TestSimpletaskCriteria:
     def test_add_success(self, task_project):
         """Test adding a criterion successfully."""
         result = simpletask_criteria(action="add", branch="test", description="New criterion")
+        assert isinstance(result, SimpleTaskWriteResponse)
+        assert result.success is True
+        assert result.action == "criterion_added"
         # Started with 1 placeholder, now have 2
         assert result.summary.criteria_total == 2
-        assert result.spec.acceptance_criteria[-1].description == "New criterion"
-        assert result.spec.acceptance_criteria[-1].id == "AC2"
+        assert "New criterion" in result.message
 
     def test_add_missing_description_raises(self, task_project):
         """Test that add without description raises ValueError."""
@@ -172,8 +204,13 @@ class TestSimpletaskCriteria:
     def test_complete_success(self, task_project):
         """Test marking criterion as completed."""
         result = simpletask_criteria(action="complete", branch="test", criterion_id="AC1")
-        assert result.spec.acceptance_criteria[0].completed is True
+        assert isinstance(result, SimpleTaskWriteResponse)
+        assert result.success is True
+        assert result.action == "criterion_completed"
         assert result.summary.criteria_completed == 1
+        # Verify it was actually completed by getting it
+        get_result = simpletask_criteria(action="get", branch="test", criterion_id="AC1")
+        assert get_result.criterion.completed is True
 
     def test_complete_false_marks_incomplete(self, task_project):
         """Test marking criterion as incomplete."""
@@ -181,8 +218,11 @@ class TestSimpletaskCriteria:
         result = simpletask_criteria(
             action="complete", branch="test", criterion_id="AC1", completed=False
         )
-        assert result.spec.acceptance_criteria[0].completed is False
+        assert result.action == "criterion_uncompleted"
         assert result.summary.criteria_completed == 0
+        # Verify it was actually marked incomplete by getting it
+        get_result = simpletask_criteria(action="get", branch="test", criterion_id="AC1")
+        assert get_result.criterion.completed is False
 
     def test_complete_missing_criterion_id_raises(self, task_project):
         """Test that complete without criterion_id raises ValueError."""
@@ -199,6 +239,9 @@ class TestSimpletaskCriteria:
         # Add a second criterion first so we don't hit min_length=1
         simpletask_criteria(action="add", branch="test", description="Second")
         result = simpletask_criteria(action="remove", branch="test", criterion_id="AC2")
+        assert isinstance(result, SimpleTaskWriteResponse)
+        assert result.success is True
+        assert result.action == "criterion_removed"
         assert result.summary.criteria_total == 1
 
     def test_remove_missing_criterion_id_raises(self, task_project):
@@ -217,3 +260,24 @@ class TestSimpletaskCriteria:
         # Removing it should fail due to min_length=1
         with pytest.raises(Exception):  # Could be ValidationError or ValueError
             simpletask_criteria(action="remove", branch="test", criterion_id="AC1")
+
+    def test_get_success(self, task_project):
+        """Test getting a criterion by ID."""
+        simpletask_criteria(action="add", branch="test", description="Test Criterion")
+        result = simpletask_criteria(action="get", branch="test", criterion_id="AC2")
+        assert isinstance(result, SimpleTaskItemResponse)
+        assert result.criterion is not None
+        assert result.task is None
+        assert result.criterion.id == "AC2"
+        assert result.criterion.description == "Test Criterion"
+        assert result.criterion.completed is False
+
+    def test_get_missing_criterion_id_raises(self, task_project):
+        """Test that get without criterion_id raises ValueError."""
+        with pytest.raises(ValueError, match="'criterion_id' is required"):
+            simpletask_criteria(action="get", branch="test")
+
+    def test_get_criterion_not_found_raises(self, task_project):
+        """Test that getting non-existent criterion raises ValueError."""
+        with pytest.raises(ValueError, match="not found"):
+            simpletask_criteria(action="get", branch="test", criterion_id="AC999")

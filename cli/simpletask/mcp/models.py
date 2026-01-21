@@ -6,10 +6,12 @@ including status summaries and validation results.
 
 from pydantic import BaseModel, Field
 
-from ..core.models import SimpleTaskSpec, TaskStatus
+from ..core.models import AcceptanceCriterion, SimpleTaskSpec, Task, TaskStatus
 
 __all__ = [
     "SimpleTaskGetResponse",
+    "SimpleTaskItemResponse",
+    "SimpleTaskWriteResponse",
     "StatusSummary",
     "ValidationResult",
     "compute_status_summary",
@@ -53,6 +55,41 @@ class SimpleTaskGetResponse(BaseModel):
     validation: ValidationResult | None = Field(
         None, description="Validation result (only when validate=true)"
     )
+
+
+class SimpleTaskWriteResponse(BaseModel):
+    """Minimal response model for write operations (add/update/remove/complete).
+
+    Returns just enough information to confirm the operation succeeded
+    and provide current status, without the full task specification.
+    """
+
+    model_config = {"extra": "forbid"}
+
+    success: bool = Field(..., description="Whether operation succeeded")
+    action: str = Field(
+        ..., description="Action performed (e.g., 'task_added', 'criterion_completed')"
+    )
+    message: str = Field(..., description="Human-readable confirmation message")
+    file_path: str = Field(..., description="Path to task file")
+    summary: StatusSummary = Field(..., description="Pre-computed status summary")
+
+
+class SimpleTaskItemResponse(BaseModel):
+    """Response model for retrieving a single task or criterion.
+
+    Used by action='get' on simpletask_task and simpletask_criteria tools.
+    Returns just the requested item plus status summary.
+    """
+
+    model_config = {"extra": "forbid"}
+
+    task: Task | None = Field(None, description="The requested task (for simpletask_task)")
+    criterion: AcceptanceCriterion | None = Field(
+        None, description="The requested criterion (for simpletask_criteria)"
+    )
+    file_path: str = Field(..., description="Path to task file")
+    summary: StatusSummary = Field(..., description="Pre-computed status summary")
 
 
 def compute_status_summary(spec: SimpleTaskSpec) -> StatusSummary:

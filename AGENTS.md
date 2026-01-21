@@ -317,7 +317,18 @@ Creates a new task file without creating a git branch (atomic MCP operation).
 - `prompt`: Original user prompt/request that led to task creation
 - `criteria` (optional): List of acceptance criteria descriptions. If `None`, adds a single placeholder criterion. If provided, must contain at least one item (empty list raises ValidationError).
 
-**Returns:** `SimpleTaskGetResponse` with created spec and summary
+**Returns:** `SimpleTaskWriteResponse` with minimal confirmation and summary
+
+**Response Structure:**
+```python
+{
+  "success": bool,
+  "action": str,  # "task_file_created"
+  "message": str,  # Human-readable confirmation
+  "file_path": str,
+  "summary": StatusSummary
+}
+```
 
 **Example Usage:**
 
@@ -341,17 +352,42 @@ result = simpletask_new(
 
 #### simpletask_task
 
-Unified tool for managing implementation tasks with three actions.
+Unified tool for managing implementation tasks with four actions.
 
 **Parameters:**
-- `action`: Operation to perform ('add', 'update', 'remove')
+- `action`: Operation to perform ('add', 'update', 'remove', 'get')
 - `branch` (optional): Branch name, or None for current git branch
-- `task_id` (optional): Task ID (required for update/remove, e.g., 'T001')
+- `task_id` (optional): Task ID (required for update/remove/get, e.g., 'T001')
 - `name` (optional): Task name (required for add)
 - `goal` (optional): Task goal/description
 - `status` (optional): Task status for update only. Valid values: 'not_started', 'in_progress', 'completed', 'blocked'. **Note:** 'add' action ignores this parameter - new tasks always start as `not_started`.
 
-**Returns:** `SimpleTaskGetResponse` with updated spec and summary
+**Returns:** 
+- `SimpleTaskWriteResponse` for write operations (add/update/remove)
+- `SimpleTaskItemResponse` for get operations
+
+**Response Structures:**
+
+Write operations return:
+```python
+{
+  "success": bool,
+  "action": str,  # e.g., "task_added", "task_updated", "task_removed"
+  "message": str,  # Human-readable confirmation
+  "file_path": str,
+  "summary": StatusSummary
+}
+```
+
+Get operations return:
+```python
+{
+  "task": Task,  # The requested task object
+  "criterion": None,
+  "file_path": str,
+  "summary": StatusSummary
+}
+```
 
 **Example Usage:**
 
@@ -386,6 +422,12 @@ result = simpletask_task(
     action="remove",
     task_id="T001"
 )
+
+# Get task details
+result = simpletask_task(
+    action="get",
+    task_id="T001"
+)
 ```
 
 **Edge Cases:**
@@ -396,16 +438,41 @@ result = simpletask_task(
 
 #### simpletask_criteria
 
-Unified tool for managing acceptance criteria with three actions.
+Unified tool for managing acceptance criteria with four actions.
 
 **Parameters:**
-- `action`: Operation to perform ('add', 'complete', 'remove')
+- `action`: Operation to perform ('add', 'complete', 'remove', 'get')
 - `branch` (optional): Branch name, or None for current git branch
-- `criterion_id` (optional): Criterion ID (required for complete/remove, e.g., 'AC1')
+- `criterion_id` (optional): Criterion ID (required for complete/remove/get, e.g., 'AC1')
 - `description` (optional): Criterion description (required for add)
 - `completed` (optional): Completion status for 'complete' action (default: true). Set to false to mark as incomplete.
 
-**Returns:** `SimpleTaskGetResponse` with updated spec and summary
+**Returns:**
+- `SimpleTaskWriteResponse` for write operations (add/complete/remove)
+- `SimpleTaskItemResponse` for get operations
+
+**Response Structures:**
+
+Write operations return:
+```python
+{
+  "success": bool,
+  "action": str,  # e.g., "criterion_added", "criterion_completed", "criterion_removed"
+  "message": str,  # Human-readable confirmation
+  "file_path": str,
+  "summary": StatusSummary
+}
+```
+
+Get operations return:
+```python
+{
+  "task": None,
+  "criterion": AcceptanceCriterion,  # The requested criterion object
+  "file_path": str,
+  "summary": StatusSummary
+}
+```
 
 **Example Usage:**
 
@@ -435,6 +502,12 @@ result = simpletask_criteria(
 result = simpletask_criteria(
     action="remove",
     criterion_id="AC3"
+)
+
+# Get criterion details
+result = simpletask_criteria(
+    action="get",
+    criterion_id="AC2"
 )
 ```
 
