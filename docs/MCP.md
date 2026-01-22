@@ -8,6 +8,7 @@ This guide covers how to integrate simpletask with AI editors using the Model Co
 - [Configuration](#configuration)
   - [OpenCode](#opencode)
   - [Qwen-CLI](#qwen-cli)
+  - [Gemini CLI](#gemini-cli)
   - [Other MCP Clients](#other-mcp-clients)
 - [Available Tools](#available-tools)
   - [get](#get)
@@ -151,6 +152,51 @@ Qwen-CLI is a command-line AI assistant with MCP support.
 **Verify connection:**
 ```sh
 qwen-cli "List available MCP tools"
+```
+
+### Gemini CLI
+
+Gemini CLI is a command-line AI assistant with MCP support.
+
+**Configuration file location:**
+- Linux/macOS: `~/.gemini/settings.json`
+- Windows: `%USERPROFILE%\.gemini\settings.json`
+
+**Add this configuration:**
+
+```json
+{
+  "mcpServers": {
+    "simpletask": {
+      "command": "simpletask",
+      "args": ["serve"],
+      "transport": "stdio"
+    }
+  }
+}
+```
+
+**Important:** Gemini CLI uses `mcpServers` (camelCase), not `mcp_servers` like Qwen-CLI.
+
+**If simpletask is installed in a virtualenv**, use the full path:
+
+```json
+{
+  "mcpServers": {
+    "simpletask": {
+      "command": "/home/user/.local/share/uv/tools/simpletask/bin/simpletask",
+      "args": ["serve"],
+      "transport": "stdio"
+    }
+  }
+}
+```
+
+**Restart Gemini CLI** after adding the configuration.
+
+**Verify connection:**
+```sh
+gemini "List available MCP tools"
 ```
 
 ### Other MCP Clients

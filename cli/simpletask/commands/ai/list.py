@@ -1,4 +1,4 @@
-"""List OpenCode and Qwen command templates."""
+"""List OpenCode, Qwen, and Gemini CLI command templates."""
 
 from pathlib import Path
 
@@ -6,12 +6,16 @@ import typer
 
 from simpletask.core.ai_templates import (
     EDITOR_CONFIGS,
+    get_bundled_gemini_templates,
     get_bundled_qwen_templates,
     get_bundled_templates,
+    get_gemini_installed_status,
     get_global_commands_dir,
+    get_global_gemini_commands_dir,
     get_global_qwen_commands_dir,
     get_installed_status,
     get_local_commands_dir,
+    get_local_gemini_commands_dir,
     get_local_qwen_commands_dir,
     get_qwen_installed_status,
 )
@@ -59,7 +63,7 @@ def _render_editor_table(
 
 
 def list_command() -> None:
-    """List available and installed OpenCode and Qwen commands.
+    """List available and installed OpenCode, Qwen, and Gemini CLI commands.
 
     Shows which command templates are bundled with simpletask
     and whether they are installed globally or locally.
@@ -76,7 +80,11 @@ def list_command() -> None:
         qwen_templates = get_bundled_qwen_templates()
         qwen_status = get_qwen_installed_status()
 
-        if not opencode_templates and not qwen_templates:
+        # Get Gemini CLI templates
+        gemini_templates = get_bundled_gemini_templates()
+        gemini_status = get_gemini_installed_status()
+
+        if not opencode_templates and not qwen_templates and not gemini_templates:
             console.print("[dim]No templates found[/dim]")
             return
 
@@ -100,6 +108,17 @@ def list_command() -> None:
                 status=qwen_status,
                 global_dir=get_global_qwen_commands_dir(),
                 local_dir=get_local_qwen_commands_dir(),
+            )
+
+        # Gemini CLI table
+        if gemini_templates:
+            _render_editor_table(
+                title="Gemini CLI Commands",
+                editor_name=EDITOR_CONFIGS["gemini"].display_name,
+                templates=gemini_templates,
+                status=gemini_status,
+                global_dir=get_global_gemini_commands_dir(),
+                local_dir=get_local_gemini_commands_dir(),
             )
 
     except Exception as e:

@@ -91,11 +91,12 @@ The recommended workflow uses slash commands in supported AI editors. These guid
 
 **Supported AI tools:**
 
-- **[OpenCode](https://opencode.ai)** and **[Qwen](https://github.com/QwenLM/qwen-code)** - Install workflow commands:
+- **[OpenCode](https://opencode.ai)**, **[Qwen](https://github.com/QwenLM/qwen-code)**, and **[Gemini CLI](https://github.com/google-gemini/gemini-cli)** - Install workflow commands:
   ```sh
-  simpletask ai install              # Both editors
+  simpletask ai install              # All three editors
   simpletask ai install --opencode   # OpenCode only
   simpletask ai install --qwen       # Qwen only
+  simpletask ai install --gemini     # Gemini CLI only
   simpletask ai install --local      # Project-local installation
   ```
 
@@ -240,7 +241,7 @@ ajv validate -s schema/simpletask.schema.json -d .tasks/my-task.yml --spec=draft
 
 ### MCP Server for AI Editors
 
-simpletask includes a Model Context Protocol (MCP) server for integration with AI editors like OpenCode and Qwen-CLI. The MCP server exposes task file operations as structured tools that AI assistants can use to read task definitions, check status, and understand project context.
+simpletask includes a Model Context Protocol (MCP) server for integration with AI editors like OpenCode, Qwen-CLI, and Gemini CLI. The MCP server exposes task file operations as structured tools that AI assistants can use to read task definitions, check status, and understand project context.
 
 **Benefits:**
 - **Structured responses**: AI gets typed JSON instead of parsing CLI output
@@ -255,7 +256,7 @@ simpletask includes a Model Context Protocol (MCP) server for integration with A
 simpletask serve
 ```
 
-Then configure your AI editor to connect to the server. For detailed setup instructions including configuration for OpenCode, Qwen-CLI, and other MCP clients, see the [MCP Integration Guide](docs/MCP.md).
+Then configure your AI editor to connect to the server. For detailed setup instructions including configuration for OpenCode, Qwen-CLI, Gemini CLI, and other MCP clients, see the [MCP Integration Guide](docs/MCP.md).
 
 ## Development
 

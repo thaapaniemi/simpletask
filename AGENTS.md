@@ -95,7 +95,8 @@ cli/simpletask/           # Main CLI package
 │   └── models.py         # MCP-specific models
 ├── templates/            # AI workflow templates
 │   ├── opencode/         # OpenCode slash commands (.md)
-│   └── qwen/             # Qwen slash commands (.toml)
+│   ├── qwen/             # Qwen slash commands (.toml)
+│   └── gemini/           # Gemini CLI slash commands (.toml)
 └── schema/
     └── task_schema.json  # JSON schema for validation
 
@@ -231,6 +232,8 @@ which simpletask
 # or
 uv tool dir simpletask
 ```
+
+**Note:** For Qwen CLI and Gemini CLI configuration, see [docs/MCP.md](docs/MCP.md).
 
 ### Available Tools
 
@@ -768,7 +771,7 @@ The `.tasks/` directory contains task definition files used during development b
 | `cli/simpletask/core/yaml_parser.py` | YAML file read/write operations |
 | `cli/simpletask/core/git.py` | Git repository operations |
 | `cli/simpletask/core/ai_templates.py` | Template installation and management |
-| `cli/simpletask/templates/` | AI workflow templates (slash commands for OpenCode/Qwen) |
+| `cli/simpletask/templates/` | AI workflow templates (slash commands for OpenCode/Qwen/Gemini) |
 | `cli/simpletask/mcp/server.py` | MCP server implementation |
 | `cli/simpletask/schema/task_schema.json` | JSON schema for task validation |
 | `tests/conftest.py` | Shared test fixtures |

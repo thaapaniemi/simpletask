@@ -1,4 +1,4 @@
-"""AI template management for OpenCode and Qwen command files."""
+"""AI template management for OpenCode, Qwen, and Gemini CLI command files."""
 
 import importlib.resources
 import shutil
@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-EditorType = Literal["opencode", "qwen"]
+EditorType = Literal["opencode", "qwen", "gemini"]
 
 
 @dataclass(frozen=True)
@@ -35,6 +35,13 @@ EDITOR_CONFIGS: dict[EditorType, EditorConfig] = {
         global_config_dir=(".qwen", "commands"),
         local_config_dir=(".qwen", "commands"),
     ),
+    "gemini": EditorConfig(
+        display_name="Gemini CLI",
+        template_subdir="gemini",
+        file_extension=".toml",
+        global_config_dir=(".gemini", "commands"),
+        local_config_dir=(".gemini", "commands"),
+    ),
 }
 
 
@@ -42,7 +49,7 @@ def _get_templates_dir(editor: EditorType) -> Path:
     """Get path to bundled templates directory for an editor.
 
     Args:
-        editor: Editor type ("opencode" or "qwen")
+        editor: Editor type ("opencode", "qwen", or "gemini")
 
     Returns:
         Path to the templates directory within the package.
@@ -65,7 +72,7 @@ def _get_bundled_templates(editor: EditorType) -> list[Path]:
     """Get list of template files bundled with the package for an editor.
 
     Args:
-        editor: Editor type ("opencode" or "qwen")
+        editor: Editor type ("opencode", "qwen", or "gemini")
 
     Returns:
         List of Path objects for each template file.
@@ -82,7 +89,7 @@ def _get_global_commands_dir(editor: EditorType) -> Path:
     """Get global commands directory for an editor.
 
     Args:
-        editor: Editor type ("opencode" or "qwen")
+        editor: Editor type ("opencode", "qwen", or "gemini")
 
     Returns:
         Path to global commands directory.
@@ -95,7 +102,7 @@ def _get_local_commands_dir(editor: EditorType) -> Path:
     """Get local commands directory for an editor.
 
     Args:
-        editor: Editor type ("opencode" or "qwen")
+        editor: Editor type ("opencode", "qwen", or "gemini")
 
     Returns:
         Path to local commands directory in current working directory.
@@ -112,7 +119,7 @@ def _install_templates(
     """Install templates to target directory for an editor.
 
     Args:
-        editor: Editor type ("opencode" or "qwen")
+        editor: Editor type ("opencode", "qwen", or "gemini")
         target_dir: Directory to install templates into
         no_overwrite: If True, skip existing files instead of overwriting
 
@@ -157,7 +164,7 @@ def _get_installed_status(editor: EditorType) -> dict[str, dict[str, bool]]:
     """Get installation status of each template for an editor.
 
     Args:
-        editor: Editor type ("opencode" or "qwen")
+        editor: Editor type ("opencode", "qwen", or "gemini")
 
     Returns:
         Dict mapping template name to {"global": bool, "local": bool}
@@ -193,6 +200,15 @@ def get_qwen_templates_dir() -> Path:
     return _get_templates_dir("qwen")
 
 
+def get_gemini_templates_dir() -> Path:
+    """Get path to bundled Gemini templates directory.
+
+    Returns:
+        Path to the templates/gemini directory within the package.
+    """
+    return _get_templates_dir("gemini")
+
+
 def get_bundled_templates() -> list[Path]:
     """Get list of OpenCode template files bundled with the package.
 
@@ -209,6 +225,15 @@ def get_bundled_qwen_templates() -> list[Path]:
         List of Path objects for each template file.
     """
     return _get_bundled_templates("qwen")
+
+
+def get_bundled_gemini_templates() -> list[Path]:
+    """Get list of Gemini template files bundled with the package.
+
+    Returns:
+        List of Path objects for each template file.
+    """
+    return _get_bundled_templates("gemini")
 
 
 def get_global_commands_dir() -> Path:
@@ -229,6 +254,15 @@ def get_global_qwen_commands_dir() -> Path:
     return _get_global_commands_dir("qwen")
 
 
+def get_global_gemini_commands_dir() -> Path:
+    """Get global Gemini commands directory.
+
+    Returns:
+        Path to ~/.gemini/commands/
+    """
+    return _get_global_commands_dir("gemini")
+
+
 def get_local_commands_dir() -> Path:
     """Get local OpenCode commands directory.
 
@@ -245,6 +279,15 @@ def get_local_qwen_commands_dir() -> Path:
         Path to .qwen/commands/ in current directory.
     """
     return _get_local_commands_dir("qwen")
+
+
+def get_local_gemini_commands_dir() -> Path:
+    """Get local Gemini commands directory.
+
+    Returns:
+        Path to .gemini/commands/ in current directory.
+    """
+    return _get_local_commands_dir("gemini")
 
 
 def install_templates(
@@ -285,6 +328,25 @@ def install_qwen_templates(
     return _install_templates("qwen", target_dir, no_overwrite)
 
 
+def install_gemini_templates(
+    target_dir: Path,
+    no_overwrite: bool = False,
+) -> tuple[list[str], list[str], list[str]]:
+    """Install Gemini templates to target directory.
+
+    Args:
+        target_dir: Directory to install templates into
+        no_overwrite: If True, skip existing files instead of overwriting
+
+    Returns:
+        Tuple of (installed, skipped, overwritten) file names.
+
+    Raises:
+        FileNotFoundError: If templates directory doesn't exist
+    """
+    return _install_templates("gemini", target_dir, no_overwrite)
+
+
 def get_installed_status() -> dict[str, dict[str, bool]]:
     """Get installation status of each OpenCode template.
 
@@ -301,3 +363,12 @@ def get_qwen_installed_status() -> dict[str, dict[str, bool]]:
         Dict mapping template name to {"global": bool, "local": bool}
     """
     return _get_installed_status("qwen")
+
+
+def get_gemini_installed_status() -> dict[str, dict[str, bool]]:
+    """Get installation status of each Gemini template.
+
+    Returns:
+        Dict mapping template name to {"global": bool, "local": bool}
+    """
+    return _get_installed_status("gemini")

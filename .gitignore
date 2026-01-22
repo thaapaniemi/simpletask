@@ -49,6 +49,11 @@ htmlcov/
 # Task files (local only)
 .tasks/
 
+# AI editor local installations
+.opencode/
+.qwen/
+.gemini/
+
 # OS
 .DS_Store
 Thumbs.db

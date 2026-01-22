@@ -14,26 +14,35 @@ class TestAiInstallCLI:
 
     @patch("simpletask.commands.ai.install.get_global_commands_dir")
     @patch("simpletask.commands.ai.install.get_global_qwen_commands_dir")
-    def test_default_installs_both_editors(self, mock_qwen_dir, mock_opencode_dir, tmp_path: Path):
-        """Should install both OpenCode and Qwen templates by default."""
+    @patch("simpletask.commands.ai.install.get_global_gemini_commands_dir")
+    def test_default_installs_all_three_editors(
+        self, mock_gemini_dir, mock_qwen_dir, mock_opencode_dir, tmp_path: Path
+    ):
+        """Should install all three editors (OpenCode, Qwen, Gemini) by default."""
         opencode_dir = tmp_path / "opencode"
         qwen_dir = tmp_path / "qwen"
+        gemini_dir = tmp_path / "gemini"
         mock_opencode_dir.return_value = opencode_dir
         mock_qwen_dir.return_value = qwen_dir
+        mock_gemini_dir.return_value = gemini_dir
 
         result = runner.invoke(app, ["ai", "install"])
 
         assert result.exit_code == 0
         assert "Installing OpenCode commands" in result.stdout
         assert "Installing Qwen commands" in result.stdout
+        assert "Installing Gemini CLI commands" in result.stdout
 
-        # Verify files were created
+        # Verify all three sets of files were created
         assert (opencode_dir / "simpletask.plan.md").exists()
         assert (opencode_dir / "simpletask.implement.md").exists()
         assert (opencode_dir / "simpletask.review.md").exists()
         assert (qwen_dir / "simpletask.plan.toml").exists()
         assert (qwen_dir / "simpletask.implement.toml").exists()
         assert (qwen_dir / "simpletask.review.toml").exists()
+        assert (gemini_dir / "simpletask.plan.toml").exists()
+        assert (gemini_dir / "simpletask.implement.toml").exists()
+        assert (gemini_dir / "simpletask.review.toml").exists()
 
     @patch("simpletask.commands.ai.install.get_global_commands_dir")
     @patch("simpletask.commands.ai.install.get_global_qwen_commands_dir")
@@ -75,41 +84,83 @@ class TestAiInstallCLI:
 
     @patch("simpletask.commands.ai.install.get_global_commands_dir")
     @patch("simpletask.commands.ai.install.get_global_qwen_commands_dir")
-    def test_both_flags_explicit(self, mock_qwen_dir, mock_opencode_dir, tmp_path: Path):
-        """Should install both when both flags are specified."""
+    @patch("simpletask.commands.ai.install.get_global_gemini_commands_dir")
+    def test_gemini_flag_only(
+        self, mock_gemini_dir, mock_qwen_dir, mock_opencode_dir, tmp_path: Path
+    ):
+        """Should install only Gemini CLI templates with --gemini flag."""
         opencode_dir = tmp_path / "opencode"
         qwen_dir = tmp_path / "qwen"
+        gemini_dir = tmp_path / "gemini"
         mock_opencode_dir.return_value = opencode_dir
         mock_qwen_dir.return_value = qwen_dir
+        mock_gemini_dir.return_value = gemini_dir
 
-        result = runner.invoke(app, ["ai", "install", "--opencode", "--qwen"])
+        result = runner.invoke(app, ["ai", "install", "--gemini"])
+
+        assert result.exit_code == 0
+        assert "Installing Gemini CLI commands" in result.stdout
+        assert "Installing OpenCode commands" not in result.stdout
+        assert "Installing Qwen commands" not in result.stdout
+
+        # Verify only Gemini files were created
+        assert (gemini_dir / "simpletask.plan.toml").exists()
+        assert (gemini_dir / "simpletask.implement.toml").exists()
+        assert (gemini_dir / "simpletask.review.toml").exists()
+        assert not opencode_dir.exists()
+        assert not qwen_dir.exists()
+
+    @patch("simpletask.commands.ai.install.get_global_commands_dir")
+    @patch("simpletask.commands.ai.install.get_global_qwen_commands_dir")
+    @patch("simpletask.commands.ai.install.get_global_gemini_commands_dir")
+    def test_all_three_flags_explicit(
+        self, mock_gemini_dir, mock_qwen_dir, mock_opencode_dir, tmp_path: Path
+    ):
+        """Should install all three editors when all flags are specified."""
+        opencode_dir = tmp_path / "opencode"
+        qwen_dir = tmp_path / "qwen"
+        gemini_dir = tmp_path / "gemini"
+        mock_opencode_dir.return_value = opencode_dir
+        mock_qwen_dir.return_value = qwen_dir
+        mock_gemini_dir.return_value = gemini_dir
+
+        result = runner.invoke(app, ["ai", "install", "--opencode", "--qwen", "--gemini"])
 
         assert result.exit_code == 0
         assert "Installing OpenCode commands" in result.stdout
         assert "Installing Qwen commands" in result.stdout
+        assert "Installing Gemini CLI commands" in result.stdout
 
-        # Verify both were created
+        # Verify all three were created
         assert (opencode_dir / "simpletask.plan.md").exists()
         assert (qwen_dir / "simpletask.plan.toml").exists()
+        assert (gemini_dir / "simpletask.plan.toml").exists()
 
     @patch("simpletask.commands.ai.install.get_local_commands_dir")
     @patch("simpletask.commands.ai.install.get_local_qwen_commands_dir")
-    def test_local_flag_with_both(self, mock_qwen_dir, mock_opencode_dir, tmp_path: Path):
-        """Should install both to local directories with --local flag."""
+    @patch("simpletask.commands.ai.install.get_local_gemini_commands_dir")
+    def test_local_flag_with_all_three(
+        self, mock_gemini_dir, mock_qwen_dir, mock_opencode_dir, tmp_path: Path
+    ):
+        """Should install all three editors to local directories with --local flag."""
         opencode_dir = tmp_path / "opencode"
         qwen_dir = tmp_path / "qwen"
+        gemini_dir = tmp_path / "gemini"
         mock_opencode_dir.return_value = opencode_dir
         mock_qwen_dir.return_value = qwen_dir
+        mock_gemini_dir.return_value = gemini_dir
 
         result = runner.invoke(app, ["ai", "install", "--local"])
 
         assert result.exit_code == 0
         assert "Installing OpenCode commands" in result.stdout
         assert "Installing Qwen commands" in result.stdout
+        assert "Installing Gemini CLI commands" in result.stdout
 
         # Verify files were created in local directories
         assert (opencode_dir / "simpletask.plan.md").exists()
         assert (qwen_dir / "simpletask.plan.toml").exists()
+        assert (gemini_dir / "simpletask.plan.toml").exists()
 
     @patch("simpletask.commands.ai.install.get_global_commands_dir")
     @patch("simpletask.commands.ai.install.get_global_qwen_commands_dir")
@@ -158,22 +209,26 @@ class TestAiInstallCLI:
 
     @patch("simpletask.commands.ai.install.get_global_commands_dir")
     @patch("simpletask.commands.ai.install.get_global_qwen_commands_dir")
-    def test_shows_summary(self, mock_qwen_dir, mock_opencode_dir, tmp_path: Path):
-        """Should show summary information after installation."""
+    @patch("simpletask.commands.ai.install.get_global_gemini_commands_dir")
+    def test_shows_summary(self, mock_gemini_dir, mock_qwen_dir, mock_opencode_dir, tmp_path: Path):
+        """Should show summary information after installation for all three editors."""
         opencode_dir = tmp_path / "opencode"
         qwen_dir = tmp_path / "qwen"
+        gemini_dir = tmp_path / "gemini"
         mock_opencode_dir.return_value = opencode_dir
         mock_qwen_dir.return_value = qwen_dir
+        mock_gemini_dir.return_value = gemini_dir
 
         result = runner.invoke(app, ["ai", "install"])
 
         assert result.exit_code == 0
         # Should show summary for each editor
         assert "Summary:" in result.stdout
-        # Should show installed files
+        # Should show installed files for OpenCode
         assert "Installed: simpletask.plan.md" in result.stdout
         assert "Installed: simpletask.implement.md" in result.stdout
         assert "Installed: simpletask.review.md" in result.stdout
+        # Should show installed files for Qwen
         assert "Installed: simpletask.plan.toml" in result.stdout
         assert "Installed: simpletask.implement.toml" in result.stdout
         assert "Installed: simpletask.review.toml" in result.stdout

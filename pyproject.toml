@@ -1,6 +1,6 @@
 [project]
 name = "simpletask"
-version = "0.12.4"
+version = "0.13.1"
 description = "CLI tool for managing AI-friendly task definitions in branch-based development workflows"
 requires-python = ">=3.11"
 license = {text = "MIT"}
