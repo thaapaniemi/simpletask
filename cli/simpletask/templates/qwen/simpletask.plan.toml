@@ -67,12 +67,22 @@ User input: {{args}}
    ```
 
 2. Check if already on a feature branch with existing task file:
+   
+   **Preferred: Use MCP tool** (if simpletask MCP server is available)
+   ```
+   Use simpletask_get() MCP tool to check for existing task file:
+   - Call simpletask_get(branch=None) to use current git branch
+   - If successful, task file exists - analyze the response
+   - If error occurs, task file does not exist
+   ```
+   
+   **Fallback: Use CLI** (if MCP tools not available)
    ```bash
-   ls .tasks/$(git branch --show-current).yml 2>/dev/null
+   simpletask show
    ```
 
 3. If file exists for current branch:
-   - Load and analyze: `simpletask show`
+   - Load and analyze the task data
    - If tasks are empty or minimal, proceed to Step 4 to add detailed tasks
    - If tasks already exist, analyze and report current state
    - Use current branch name as `[branch-name]`
@@ -80,6 +90,8 @@ User input: {{args}}
 4. If file does NOT exist:
    - If on main/master/develop: proceed to Step 2 to create new branch
    - If on other branch: ask user if they want to create task file for current branch or create new branch
+
+**Note:** Branch names with slashes (e.g., `feature/user-auth`) are automatically normalized to filenames with hyphens (e.g., `.tasks/feature-user-auth.yml`). The MCP tools and CLI commands handle normalization automatically.
 
 **Step 2: Create Git Branch (if needed)**
 
@@ -98,6 +110,17 @@ git checkout -b refactor/database-queries
 **Step 3: Create Task File**
 
 Use simpletask CLI to create the task file:
+
+**Preferred: Use MCP tool** (if simpletask MCP server is available)
+```
+Use simpletask_new() MCP tool to create task file:
+- Call simpletask_new(branch="[branch-name]", title="[title]", prompt="[original prompt from {{args}}]", criteria=None)
+- The MCP tool handles branch name normalization automatically
+- Returns SimpleTaskWriteResponse with file_path and summary
+- If criteria=None, creates placeholder criterion automatically
+```
+
+**Fallback: Use CLI** (if MCP tools not available)
 ```bash
 simpletask new [branch-name] "[original prompt from {{args}}]" -y
 ```
@@ -108,11 +131,19 @@ This creates a task file with the basic structure.
 
 **Step 4: Plan Acceptance Criteria**
 
-Add acceptance criteria using simpletask CLI. Each criterion should be:
+Add acceptance criteria using simpletask tools. Each criterion should be:
 - Specific and verifiable
 - Independent (can be tested individually)
 - Focused on WHAT, not HOW
 
+**Preferred: Use MCP tool** (if simpletask MCP server is available)
+```
+Use simpletask_criteria() MCP tool:
+- Call simpletask_criteria(action="add", branch="[branch-name]", description="Criterion description")
+- Returns SimpleTaskWriteResponse with updated criteria state
+```
+
+**Fallback: Use CLI** (if MCP tools not available)
 ```bash
 simpletask criteria add "Criterion description" -b [branch-name]
 ```
@@ -131,6 +162,16 @@ Add detailed implementation tasks. Each task MUST be:
 - Include specific file paths, function names, and code patterns
 
 For each task, use:
+
+**Preferred: Use MCP tool** (if simpletask MCP server is available)
+```
+Use simpletask_task() MCP tool:
+- Call simpletask_task(action="add", branch="[branch-name]", name="Task name", goal="Detailed goal description", steps=["step1", "step2", ...])
+- Returns SimpleTaskWriteResponse with updated task state
+- If steps parameter is omitted or None, a placeholder step is added automatically
+```
+
+**Fallback: Use CLI** (if MCP tools not available)
 ```bash
 simpletask task add "Task name" -g "Detailed goal description" -b [branch-name]
 ```
@@ -196,11 +237,31 @@ Edit `.tasks/[branch-name].yml` directly to add:
 **Step 7: Validate and Summarize**
 
 1. Validate the task file:
+   
+   **Preferred: Use MCP tool** (if simpletask MCP server is available)
+   ```
+   Use simpletask_get() MCP tool with validation:
+   - Call simpletask_get(branch="[branch-name]", validate=True)
+   - Check validation.valid in response
+   - If validation.valid is False, check validation.errors for details
+   ```
+   
+   **Fallback: Use CLI** (if MCP tools not available)
    ```bash
    simpletask schema validate
    ```
 
 2. Show the complete task:
+   
+   **Preferred: Use MCP tool** (if simpletask MCP server is available)
+   ```
+   Use simpletask_get() MCP tool:
+   - Display spec.branch, spec.title, spec.status
+   - Display summary.criteria_total, summary.tasks_total
+   - Show acceptance_criteria and tasks arrays
+   ```
+   
+   **Fallback: Use CLI** (if MCP tools not available)
    ```bash
    simpletask show
    ```
