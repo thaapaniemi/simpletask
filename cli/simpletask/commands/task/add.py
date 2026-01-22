@@ -2,8 +2,9 @@
 
 import typer
 
-from simpletask.mcp.server import simpletask_task
-from simpletask.utils.console import error, success
+from simpletask.core.yaml_parser import InvalidTaskFileError
+from simpletask.mcp.server import task
+from simpletask.utils.console import handle_exception, success
 
 
 def add_command(
@@ -22,7 +23,7 @@ def add_command(
     """
     try:
         # Call MCP tool directly
-        result = simpletask_task(
+        result = task(
             action="add",
             branch=branch,
             name=name,
@@ -33,9 +34,5 @@ def add_command(
         new_id = result.spec.tasks[-1].id
         success(f"Added task {new_id}: {name}")
 
-    except ValueError as e:
-        error(str(e))
-    except FileNotFoundError as e:
-        error(str(e))
-    except Exception as e:
-        error(f"Unexpected error: {e}")
+    except (ValueError, FileNotFoundError, InvalidTaskFileError) as e:
+        handle_exception(e, "adding implementation task")

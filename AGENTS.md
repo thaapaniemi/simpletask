@@ -236,17 +236,19 @@ uv tool dir simpletask
 
 The MCP server exposes 5 tools for task management:
 
+**Note:** MCP clients automatically prefix tool names with the server name. When invoked through an MCP client (like OpenCode), these tools become `simpletask_get`, `simpletask_list`, `simpletask_new`, `simpletask_task`, and `simpletask_criteria`.
+
 | Tool | Description | Parameters |
 |------|-------------|------------|
-| `simpletask_get` | Get complete task specification with status summary | `branch` (str, optional): Branch name or None for current<br>`validate` (bool, optional): Include schema validation (default: false) |
-| `simpletask_list` | List all task file branch names in the project | None |
-| `simpletask_new` | Create a new task file | `branch` (str): Branch identifier<br>`title` (str): Task title<br>`prompt` (str): Original user request<br>`criteria` (list[str] \| None, optional): Acceptance criteria |
-| `simpletask_task` | Manage implementation tasks (add/update/remove) | `action` (str): 'add', 'update', or 'remove'<br>`branch` (str, optional): Branch name or None for current<br>`task_id` (str, optional): Task ID (required for update/remove)<br>`name` (str, optional): Task name (required for add)<br>`goal` (str, optional): Task goal/description<br>`status` (str, optional): Status for update ('not_started', 'in_progress', 'completed', 'blocked')<br>`steps` (list[str] \| None, optional): Task steps for add action. None or [] adds placeholder ['To be defined'] |
-| `simpletask_criteria` | Manage acceptance criteria (add/complete/remove) | `action` (str): 'add', 'complete', or 'remove'<br>`branch` (str, optional): Branch name or None for current<br>`criterion_id` (str, optional): Criterion ID (required for complete/remove)<br>`description` (str, optional): Description (required for add)<br>`completed` (bool, optional): Completion status for 'complete' (default: true) |
+| `get` | Get complete task specification with status summary | `branch` (str, optional): Branch name or None for current<br>`validate` (bool, optional): Include schema validation (default: false) |
+| `list` | List all task file branch names in the project | None |
+| `new` | Create a new task file | `branch` (str): Branch identifier<br>`title` (str): Task title<br>`prompt` (str): Original user request<br>`criteria` (list[str] \| None, optional): Acceptance criteria |
+| `task` | Manage implementation tasks (add/update/remove) | `action` (str): 'add', 'update', or 'remove'<br>`branch` (str, optional): Branch name or None for current<br>`task_id` (str, optional): Task ID (required for update/remove)<br>`name` (str, optional): Task name (required for add)<br>`goal` (str, optional): Task goal/description<br>`status` (str, optional): Status for update ('not_started', 'in_progress', 'completed', 'blocked')<br>`steps` (list[str] \| None, optional): Task steps for add action. None or [] adds placeholder ['To be defined'] |
+| `criteria` | Manage acceptance criteria (add/complete/remove) | `action` (str): 'add', 'complete', or 'remove'<br>`branch` (str, optional): Branch name or None for current<br>`criterion_id` (str, optional): Criterion ID (required for complete/remove)<br>`description` (str, optional): Description (required for add)<br>`completed` (bool, optional): Completion status for 'complete' (default: true) |
 
 ### Tool Details
 
-#### simpletask_get
+#### get
 
 Returns enriched task data with pre-computed status counts:
 
@@ -291,7 +293,7 @@ Returns enriched task data with pre-computed status counts:
 }
 ```
 
-#### simpletask_list
+#### list
 
 Returns list of all task branch names (original names, not normalized filenames).
 
@@ -307,7 +309,7 @@ Returns list of all task branch names (original names, not normalized filenames)
 ]
 ```
 
-#### simpletask_new
+#### new
 
 Creates a new task file without creating a git branch (atomic MCP operation).
 
@@ -333,7 +335,7 @@ Creates a new task file without creating a git branch (atomic MCP operation).
 **Example Usage:**
 
 ```python
-result = simpletask_new(
+result = new(
     branch="feature/user-auth",
     title="Add user authentication",
     prompt="Implement JWT-based auth with login/logout",
@@ -350,7 +352,7 @@ result = simpletask_new(
 - `criteria=[]` → creates placeholder criterion `AC1` with description "Task completion criteria (to be filled)"
 - `criteria=None` → creates placeholder criterion `AC1` with description "Task completion criteria (to be filled)"
 
-#### simpletask_task
+#### task
 
 Unified tool for managing implementation tasks with four actions.
 
@@ -394,7 +396,7 @@ Get operations return:
 
 ```python
 # Add a new task
-result = simpletask_task(
+result = task(
     action="add",
     branch="feature/user-auth",
     task_id="T001",
@@ -403,7 +405,7 @@ result = simpletask_task(
 )
 
 # Add a new task with specific steps
-result = simpletask_task(
+result = task(
     action="add",
     branch="feature/user-auth",
     task_id="T002",
@@ -413,7 +415,7 @@ result = simpletask_task(
 )
 
 # Update task status
-result = simpletask_task(
+result = task(
     action="update",
     branch="feature/user-auth",
     task_id="T001",
@@ -421,7 +423,7 @@ result = simpletask_task(
 )
 
 # Update task name/goal
-result = simpletask_task(
+result = task(
     action="update",
     task_id="T001",  # Uses current branch
     name="Updated task name",
@@ -429,13 +431,13 @@ result = simpletask_task(
 )
 
 # Remove task
-result = simpletask_task(
+result = task(
     action="remove",
     task_id="T001"
 )
 
 # Get task details
-result = simpletask_task(
+result = task(
     action="get",
     task_id="T001"
 )
@@ -447,7 +449,7 @@ result = simpletask_task(
 - Invalid status value → raises `ValueError`
 - Status provided with action='add' → status is ignored, task created as `not_started`
 
-#### simpletask_criteria
+#### criteria
 
 Unified tool for managing acceptance criteria with four actions.
 
@@ -489,34 +491,34 @@ Get operations return:
 
 ```python
 # Add a new criterion
-result = simpletask_criteria(
+result = criteria(
     action="add",
     branch="feature/user-auth",
     description="Users can reset forgotten passwords"
 )
 
 # Mark criterion as completed
-result = simpletask_criteria(
+result = criteria(
     action="complete",
     criterion_id="AC2",
     completed=True
 )
 
 # Mark criterion as incomplete
-result = simpletask_criteria(
+result = criteria(
     action="complete",
     criterion_id="AC2",
     completed=False
 )
 
 # Remove criterion
-result = simpletask_criteria(
+result = criteria(
     action="remove",
     criterion_id="AC3"
 )
 
 # Get criterion details
-result = simpletask_criteria(
+result = criteria(
     action="get",
     criterion_id="AC2"
 )

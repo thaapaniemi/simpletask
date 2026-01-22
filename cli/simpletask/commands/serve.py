@@ -28,5 +28,8 @@ def serve() -> None:
     Available MCP tools:
     - simpletask_get: Get complete task specification with status summary
     - simpletask_list: List all task file branch names in the project
+    - simpletask_new: Create a new task file
+    - simpletask_task: Manage implementation tasks (add/update/remove/get)
+    - simpletask_criteria: Manage acceptance criteria (add/complete/remove/get)
     """
     run_server()

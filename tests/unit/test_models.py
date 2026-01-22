@@ -8,8 +8,9 @@ Tests cover:
 - Cross-field validation (prerequisite task IDs)
 """
 
-import pytest
 from datetime import UTC, datetime
+
+import pytest
 from pydantic import ValidationError
 from simpletask.core.models import (
     AcceptanceCriterion,

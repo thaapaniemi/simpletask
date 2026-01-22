@@ -10,11 +10,11 @@ This guide covers how to integrate simpletask with AI editors using the Model Co
   - [Qwen-CLI](#qwen-cli)
   - [Other MCP Clients](#other-mcp-clients)
 - [Available Tools](#available-tools)
-  - [simpletask_get](#simpletask_get)
-  - [simpletask_list](#simpletask_list)
-  - [simpletask_new](#simpletask_new)
-  - [simpletask_task](#simpletask_task)
-  - [simpletask_criteria](#simpletask_criteria)
+  - [get](#get)
+  - [list](#list)
+  - [new](#new)
+  - [task](#task)
+  - [criteria](#criteria)
 - [Usage Examples](#usage-examples)
   - [Example 1: Understanding Task Context](#example-1-understanding-task-context)
   - [Example 2: Checking Progress](#example-2-checking-progress)
@@ -108,7 +108,7 @@ Open OpenCode and ask the AI:
 "Can you list the available simpletask tools?"
 ```
 
-You should see `simpletask_get` and `simpletask_list` in the response.
+You should see `simpletask_get`, `simpletask_list`, `simpletask_new`, `simpletask_task`, and `simpletask_criteria` in the response (MCP clients automatically prefix tool names with the server name).
 
 ### Qwen-CLI
 
@@ -182,7 +182,7 @@ Refer to your MCP client's documentation for specific configuration file locatio
 
 The simpletask MCP server exposes 5 tools for task management.
 
-### simpletask_get
+### get
 
 Get complete task specification with pre-computed status summary.
 
@@ -267,7 +267,7 @@ result = simpletask_get(validate=True)
 - "What's the status of the feature/auth task?"
 - "Validate the current task file"
 
-### simpletask_list
+### list
 
 List all task file branch names in the project.
 
@@ -293,7 +293,7 @@ branches = simpletask_list()
 - "What tasks are available?"
 - "Show me all branches with task files"
 
-### simpletask_new
+### new
 
 Create a new task file without creating a git branch.
 
@@ -338,7 +338,7 @@ result = simpletask_new(
 - "Start a task for fixing the login bug"
 - "Set up a new feature task for notifications"
 
-### simpletask_task
+### task
 
 Manage implementation tasks (add, update, remove).
 
@@ -395,7 +395,7 @@ result = simpletask_task(
 - "Update T002 status to in progress"
 - "Remove task T003"
 
-### simpletask_criteria
+### criteria
 
 Manage acceptance criteria (add, complete, remove).
 

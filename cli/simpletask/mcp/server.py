@@ -3,6 +3,9 @@
 Exposes task file operations as MCP tools for AI editor integration.
 """
 
+from __future__ import annotations
+
+import builtins
 from typing import Literal
 
 from mcp.server.fastmcp import FastMCP
@@ -30,22 +33,48 @@ from .models import (
     compute_status_summary,
 )
 
+# ============================================================================
+# IMPORTANT: list() function shadows Python's built-in
+# ============================================================================
+# This module defines a function named list() which shadows the built-in list.
+# This is an intentional design choice to follow MCP naming conventions where
+# tool names should be simple and intuitive (get, list, new, task, criteria).
+#
+# CRITICAL: The _list alias below MUST be preserved for type hints to work.
+# Without it, type hints like list[str] would fail after the list() function
+# is defined. The from __future__ import annotations at the top of this file
+# defers type hint evaluation, allowing us to use list[T] safely.
+#
+# Architectural tradeoff:
+# - PRO: Clean MCP tool names (clients see simpletask_list, not simpletask_list_tasks)
+# - PRO: Consistent with Python conventions for module-level functions
+# - CON: Shadows built-in list in this module scope
+# - CON: Requires _list workaround for type hints
+#
+# Alternative considered: Use list_tasks() to avoid shadowing
+# - Rejected because it creates verbose MCP tool name (simpletask_list_tasks)
+# ============================================================================
+
+# Preserve reference to built-in list type before defining list() function
+# This allows type hints to use list[T] even after list() function is defined
+_list = builtins.list
+
 # Initialize FastMCP server
 mcp = FastMCP("simpletask")
 
 __all__ = [
+    "criteria",
+    "get",
+    "list",
     "mcp",
+    "new",
     "run_server",
-    "simpletask_criteria",
-    "simpletask_get",
-    "simpletask_list",
-    "simpletask_new",
-    "simpletask_task",
+    "task",
 ]
 
 
 @mcp.tool()
-def simpletask_get(
+def get(
     branch: str | None = None,
     validate: bool = False,
 ) -> SimpleTaskGetResponse:
@@ -92,7 +121,7 @@ def simpletask_get(
 
 
 @mcp.tool()
-def simpletask_list() -> list[str]:
+def list() -> _list[str]:
     """List all task file branch names in the project.
 
     Returns the original branch names (not normalized filenames) from
@@ -109,11 +138,11 @@ def simpletask_list() -> list[str]:
 
 
 @mcp.tool()
-def simpletask_new(
+def new(
     branch: str,
     title: str,
     prompt: str,
-    criteria: list[str] | None = None,
+    criteria: _list[str] | None = None,
 ) -> SimpleTaskWriteResponse:
     """Create a new task file.
 
@@ -149,14 +178,14 @@ def simpletask_new(
 
 
 @mcp.tool()
-def simpletask_task(
+def task(
     action: Literal["add", "update", "remove", "get"],
     branch: str | None = None,
     task_id: str | None = None,
     name: str | None = None,
     goal: str | None = None,
     status: str | None = None,
-    steps: list[str] | None = None,
+    steps: _list[str] | None = None,
 ) -> SimpleTaskWriteResponse | SimpleTaskItemResponse:
     """Manage implementation tasks.
 
@@ -254,7 +283,7 @@ def simpletask_task(
 
 
 @mcp.tool()
-def simpletask_criteria(
+def criteria(
     action: Literal["add", "complete", "remove", "get"],
     branch: str | None = None,
     criterion_id: str | None = None,
@@ -297,6 +326,10 @@ def simpletask_criteria(
             )
 
         case "add":
+            if criterion_id is not None:
+                raise ValueError(
+                    "'criterion_id' cannot be specified for action='add' (IDs are auto-generated)"
+                )
             if not description:
                 raise ValueError("'description' is required for action='add'")
             add_acceptance_criterion(file_path, description)

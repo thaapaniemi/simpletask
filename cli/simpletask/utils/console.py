@@ -1,5 +1,8 @@
 """Console utility functions using Rich."""
 
+import os
+import traceback
+
 import typer
 from rich.console import Console
 from rich.table import Table
@@ -86,6 +89,51 @@ def create_table(title: str, columns: list[str]) -> Table:
     return table
 
 
+def handle_exception(e: Exception, operation: str) -> None:
+    """Handle exceptions with improved error messages and debug support.
+
+    In debug mode (SIMPLETASK_DEBUG=1), logs full traceback and re-raises.
+    Otherwise, provides user-friendly error message with context.
+
+    Args:
+        e: The exception to handle
+        operation: Description of the operation that failed (e.g., "adding criterion")
+
+    Raises:
+        typer.Exit: Always exits with code 1
+        Exception: Re-raises in debug mode
+    """
+    debug = os.getenv("SIMPLETASK_DEBUG", "").lower() in ("1", "true", "yes")
+
+    if debug:
+        # In debug mode, show full traceback and re-raise
+        error_console.print(f"[red]Error during {operation}:[/red]")
+        error_console.print(traceback.format_exc())
+        raise e
+
+    # User-friendly error message
+    error_message = str(e)
+
+    # Add helpful context based on exception type
+    if isinstance(e, ValueError):
+        error_console.print(f"[red]Error:[/red] {error_message}")
+        if "No task file found" in error_message or "not in a git repository" in error_message:
+            error_console.print("[yellow]Tip:[/yellow] Run 'simpletask new' to create a task file")
+    elif isinstance(e, FileNotFoundError):
+        error_console.print(f"[red]Error:[/red] {error_message}")
+        error_console.print(
+            "[yellow]Tip:[/yellow] Ensure you're on the correct branch or specify --branch"
+        )
+    else:
+        # Generic error with suggestion to enable debug mode
+        error_console.print(f"[red]Unexpected error during {operation}:[/red] {error_message}")
+        error_console.print(
+            "[yellow]Tip:[/yellow] Set SIMPLETASK_DEBUG=1 for full traceback details"
+        )
+
+    raise typer.Exit(1)
+
+
 # Export public API
 __all__ = [
     "confirm",
@@ -93,6 +141,7 @@ __all__ = [
     "create_table",
     "error",
     "error_console",
+    "handle_exception",
     "info",
     "success",
     "warning",

@@ -1,12 +1,13 @@
-"""Unit tests for MCP write tools (simpletask_new, simpletask_task, simpletask_criteria)."""
+"""Unit tests for MCP write tools (new, task, criteria)."""
 
 import subprocess
 from pathlib import Path
 
 import pytest
 from simpletask.core.models import TaskStatus
+from simpletask.core.yaml_parser import InvalidTaskFileError
 from simpletask.mcp.models import SimpleTaskItemResponse, SimpleTaskWriteResponse
-from simpletask.mcp.server import simpletask_criteria, simpletask_new, simpletask_task
+from simpletask.mcp.server import criteria, new, task
 
 
 @pytest.fixture
@@ -22,16 +23,16 @@ def temp_project(tmp_path, monkeypatch):
 @pytest.fixture
 def task_project(temp_project):
     """Create project with existing task file."""
-    simpletask_new(branch="test", title="Test", prompt="Test")
+    new(branch="test", title="Test", prompt="Test")
     return temp_project
 
 
 class TestSimpletaskNew:
-    """Tests for simpletask_new MCP tool."""
+    """Tests for new MCP tool."""
 
     def test_creates_task_file(self, temp_project):
-        """Test that simpletask_new creates a task file with correct structure."""
-        result = simpletask_new(
+        """Test that new creates a task file with correct structure."""
+        result = new(
             branch="test/branch",
             title="Test Task",
             prompt="Test prompt",
@@ -45,13 +46,13 @@ class TestSimpletaskNew:
 
     def test_already_exists_raises(self, temp_project):
         """Test that creating duplicate task raises ValueError."""
-        simpletask_new(branch="test", title="T", prompt="P")
+        new(branch="test", title="T", prompt="P")
         with pytest.raises(ValueError, match="already exists"):
-            simpletask_new(branch="test", title="T", prompt="P")
+            new(branch="test", title="T", prompt="P")
 
     def test_criteria_none_adds_placeholder(self, temp_project):
         """Test that criteria=None adds a placeholder criterion."""
-        result = simpletask_new(branch="t", title="T", prompt="P", criteria=None)
+        result = new(branch="t", title="T", prompt="P", criteria=None)
         assert result.summary.criteria_total == 1
         assert "1 criteria" in result.message
 
@@ -60,7 +61,7 @@ class TestSimpletaskNew:
         from simpletask.core.project import get_task_file_path
         from simpletask.core.yaml_parser import parse_task_file
 
-        result = simpletask_new(branch="t", title="T", prompt="P", criteria=[])
+        result = new(branch="t", title="T", prompt="P", criteria=[])
 
         # Should succeed and create placeholder
         assert result.success is True
@@ -75,23 +76,23 @@ class TestSimpletaskNew:
 
     def test_criteria_list_creates_criteria(self, temp_project):
         """Test that criteria list creates criteria with correct IDs."""
-        result = simpletask_new(branch="t", title="T", prompt="P", criteria=["First", "Second"])
+        result = new(branch="t", title="T", prompt="P", criteria=["First", "Second"])
         assert result.summary.criteria_total == 2
 
     def test_returns_correct_summary(self, temp_project):
         """Test that returned summary has correct counts."""
-        result = simpletask_new(branch="t", title="T", prompt="P", criteria=["A", "B", "C"])
+        result = new(branch="t", title="T", prompt="P", criteria=["A", "B", "C"])
         assert result.summary.criteria_total == 3
         assert result.summary.criteria_completed == 0
         assert result.summary.tasks_total == 0
 
 
 class TestSimpletaskTask:
-    """Tests for simpletask_task MCP tool."""
+    """Tests for task MCP tool."""
 
     def test_add_success(self, task_project):
         """Test adding a task successfully."""
-        result = simpletask_task(action="add", branch="test", name="Task 1", goal="Do something")
+        result = task(action="add", branch="test", name="Task 1", goal="Do something")
         assert isinstance(result, SimpleTaskWriteResponse)
         assert result.success is True
         assert result.action == "task_added"
@@ -101,80 +102,78 @@ class TestSimpletaskTask:
     def test_add_missing_name_raises(self, task_project):
         """Test that add without name raises ValueError."""
         with pytest.raises(ValueError, match="'name' is required"):
-            simpletask_task(action="add", branch="test")
+            task(action="add", branch="test")
 
     def test_add_ignores_status_param(self, task_project):
         """Test that add action ignores status parameter."""
-        result = simpletask_task(action="add", branch="test", name="Task", status="completed")
+        task(action="add", branch="test", name="Task", status="completed")
         # Verify task was added as not_started - we need to fetch it to check
-        get_result = simpletask_task(action="get", branch="test", task_id="T001")
+        get_result = task(action="get", branch="test", task_id="T001")
         assert get_result.task.status == TaskStatus.NOT_STARTED
 
     def test_update_status_success(self, task_project):
         """Test updating task status."""
-        simpletask_task(action="add", branch="test", name="Task")
-        result = simpletask_task(
-            action="update", branch="test", task_id="T001", status="in_progress"
-        )
+        task(action="add", branch="test", name="Task")
+        result = task(action="update", branch="test", task_id="T001", status="in_progress")
         assert isinstance(result, SimpleTaskWriteResponse)
         assert result.success is True
         assert result.action == "task_updated"
         # Verify status was updated by getting the task
-        get_result = simpletask_task(action="get", branch="test", task_id="T001")
+        get_result = task(action="get", branch="test", task_id="T001")
         assert get_result.task.status == TaskStatus.IN_PROGRESS
 
     def test_update_name_and_goal(self, task_project):
         """Test updating task name and goal."""
-        simpletask_task(action="add", branch="test", name="Old Name", goal="Old Goal")
-        result = simpletask_task(
+        task(action="add", branch="test", name="Old Name", goal="Old Goal")
+        result = task(
             action="update", branch="test", task_id="T001", name="New Name", goal="New Goal"
         )
         assert result.success is True
         # Verify name and goal were updated by getting the task
-        get_result = simpletask_task(action="get", branch="test", task_id="T001")
+        get_result = task(action="get", branch="test", task_id="T001")
         assert get_result.task.name == "New Name"
         assert get_result.task.goal == "New Goal"
 
     def test_update_missing_task_id_raises(self, task_project):
         """Test that update without task_id raises ValueError."""
         with pytest.raises(ValueError, match="'task_id' is required"):
-            simpletask_task(action="update", branch="test", status="completed")
+            task(action="update", branch="test", status="completed")
 
     def test_update_invalid_status_raises(self, task_project):
         """Test that invalid status raises ValueError."""
-        simpletask_task(action="add", branch="test", name="Task")
+        task(action="add", branch="test", name="Task")
         with pytest.raises(ValueError, match=r"Invalid status.*Valid:"):
-            simpletask_task(action="update", branch="test", task_id="T001", status="invalid")
+            task(action="update", branch="test", task_id="T001", status="invalid")
 
     def test_update_task_not_found_raises(self, task_project):
         """Test that updating non-existent task raises ValueError."""
         # First add a task so we have tasks defined
-        simpletask_task(action="add", branch="test", name="Task")
+        task(action="add", branch="test", name="Task")
         with pytest.raises(ValueError, match="not found"):
-            simpletask_task(action="update", branch="test", task_id="T999", status="completed")
+            task(action="update", branch="test", task_id="T999", status="completed")
 
     def test_remove_success(self, task_project):
         """Test removing a task successfully."""
-        simpletask_task(action="add", branch="test", name="Task")
-        result = simpletask_task(action="remove", branch="test", task_id="T001")
+        task(action="add", branch="test", name="Task")
+        result = task(action="remove", branch="test", task_id="T001")
         assert result.summary.tasks_total == 0
 
     def test_remove_missing_task_id_raises(self, task_project):
         """Test that remove without task_id raises ValueError."""
         with pytest.raises(ValueError, match="'task_id' is required"):
-            simpletask_task(action="remove", branch="test")
+            task(action="remove", branch="test")
 
     def test_remove_task_not_found_raises(self, task_project):
         """Test that removing non-existent task raises ValueError."""
         # First add a task so we have tasks defined
-        simpletask_task(action="add", branch="test", name="Task")
+        task(action="add", branch="test", name="Task")
         with pytest.raises(ValueError, match="not found"):
-            simpletask_task(action="remove", branch="test", task_id="T999")
+            task(action="remove", branch="test", task_id="T999")
 
     def test_get_success(self, task_project):
         """Test getting a task by ID."""
-        simpletask_task(action="add", branch="test", name="Test Task", goal="Test Goal")
-        result = simpletask_task(action="get", branch="test", task_id="T001")
+        task(action="add", branch="test", name="Test Task", goal="Test Goal")
+        result = task(action="get", branch="test", task_id="T001")
         assert isinstance(result, SimpleTaskItemResponse)
         assert result.task is not None
         assert result.criterion is None
@@ -186,22 +185,22 @@ class TestSimpletaskTask:
     def test_get_missing_task_id_raises(self, task_project):
         """Test that get without task_id raises ValueError."""
         with pytest.raises(ValueError, match="'task_id' is required"):
-            simpletask_task(action="get", branch="test")
+            task(action="get", branch="test")
 
     def test_get_task_not_found_raises(self, task_project):
         """Test that getting non-existent task raises ValueError."""
         # First add a task so we have tasks defined
-        simpletask_task(action="add", branch="test", name="Task")
+        task(action="add", branch="test", name="Task")
         with pytest.raises(ValueError, match="not found"):
-            simpletask_task(action="get", branch="test", task_id="T999")
+            task(action="get", branch="test", task_id="T999")
 
 
 class TestSimpletaskCriteria:
-    """Tests for simpletask_criteria MCP tool."""
+    """Tests for criteria MCP tool."""
 
     def test_add_success(self, task_project):
         """Test adding a criterion successfully."""
-        result = simpletask_criteria(action="add", branch="test", description="New criterion")
+        result = criteria(action="add", branch="test", description="New criterion")
         assert isinstance(result, SimpleTaskWriteResponse)
         assert result.success is True
         assert result.action == "criterion_added"
@@ -212,46 +211,44 @@ class TestSimpletaskCriteria:
     def test_add_missing_description_raises(self, task_project):
         """Test that add without description raises ValueError."""
         with pytest.raises(ValueError, match="'description' is required"):
-            simpletask_criteria(action="add", branch="test")
+            criteria(action="add", branch="test")
 
     def test_complete_success(self, task_project):
         """Test marking criterion as completed."""
-        result = simpletask_criteria(action="complete", branch="test", criterion_id="AC1")
+        result = criteria(action="complete", branch="test", criterion_id="AC1")
         assert isinstance(result, SimpleTaskWriteResponse)
         assert result.success is True
         assert result.action == "criterion_completed"
         assert result.summary.criteria_completed == 1
         # Verify it was actually completed by getting it
-        get_result = simpletask_criteria(action="get", branch="test", criterion_id="AC1")
+        get_result = criteria(action="get", branch="test", criterion_id="AC1")
         assert get_result.criterion.completed is True
 
     def test_complete_false_marks_incomplete(self, task_project):
         """Test marking criterion as incomplete."""
-        simpletask_criteria(action="complete", branch="test", criterion_id="AC1")
-        result = simpletask_criteria(
-            action="complete", branch="test", criterion_id="AC1", completed=False
-        )
+        criteria(action="complete", branch="test", criterion_id="AC1")
+        result = criteria(action="complete", branch="test", criterion_id="AC1", completed=False)
         assert result.action == "criterion_uncompleted"
         assert result.summary.criteria_completed == 0
         # Verify it was actually marked incomplete by getting it
-        get_result = simpletask_criteria(action="get", branch="test", criterion_id="AC1")
+        get_result = criteria(action="get", branch="test", criterion_id="AC1")
         assert get_result.criterion.completed is False
 
     def test_complete_missing_criterion_id_raises(self, task_project):
         """Test that complete without criterion_id raises ValueError."""
         with pytest.raises(ValueError, match="'criterion_id' is required"):
-            simpletask_criteria(action="complete", branch="test")
+            criteria(action="complete", branch="test")
 
     def test_complete_criterion_not_found_raises(self, task_project):
         """Test that completing non-existent criterion raises ValueError."""
         with pytest.raises(ValueError, match="not found"):
-            simpletask_criteria(action="complete", branch="test", criterion_id="AC999")
+            criteria(action="complete", branch="test", criterion_id="AC999")
 
     def test_remove_success(self, task_project):
         """Test removing a criterion successfully."""
         # Add a second criterion first so we don't hit min_length=1
-        simpletask_criteria(action="add", branch="test", description="Second")
-        result = simpletask_criteria(action="remove", branch="test", criterion_id="AC2")
+        criteria(action="add", branch="test", description="Second")
+        result = criteria(action="remove", branch="test", criterion_id="AC2")
         assert isinstance(result, SimpleTaskWriteResponse)
         assert result.success is True
         assert result.action == "criterion_removed"
@@ -260,24 +257,24 @@ class TestSimpletaskCriteria:
     def test_remove_missing_criterion_id_raises(self, task_project):
         """Test that remove without criterion_id raises ValueError."""
         with pytest.raises(ValueError, match="'criterion_id' is required"):
-            simpletask_criteria(action="remove", branch="test")
+            criteria(action="remove", branch="test")
 
     def test_remove_criterion_not_found_raises(self, task_project):
         """Test that removing non-existent criterion raises ValueError."""
         with pytest.raises(ValueError, match="not found"):
-            simpletask_criteria(action="remove", branch="test", criterion_id="AC999")
+            criteria(action="remove", branch="test", criterion_id="AC999")
 
     def test_remove_last_criterion_fails(self, task_project):
         """Test that removing the last criterion fails due to schema validation."""
         # Task starts with 1 placeholder criterion due to criteria=None default
         # Removing it should fail due to min_length=1
-        with pytest.raises(Exception):  # Could be ValidationError or ValueError
-            simpletask_criteria(action="remove", branch="test", criterion_id="AC1")
+        with pytest.raises(InvalidTaskFileError):
+            criteria(action="remove", branch="test", criterion_id="AC1")
 
     def test_get_success(self, task_project):
         """Test getting a criterion by ID."""
-        simpletask_criteria(action="add", branch="test", description="Test Criterion")
-        result = simpletask_criteria(action="get", branch="test", criterion_id="AC2")
+        criteria(action="add", branch="test", description="Test Criterion")
+        result = criteria(action="get", branch="test", criterion_id="AC2")
         assert isinstance(result, SimpleTaskItemResponse)
         assert result.criterion is not None
         assert result.task is None
@@ -288,12 +285,12 @@ class TestSimpletaskCriteria:
     def test_get_missing_criterion_id_raises(self, task_project):
         """Test that get without criterion_id raises ValueError."""
         with pytest.raises(ValueError, match="'criterion_id' is required"):
-            simpletask_criteria(action="get", branch="test")
+            criteria(action="get", branch="test")
 
     def test_get_criterion_not_found_raises(self, task_project):
         """Test that getting non-existent criterion raises ValueError."""
         with pytest.raises(ValueError, match="not found"):
-            simpletask_criteria(action="get", branch="test", criterion_id="AC999")
+            criteria(action="get", branch="test", criterion_id="AC999")
 
 
 class TestCriteriaRepair:
@@ -301,9 +298,9 @@ class TestCriteriaRepair:
 
     def test_repair_empty_criteria(self, temp_project):
         """Test that empty acceptance_criteria is automatically repaired."""
+        import yaml
         from simpletask.core.project import get_task_file_path
         from simpletask.core.yaml_parser import parse_task_file
-        import yaml
 
         # Create task with empty criteria manually
         task_path = get_task_file_path("repair-test")
@@ -321,9 +318,7 @@ class TestCriteriaRepair:
         task_path.write_text(yaml.dump(broken_data))
 
         # This should trigger repair and succeed
-        result = simpletask_criteria(
-            action="add", branch="repair-test", description="New criterion"
-        )
+        result = criteria(action="add", branch="repair-test", description="New criterion")
 
         assert result.success is True
         # Should have placeholder AC1 + new AC2
@@ -338,9 +333,9 @@ class TestCriteriaRepair:
 
     def test_repair_unknown_fields(self, temp_project):
         """Test that unknown root fields are automatically stripped."""
+        import yaml
         from simpletask.core.project import get_task_file_path
         from simpletask.core.yaml_parser import parse_task_file
-        import yaml
 
         # Create task with invalid root fields
         task_path = get_task_file_path("repair-test2")
@@ -360,9 +355,7 @@ class TestCriteriaRepair:
         task_path.write_text(yaml.dump(broken_data))
 
         # This should trigger repair and succeed
-        result = simpletask_criteria(
-            action="add", branch="repair-test2", description="New criterion"
-        )
+        result = criteria(action="add", branch="repair-test2", description="New criterion")
 
         assert result.success is True
 
@@ -378,9 +371,9 @@ class TestCriteriaRepair:
 
     def test_repair_combined(self, temp_project):
         """Test repair of both empty criteria and unknown fields."""
+        import yaml
         from simpletask.core.project import get_task_file_path
         from simpletask.core.yaml_parser import parse_task_file
-        import yaml
 
         # Create task with BOTH issues
         task_path = get_task_file_path("repair-test3")
@@ -400,9 +393,7 @@ class TestCriteriaRepair:
         task_path.write_text(yaml.dump(broken_data))
 
         # This should repair both issues and succeed
-        result = simpletask_criteria(
-            action="add", branch="repair-test3", description="New criterion"
-        )
+        result = criteria(action="add", branch="repair-test3", description="New criterion")
 
         assert result.success is True
         assert result.summary.criteria_total == 2  # Placeholder + new
@@ -417,18 +408,18 @@ class TestCriteriaRepair:
 
 
 class TestTaskStepsParameter:
-    """Tests for steps parameter in simpletask_task."""
+    """Tests for steps parameter in task."""
 
     def test_task_add_steps_none(self, temp_project):
         """Test that steps=None creates placeholder."""
-        from simpletask.core.yaml_parser import parse_task_file
         from simpletask.core.project import get_task_file_path
+        from simpletask.core.yaml_parser import parse_task_file
 
         # Create task file first
-        simpletask_new(branch="steps-test", title="Test", prompt="Test", criteria=["AC1"])
+        new(branch="steps-test", title="Test", prompt="Test", criteria=["AC1"])
 
         # Add task with steps=None (default)
-        result = simpletask_task(
+        result = task(
             action="add",
             branch="steps-test",
             name="Test Task",
@@ -441,17 +432,17 @@ class TestTaskStepsParameter:
         # Verify placeholder was created by reading the file
         task_path = get_task_file_path("steps-test")
         spec = parse_task_file(task_path)
-        task = spec.tasks[0]
-        assert task.steps == ["To be defined"]
+        task_obj = spec.tasks[0]
+        assert task_obj.steps == ["To be defined"]
 
     def test_task_add_steps_empty(self, temp_project):
         """Test that steps=[] creates placeholder."""
-        from simpletask.core.yaml_parser import parse_task_file
         from simpletask.core.project import get_task_file_path
+        from simpletask.core.yaml_parser import parse_task_file
 
-        simpletask_new(branch="steps-test2", title="Test", prompt="Test", criteria=["AC1"])
+        new(branch="steps-test2", title="Test", prompt="Test", criteria=["AC1"])
 
-        result = simpletask_task(
+        result = task(
             action="add",
             branch="steps-test2",
             name="Test Task",
@@ -464,18 +455,18 @@ class TestTaskStepsParameter:
         # Verify placeholder was created by reading the file
         task_path = get_task_file_path("steps-test2")
         spec = parse_task_file(task_path)
-        task = spec.tasks[0]
-        assert task.steps == ["To be defined"]
+        task_obj = spec.tasks[0]
+        assert task_obj.steps == ["To be defined"]
 
     def test_task_add_steps_provided(self, temp_project):
         """Test that provided steps are used."""
-        from simpletask.core.yaml_parser import parse_task_file
         from simpletask.core.project import get_task_file_path
+        from simpletask.core.yaml_parser import parse_task_file
 
-        simpletask_new(branch="steps-test3", title="Test", prompt="Test", criteria=["AC1"])
+        new(branch="steps-test3", title="Test", prompt="Test", criteria=["AC1"])
 
         custom_steps = ["Step 1", "Step 2", "Step 3"]
-        result = simpletask_task(
+        result = task(
             action="add",
             branch="steps-test3",
             name="Test Task",
@@ -488,18 +479,18 @@ class TestTaskStepsParameter:
         # Verify custom steps were used by reading the file
         task_path = get_task_file_path("steps-test3")
         spec = parse_task_file(task_path)
-        task = spec.tasks[0]
-        assert task.steps == custom_steps
-        assert len(task.steps) == 3
+        task_obj = spec.tasks[0]
+        assert task_obj.steps == custom_steps
+        assert len(task_obj.steps) == 3
 
     def test_task_add_steps_in_yaml(self, temp_project):
         """Test that steps are properly serialized in YAML."""
-        from simpletask.core.project import get_task_file_path
         import yaml
+        from simpletask.core.project import get_task_file_path
 
-        simpletask_new(branch="steps-test4", title="Test", prompt="Test", criteria=["AC1"])
+        new(branch="steps-test4", title="Test", prompt="Test", criteria=["AC1"])
 
-        simpletask_task(
+        task(
             action="add",
             branch="steps-test4",
             name="Test Task",

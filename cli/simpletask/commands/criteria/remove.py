@@ -2,8 +2,9 @@
 
 import typer
 
-from simpletask.mcp.server import simpletask_criteria
-from simpletask.utils.console import confirm, error, success
+from simpletask.core.yaml_parser import InvalidTaskFileError
+from simpletask.mcp.server import criteria
+from simpletask.utils.console import confirm, handle_exception, success
 
 
 def remove_command(
@@ -27,7 +28,7 @@ def remove_command(
                 raise typer.Abort()
 
         # Call MCP tool directly
-        simpletask_criteria(
+        criteria(
             action="remove",
             branch=branch,
             criterion_id=criterion_id,
@@ -37,9 +38,5 @@ def remove_command(
 
     except typer.Abort:
         raise
-    except ValueError as e:
-        error(str(e))
-    except FileNotFoundError as e:
-        error(str(e))
-    except Exception as e:
-        error(f"Unexpected error: {e}")
+    except (ValueError, FileNotFoundError, InvalidTaskFileError) as e:
+        handle_exception(e, "removing acceptance criterion")

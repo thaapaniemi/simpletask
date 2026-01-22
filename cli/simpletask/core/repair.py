@@ -5,10 +5,9 @@ that have schema violations or invalid fields.
 """
 
 from pathlib import Path
-from typing import Any
 
 from .models import SimpleTaskSpec
-from .yaml_parser import InvalidTaskFileError, parse_task_file_lenient
+from .yaml_parser import parse_task_file_lenient
 
 
 def repair_task_file(file_path: Path) -> SimpleTaskSpec:
