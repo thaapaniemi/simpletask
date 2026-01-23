@@ -139,6 +139,56 @@ ls src/models/user.py
 ruff check src/
 ```
 
+### 3.4b Quality Gate Checkpoint (MANDATORY)
+
+**Before marking the task complete, run all configured quality checks for this task.**
+
+1. Get quality requirements from task file:
+   
+   **Preferred: Use MCP tool** (if simpletask MCP server is available)
+   ```
+   Use simpletask_quality() MCP tool to check requirements:
+   - Call simpletask_quality(action="check")
+   - Returns enabled quality requirements with commands to run
+   - Example response: {linting: "ruff check .", testing: "pytest --cov=..."}
+   ```
+   
+   **Fallback: Use CLI** (if MCP tools not available)
+   ```bash
+   simpletask quality check
+   ```
+
+2. Run each enabled quality check:
+   ```bash
+   # Example: If linting is enabled
+   ruff check .
+   
+   # Example: If testing is enabled with coverage
+   pytest --cov=cli/simpletask --cov-report=term-missing
+   
+   # Example: If type checking is enabled
+   mypy cli/simpletask
+   
+   # Example: If formatting is enabled
+   black --check .
+   ```
+
+3. Fix any issues found before proceeding:
+   - Linting errors → Fix code style issues
+   - Test failures → Fix bugs or update tests
+   - Type errors → Add/fix type hints
+   - Format issues → Run formatter (e.g., `black .`)
+
+4. Re-run checks until all pass:
+   ```bash
+   # Re-run failed checks after fixes
+   ruff check .
+   pytest
+   mypy cli/simpletask
+   ```
+
+**DO NOT mark the task as completed until ALL quality checks pass.** This prevents accumulating technical debt and catches issues early.
+
 ### 3.5 Mark Task as Completed
 
 **Preferred: Use MCP tool** (if simpletask MCP server is available)
@@ -277,6 +327,38 @@ After completing ALL tasks, evaluate which acceptance criteria are now satisfied
    simpletask task list --status in_progress
    simpletask task list --status blocked
    ```
+
+4a. Run Final Quality Check (MANDATORY):
+   
+   **Before committing, run all configured quality checks one final time to ensure nothing was missed.**
+   
+   **Preferred: Use MCP tool** (if simpletask MCP server is available)
+   ```
+   Use simpletask_quality() MCP tool:
+   - Call simpletask_quality(action="check")
+   - Run each enabled quality command
+   - Verify all checks pass before proceeding
+   ```
+   
+   **Fallback: Use CLI** (if MCP tools not available)
+   ```bash
+   # Check which quality requirements are enabled
+   simpletask quality show
+   
+   # Run each enabled check
+   # Example: if linting, testing, type-checking are enabled
+   ruff check .
+   pytest --cov=cli/simpletask --cov-report=term-missing
+   mypy cli/simpletask
+   black --check .
+   ```
+   
+   **If any quality check fails:**
+   - Fix the issues immediately
+   - Re-run the failing checks
+   - Do NOT proceed to commit until ALL checks pass
+   
+   This final gate prevents committing code that fails quality standards.
 
 5. Create a single commit with ALL implementation changes:
    

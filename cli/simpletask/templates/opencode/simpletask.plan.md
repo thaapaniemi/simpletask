@@ -164,7 +164,210 @@ Example acceptance criteria:
 - AC3: "All existing tests pass"
 - AC4: "New functionality is covered by unit tests"
 
-**Step 5: Plan Implementation Tasks**
+**Step 4.5: Codebase Analysis & Design (MANDATORY)**
+
+**This step is MANDATORY before planning implementation tasks.** Use the Task tool with the `explore` agent to systematically analyze the codebase and populate the design section. Set thoroughness based on task complexity:
+- **"quick"** - Simple tasks with obvious patterns
+- **medium** - Most tasks requiring moderate exploration  
+- **"very thorough"** - Complex tasks or unfamiliar codebases
+
+**4.5.1: Find Reference Implementations**
+
+Use the explore agent to find similar existing code:
+```
+Task(
+  subagent_type="explore",
+  description="Find reference implementations",
+  prompt="Find files similar to [feature description]. Look for:
+- Similar functionality or patterns
+- Existing implementations we should follow
+- Code that solves related problems
+Thoroughness: [quick/medium/very thorough]"
+)
+```
+
+Document findings using MCP tools (with CLI fallback):
+
+**Preferred: Use MCP tool** (if simpletask MCP server is available)
+```
+Use simpletask_design() MCP tool to add references:
+- Call simpletask_design(
+    action="set",
+    branch="[branch-name]",
+    field="references",
+    value="[file path]",
+    reference_reason="[why this is relevant]"
+  )
+- Repeat for each reference implementation
+```
+
+**Fallback: Use CLI** (if MCP tools not available)
+```bash
+simpletask design set references path/to/file.py --reason "Similar functionality" -b [branch-name]
+```
+
+**4.5.2: Document Patterns to Follow**
+
+Use the explore agent to identify coding patterns:
+```
+Task(
+  subagent_type="explore",
+  description="Identify design patterns",
+  prompt="Analyze [relevant files] to identify:
+- Design patterns used (Repository, Factory, Observer, etc.)
+- Code organization patterns  
+- Naming conventions
+- Dependency injection patterns
+Thoroughness: [quick/medium/very thorough]"
+)
+```
+
+Document using MCP tools (with CLI fallback):
+
+**Preferred: Use MCP tool**
+```
+Use simpletask_design() MCP tool:
+- Call simpletask_design(
+    action="set",
+    branch="[branch-name]",
+    field="patterns",
+    value="[Pattern 1],[Pattern 2],[Pattern 3]"
+  )
+```
+
+**Fallback: Use CLI**
+```bash
+simpletask design set patterns "Repository pattern,Use dependency injection,Follow existing naming conventions" -b [branch-name]
+```
+
+**4.5.3: Define Architectural Constraints**
+
+Use the explore agent to understand constraints:
+```
+Task(
+  subagent_type="explore",
+  description="Identify architectural constraints",
+  prompt="Analyze codebase structure to identify:
+- Layer separation rules (UI/business/data)
+- Circular dependency constraints
+- Module boundaries
+- Technology stack limitations
+Thoroughness: [quick/medium/very thorough]"
+)
+```
+
+Document using MCP tools (with CLI fallback):
+
+**Preferred: Use MCP tool**
+```
+Use simpletask_design() MCP tool:
+- Call simpletask_design(
+    action="set",
+    branch="[branch-name]",
+    field="constraints",
+    value="[Constraint 1],[Constraint 2],[Constraint 3]"
+  )
+```
+
+**Fallback: Use CLI**
+```bash
+simpletask design set constraints "Use clean architecture,No circular dependencies,Keep UI layer thin" -b [branch-name]
+```
+
+**4.5.4: Identify Security Considerations**
+
+Use the explore agent for security analysis:
+```
+Task(
+  subagent_type="explore",
+  description="Identify security patterns",
+  prompt="Analyze [relevant files] for security patterns:
+- Input validation approaches
+- Authentication/authorization patterns
+- Data sanitization methods
+- Sensitive data handling
+Thoroughness: [quick/medium/very thorough]"
+)
+```
+
+Document using MCP tools (with CLI fallback):
+
+**Preferred: Use MCP tool**
+```
+Use simpletask_design() MCP tool:
+- Call simpletask_design(
+    action="set",
+    branch="[branch-name]",
+    field="security",
+    value="[Security 1],[Security 2],[Security 3]"
+  )
+```
+
+**Fallback: Use CLI**
+```bash
+simpletask design set security "Validate all user inputs,Use parameterized queries,Sanitize output" -b [branch-name]
+```
+
+**4.5.5: Define Error Handling Pattern**
+
+Use the explore agent to understand error handling:
+```
+Task(
+  subagent_type="explore",
+  description="Identify error handling pattern",
+  prompt="Find how errors are handled in [similar files]:
+- Exception types used
+- Error propagation strategy
+- Logging approach
+- User-facing error messages
+Thoroughness: [quick/medium/very thorough]"
+)
+```
+
+Document using MCP tools (with CLI fallback):
+
+**Preferred: Use MCP tool**
+```
+Use simpletask_design() MCP tool:
+- Call simpletask_design(
+    action="set",
+    branch="[branch-name]",
+    field="error-handling",
+    value="[Error handling pattern description]"
+  )
+```
+
+**Fallback: Use CLI**
+```bash
+simpletask design set error-handling "Use Result type for error handling, log all errors, return user-friendly messages" -b [branch-name]
+```
+
+**4.5.6: Define Quality Requirements**
+
+Based on the codebase tech stack, apply a quality preset or configure manually using MCP tools (with CLI fallback):
+
+**Preferred: Use MCP tool**
+```
+Use simpletask_quality() MCP tool to apply preset:
+- Call simpletask_quality(
+    action="preset",
+    branch="[branch-name]",
+    preset_name="[python|typescript|node|go|rust|java-maven|java-gradle]"
+  )
+- Returns fields that were filled (gaps only)
+```
+
+**Fallback: Use CLI**
+```bash
+simpletask quality preset python -b [branch-name]
+# or manually configure:
+simpletask quality set linting --command "ruff check ." --enable -b [branch-name]
+simpletask quality set testing --command "pytest" --enable --min-coverage 80 -b [branch-name]
+```
+
+**Available presets:** python, typescript, node, go, rust, java-maven, java-gradle
+
+**Step 6: Plan Implementation Tasks**
 
 Add detailed implementation tasks using MCP tools (with CLI fallback). Each task MUST be:
 - Completable in 5-30 minutes
@@ -220,7 +423,7 @@ tasks:
               pass
 ```
 
-**Step 6: Add Context and Constraints**
+**Step 7: Add Context and Constraints**
 
 Edit `.tasks/[branch-name].yml` directly to add:
 
@@ -247,7 +450,7 @@ Edit `.tasks/[branch-name].yml` directly to add:
        - "Known pitfall to avoid"
    ```
 
-**Step 7: Validate and Summarize**
+**Step 8: Validate and Summarize**
 
 1. Validate the task file:
    

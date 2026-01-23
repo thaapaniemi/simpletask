@@ -6,7 +6,7 @@ Exposes task file operations as MCP tools for AI editor integration.
 from __future__ import annotations
 
 import builtins
-from typing import Literal
+from typing import Literal, cast
 
 from mcp.server.fastmcp import FastMCP
 
@@ -15,8 +15,23 @@ from ..core.criteria_ops import (
     mark_criterion_complete,
     remove_acceptance_criterion,
 )
-from ..core.models import TaskStatus
+from ..core.design_ops import remove_design_field
+from ..core.models import (
+    ArchitecturalPattern,
+    Design,
+    DesignReference,
+    ErrorHandlingStrategy,
+    SecurityCategory,
+    SecurityRequirement,
+    TaskStatus,
+    ToolName,
+)
 from ..core.project import ensure_project, get_task_file_path
+from ..core.quality_ops import (
+    apply_quality_preset,
+    run_quality_checks,
+    update_quality_config,
+)
 from ..core.task_file_ops import create_task_file
 from ..core.task_ops import (
     add_implementation_task,
@@ -24,10 +39,13 @@ from ..core.task_ops import (
     update_implementation_task,
 )
 from ..core.validation import validate_task_file
-from ..core.yaml_parser import parse_task_file
+from ..core.yaml_parser import parse_task_file, write_task_file
 from .models import (
+    QualityCheckResult,
+    SimpleTaskDesignResponse,
     SimpleTaskGetResponse,
     SimpleTaskItemResponse,
+    SimpleTaskQualityResponse,
     SimpleTaskWriteResponse,
     ValidationResult,
     compute_status_summary,
@@ -64,10 +82,12 @@ mcp = FastMCP("simpletask")
 
 __all__ = [
     "criteria",
+    "design",
     "get",
     "list",
     "mcp",
     "new",
+    "quality",
     "run_server",
     "task",
 ]
@@ -370,6 +390,308 @@ def criteria(
                 success=True,
                 action="criterion_removed",
                 message=f"Removed criterion {criterion_id}",
+                file_path=str(file_path),
+                summary=summary,
+            )
+
+
+@mcp.tool()
+def quality(
+    action: Literal["check", "set", "get", "preset"],
+    branch: str | None = None,
+    config_type: str | None = None,
+    tool: str | None = None,
+    args: str | None = None,
+    enabled: bool | None = None,
+    min_coverage: int | None = None,
+    timeout: int | None = None,
+    preset_name: str | None = None,
+) -> SimpleTaskQualityResponse | SimpleTaskWriteResponse:
+    """Manage quality requirements and run quality checks.
+
+    Args:
+        action: Operation to perform ('check', 'set', 'get', 'preset')
+        branch: Branch name, or None for current git branch
+        config_type: Config type for 'set' action ('linting', 'type-checking', 'testing', 'security')
+        tool: Tool name for 'set' action (e.g., 'ruff', 'mypy', 'pytest')
+        args: Comma-separated tool arguments for 'set' action (e.g., 'check,.,--fix')
+        enabled: Enable/disable status for 'set' action
+        min_coverage: Minimum coverage for 'set' action with testing type
+        timeout: Timeout in seconds for 'set' action (default: 300)
+        preset_name: Preset name for 'preset' action
+
+    Returns:
+        SimpleTaskQualityResponse for check/get actions.
+        SimpleTaskWriteResponse for set/preset actions.
+
+    Raises:
+        ValueError: If required parameters missing or invalid values provided.
+    """
+    file_path = get_task_file_path(branch)
+    spec = parse_task_file(file_path)
+
+    # Parse args if provided
+    args_list: _list[str] = []
+    if args:
+        args_list = [arg.strip() for arg in args.split(",")]
+
+    # Convert tool string to ToolName enum if provided
+    tool_enum: ToolName | None = None
+    if tool:
+        try:
+            tool_enum = ToolName(tool)
+        except ValueError:
+            valid_tools = ", ".join([t.value for t in ToolName])
+            raise ValueError(f"Invalid tool '{tool}'. Valid tools: {valid_tools}") from None
+
+    match action:
+        case "get":
+            summary = compute_status_summary(spec)
+            return SimpleTaskQualityResponse(
+                action="quality_get",
+                quality_requirements=spec.quality_requirements,
+                check_results=None,
+                all_passed=None,
+                applied_fields=None,
+                file_path=str(file_path),
+                summary=summary,
+            )
+
+        case "check":
+            # Run all enabled quality checks using shared function
+            quality_reqs = spec.quality_requirements
+            check_results: _list[QualityCheckResult]
+            if quality_reqs is None:
+                check_results = []
+                all_passed = True
+            else:
+                check_results, all_passed = run_quality_checks(quality_reqs)
+
+            summary = compute_status_summary(spec)
+
+            return SimpleTaskQualityResponse(
+                action="quality_check",
+                quality_requirements=None,
+                check_results=check_results,
+                all_passed=all_passed,
+                applied_fields=None,
+                file_path=str(file_path),
+                summary=summary,
+            )
+
+        case "set":
+            if not config_type:
+                raise ValueError("'config_type' is required for action='set'")
+            if config_type not in ["linting", "type-checking", "testing", "security"]:
+                raise ValueError(
+                    f"Invalid config_type '{config_type}'. "
+                    "Valid options: linting, type-checking, testing, security"
+                )
+
+            # Validate min_coverage only for testing
+            if min_coverage is not None and config_type != "testing":
+                raise ValueError("min_coverage can only be used with 'testing' config type")
+
+            # Type narrowing using cast after validation
+            validated_config_type = cast(
+                Literal["linting", "type-checking", "testing", "security"], config_type
+            )
+
+            # Use shared function to update quality config
+            spec = update_quality_config(
+                spec=spec,
+                config_type=validated_config_type,
+                tool=tool_enum,
+                args=args_list if args_list else None,
+                enabled=enabled,
+                min_coverage=min_coverage,
+                timeout=timeout,
+            )
+
+            write_task_file(file_path, spec)
+            summary = compute_status_summary(spec)
+
+            return SimpleTaskWriteResponse(
+                success=True,
+                action="quality_set",
+                message=f"Updated quality configuration for {config_type}",
+                file_path=str(file_path),
+                summary=summary,
+            )
+
+        case "preset":
+            if not preset_name:
+                raise ValueError("'preset_name' is required for action='preset'")
+
+            # Apply preset using shared function
+            merged, _applied = apply_quality_preset(spec.quality_requirements, preset_name)
+            spec.quality_requirements = merged
+
+            write_task_file(file_path, spec)
+            summary = compute_status_summary(spec)
+
+            return SimpleTaskWriteResponse(
+                success=True,
+                action="quality_preset_applied",
+                message=f"Applied preset '{preset_name}' (filled gaps only)",
+                file_path=str(file_path),
+                summary=summary,
+            )
+
+
+@mcp.tool()
+def design(
+    action: Literal["set", "get", "remove"],
+    branch: str | None = None,
+    field: str | None = None,
+    value: str | None = None,
+    reason: str | None = None,
+    category: str | None = None,
+    index: int | None = None,
+    all: bool = False,
+) -> SimpleTaskDesignResponse | SimpleTaskWriteResponse:
+    """Manage design guidance and architectural context.
+
+    Args:
+        action: Operation to perform ('set', 'get', 'remove')
+        branch: Branch name, or None for current git branch
+        field: Field to set/remove ('pattern', 'reference', 'constraint', 'security', 'error-handling')
+        value: Value to set (enum value for pattern/error-handling, free text for others)
+        reason: Reason for reference (required when field='reference')
+        category: Security category (required when field='security')
+        index: Index of item to remove (for list fields in 'remove' action)
+        all: Remove all items from field or entire design section (for 'remove' action)
+
+    Returns:
+        SimpleTaskDesignResponse for get action.
+        SimpleTaskWriteResponse for set/remove actions.
+
+    Raises:
+        ValueError: If required parameters missing or invalid values provided.
+    """
+    file_path = get_task_file_path(branch)
+    spec = parse_task_file(file_path)
+
+    match action:
+        case "get":
+            summary = compute_status_summary(spec)
+            return SimpleTaskDesignResponse(
+                action="design_get",
+                design=spec.design,
+                file_path=str(file_path),
+                summary=summary,
+            )
+
+        case "set":
+            if not field:
+                raise ValueError("'field' is required for action='set'")
+            if not value:
+                raise ValueError("'value' is required for action='set'")
+
+            # Initialize design section if it doesn't exist
+            if not spec.design:
+                spec.design = Design(
+                    patterns=None,
+                    reference_implementations=None,
+                    architectural_constraints=None,
+                    security=None,
+                    error_handling=None,
+                )
+
+            if field == "pattern":
+                # Parse enum value
+                try:
+                    pattern = ArchitecturalPattern(value)
+                except ValueError:
+                    valid_patterns = ", ".join([p.value for p in ArchitecturalPattern])
+                    raise ValueError(
+                        f"Invalid pattern: {value}. Valid patterns: {valid_patterns}"
+                    ) from None
+                if not spec.design.patterns:
+                    spec.design.patterns = []
+                spec.design.patterns.append(pattern)
+                message = f"Added pattern: {pattern.value}"
+
+            elif field == "reference":
+                if not reason:
+                    raise ValueError("'reason' is required when field='reference'")
+                if not spec.design.reference_implementations:
+                    spec.design.reference_implementations = []
+                ref = DesignReference(path=value, reason=reason)
+                spec.design.reference_implementations.append(ref)
+                message = f"Added reference: {value}"
+
+            elif field == "constraint":
+                if not spec.design.architectural_constraints:
+                    spec.design.architectural_constraints = []
+                spec.design.architectural_constraints.append(value)
+                message = "Added constraint"
+
+            elif field == "security":
+                if not category:
+                    raise ValueError("'category' is required when field='security'")
+                # Parse category enum
+                try:
+                    cat = SecurityCategory(category)
+                except ValueError:
+                    valid_categories = ", ".join([c.value for c in SecurityCategory])
+                    raise ValueError(
+                        f"Invalid category: {category}. Valid categories: {valid_categories}"
+                    ) from None
+                if not spec.design.security:
+                    spec.design.security = []
+                req = SecurityRequirement(category=cat, description=value)
+                spec.design.security.append(req)
+                message = f"Added security requirement: {cat.value}"
+
+            elif field == "error-handling":
+                # Parse enum value
+                try:
+                    strategy = ErrorHandlingStrategy(value)
+                except ValueError:
+                    valid_strategies = ", ".join([s.value for s in ErrorHandlingStrategy])
+                    raise ValueError(
+                        f"Invalid strategy: {value}. Valid strategies: {valid_strategies}"
+                    ) from None
+                spec.design.error_handling = strategy
+                message = f"Set error handling strategy: {strategy.value}"
+
+            else:
+                raise ValueError(
+                    f"Invalid field: {field}. "
+                    "Valid options: pattern, reference, constraint, security, error-handling"
+                )
+
+            write_task_file(file_path, spec)
+            summary = compute_status_summary(spec)
+
+            return SimpleTaskWriteResponse(
+                success=True,
+                action="design_set",
+                message=message,
+                file_path=str(file_path),
+                summary=summary,
+            )
+
+        case "remove":
+            if not field:
+                raise ValueError("'field' is required for action='remove'")
+
+            # Use shared design operations logic
+            spec, message = remove_design_field(
+                spec=spec,
+                field=field,
+                index=index,
+                all_items=all,  # MCP uses explicit all=True parameter
+            )
+
+            write_task_file(file_path, spec)
+            summary = compute_status_summary(spec)
+
+            return SimpleTaskWriteResponse(
+                success=True,
+                action="design_remove",
+                message=message,
                 file_path=str(file_path),
                 summary=summary,
             )

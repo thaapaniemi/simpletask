@@ -6,16 +6,38 @@ including status summaries and validation results.
 
 from pydantic import BaseModel, Field
 
-from ..core.models import AcceptanceCriterion, SimpleTaskSpec, Task, TaskStatus
+from ..core.models import (
+    AcceptanceCriterion,
+    Design,
+    QualityRequirements,
+    SimpleTaskSpec,
+    Task,
+    TaskStatus,
+)
 
 __all__ = [
+    "QualityCheckResult",
+    "SimpleTaskDesignResponse",
     "SimpleTaskGetResponse",
     "SimpleTaskItemResponse",
+    "SimpleTaskQualityResponse",
     "SimpleTaskWriteResponse",
     "StatusSummary",
     "ValidationResult",
     "compute_status_summary",
 ]
+
+
+class QualityCheckResult(BaseModel):
+    """Result of a single quality check."""
+
+    model_config = {"extra": "forbid"}
+
+    check_name: str = Field(..., description="Name of the check (e.g., 'Linting', 'Testing')")
+    passed: bool = Field(..., description="Whether the check passed")
+    command: str = Field(..., description="Command that was executed")
+    stdout: str = Field(default="", description="Standard output from command")
+    stderr: str = Field(default="", description="Standard error from command")
 
 
 class StatusSummary(BaseModel):
@@ -88,6 +110,45 @@ class SimpleTaskItemResponse(BaseModel):
     criterion: AcceptanceCriterion | None = Field(
         None, description="The requested criterion (for simpletask_criteria)"
     )
+    file_path: str = Field(..., description="Path to task file")
+    summary: StatusSummary = Field(..., description="Pre-computed status summary")
+
+
+class SimpleTaskQualityResponse(BaseModel):
+    """Response model for simpletask_quality tool.
+
+    Used for quality check and get actions.
+    """
+
+    model_config = {"extra": "forbid"}
+
+    action: str = Field(..., description="Action performed (e.g., 'quality_check', 'quality_get')")
+    quality_requirements: QualityRequirements | None = Field(
+        None, description="Current quality requirements (for 'get' action)"
+    )
+    check_results: list[QualityCheckResult] | None = Field(
+        None, description="Quality check results (for 'check' action)"
+    )
+    all_passed: bool | None = Field(
+        None, description="Whether all checks passed (for 'check' action)"
+    )
+    applied_fields: dict[str, bool] | None = Field(
+        None, description="Fields applied from preset (for 'preset' action)"
+    )
+    file_path: str = Field(..., description="Path to task file")
+    summary: StatusSummary = Field(..., description="Pre-computed status summary")
+
+
+class SimpleTaskDesignResponse(BaseModel):
+    """Response model for simpletask_design tool.
+
+    Used for design get action.
+    """
+
+    model_config = {"extra": "forbid"}
+
+    action: str = Field(..., description="Action performed (e.g., 'design_get')")
+    design: Design | None = Field(None, description="Current design section")
     file_path: str = Field(..., description="Path to task file")
     summary: StatusSummary = Field(..., description="Pre-computed status summary")
 

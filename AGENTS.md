@@ -131,16 +131,232 @@ The `normalize_branch_name()` function in `cli/simpletask/core/project.py` conve
 
 ## Commands
 
+### Python Virtual Environment
+
+**IMPORTANT:** Always use the `.venv` virtual environment for development and testing to ensure all necessary modules are available.
+
+```bash
+# Activate the virtual environment
+source .venv/bin/activate
+
+# Verify activation (should show .venv path)
+which python
+
+# Deactivate when done
+deactivate
+```
+
+The `.venv` environment contains all dependencies from `pyproject.toml` including:
+- Runtime dependencies (typer, pydantic, rich, etc.)
+- Development tools (pytest, black, ruff, mypy)
+- Test dependencies (pytest-cov, pytest plugins)
+
+**All pytest, black, ruff, and mypy commands must be run within the activated `.venv` environment.**
+
 ### Development
 
 ```bash
-# Install in editable mode
+# Install in editable mode (within .venv)
 pip install -e .
 
 # Run the CLI
 simpletask --help
 simpletask task list
 simpletask criteria add <task-id> "New criterion"
+simpletask quality check
+simpletask design show
+```
+
+### Quality Commands
+
+The `simpletask quality` subcommand group manages quality requirements (linting, type checking, testing, security checks):
+
+```bash
+# Show current quality configuration
+simpletask quality show
+
+# Run all enabled quality checks
+simpletask quality check
+
+# Run specific checks only
+simpletask quality check --lint-only
+simpletask quality check --test-only
+simpletask quality check --type-only
+simpletask quality check --security-only
+
+# Configure individual quality requirements
+simpletask quality set linting --tool ruff --args "check" "."
+simpletask quality set testing --tool pytest --min-coverage 80 --timeout 600
+simpletask quality set type-checking --tool mypy --args "." --timeout 120
+simpletask quality set security --tool bandit --args "-r" "." --timeout 300
+
+# Apply a quality preset (fills gaps only, doesn't overwrite)
+simpletask quality preset python
+simpletask quality preset typescript
+simpletask quality preset --list  # Show available presets
+
+# Available built-in presets:
+# - python: ruff, mypy, pytest
+# - typescript: eslint, tsc, npm test
+# - node: eslint, npm test
+# - go: golangci-lint, go test
+# - rust: cargo clippy, cargo test
+# - java-maven: maven checkstyle, maven test
+# - java-gradle: gradle checkstyle, gradle test
+```
+
+**Custom Quality Presets:**
+
+You can define custom quality presets in YAML files without modifying source code:
+
+1. **Project-specific presets**: `.simpletask/presets.yaml` (checked into git)
+2. **User-specific presets**: `~/.config/simpletask/presets.yaml` (personal config)
+
+Custom presets take precedence over built-in presets with the same name.
+
+**Custom Preset File Format:**
+
+```yaml
+# .simpletask/presets.yaml or ~/.config/simpletask/presets.yaml
+my-custom-preset:
+  linting:
+    enabled: true
+    tool: ruff
+    args: ["check", "src/"]
+    timeout: 300
+  type_checking:
+    enabled: true
+    tool: mypy
+    args: ["src/", "--strict"]
+    timeout: 120
+  testing:
+    enabled: true
+    tool: pytest
+    args: ["tests/"]
+    min_coverage: 90
+    timeout: 600
+  security_check:
+    enabled: false
+    tool: null
+    args: []
+    timeout: 300
+
+another-preset:
+  linting:
+    enabled: true
+    tool: eslint
+    args: [".", "--fix"]
+    timeout: 300
+  testing:
+    enabled: true
+    tool: npm
+    args: ["test"]
+    min_coverage: 75
+    timeout: 600
+```
+
+**Valid tool names** (from ToolName enum):
+- Python: `ruff`, `mypy`, `pytest`, `bandit`
+- TypeScript/Node: `eslint`, `tsc`, `npm`, `prettier`
+- Go: `go`, `golangci-lint`, `gosec`
+- Rust: `cargo`
+- Java: `mvn`, `gradle`
+
+```bash
+# List all available presets (built-in + custom)
+simpletask quality preset --list
+
+# Apply custom preset
+simpletask quality preset my-custom-preset
+```
+
+**Quality Config Structure (Schema v1.3):**
+
+Quality configurations use structured `tool + args` instead of raw command strings to prevent shell injection:
+
+```yaml
+quality_requirements:
+  linting:
+    enabled: true
+    tool: ruff
+    args: ["check", "."]
+    timeout: 300  # Default: 300 seconds
+  type_checking:
+    enabled: true
+    tool: mypy
+    args: ["."]
+    timeout: 300
+  testing:
+    enabled: true
+    tool: pytest
+    args: ["--cov=cli/simpletask", "--cov-report=term-missing"]
+    min_coverage: 80
+    timeout: 600  # Longer timeout for tests
+  security_check:
+    enabled: false
+    tool: bandit
+    args: ["-r", "."]
+    timeout: 300
+```
+
+**ToolName Enum** (whitelisted tools for security):
+- Python: `ruff`, `mypy`, `pytest`, `bandit`
+- TypeScript/Node: `eslint`, `tsc`, `npm`, `prettier`
+- Go: `go`, `golangci-lint`, `gosec`
+- Rust: `cargo`
+- Java: `mvn`, `gradle`
+
+### Design Commands
+
+The `simpletask design` subcommand group manages the design section (patterns, references, constraints, security):
+
+```bash
+# Show current design section
+simpletask design show
+
+# Add patterns to follow
+simpletask design set pattern "Repository pattern for data access"
+simpletask design set pattern "Dependency injection for loose coupling"
+
+# Add reference implementations
+simpletask design set reference "cli/simpletask/mcp/server.py" "MCP tool pattern to follow"
+
+# Add architectural constraints
+simpletask design set constraint "Use Pydantic models with extra='forbid'"
+simpletask design set constraint "No shell=True in subprocess calls"
+
+# Add security considerations
+simpletask design set security "Validate all user inputs"
+simpletask design set security "Use whitelisting for tool execution"
+
+# Set error handling pattern
+simpletask design set error-handling "Use Pydantic ValidationError for input validation"
+
+# Remove design elements
+simpletask design remove pattern --index 0  # Remove first pattern
+simpletask design remove pattern --all      # Remove all patterns
+simpletask design remove reference --index 1
+simpletask design remove error-handling     # Remove error handling pattern
+simpletask design remove --all              # Clear entire design section
+```
+
+**Design Section Structure:**
+
+```yaml
+design:
+  patterns_to_follow:
+    - "Repository pattern for data access"
+    - "Dependency injection for loose coupling"
+  reference_implementations:
+    - path: "cli/simpletask/mcp/server.py"
+      reason: "MCP tool pattern to follow"
+  architectural_constraints:
+    - "Use Pydantic models with extra='forbid'"
+    - "No shell=True in subprocess calls"
+  security_considerations:
+    - "Validate all user inputs"
+    - "Use whitelisting for tool execution"
+  error_handling_pattern: "Use Pydantic ValidationError for input validation"
 ```
 
 ### Testing
@@ -237,17 +453,19 @@ uv tool dir simpletask
 
 ### Available Tools
 
-The MCP server exposes 5 tools for task management:
+The MCP server exposes 7 tools for task management:
 
-**Note:** MCP clients automatically prefix tool names with the server name. When invoked through an MCP client (like OpenCode), these tools become `simpletask_get`, `simpletask_list`, `simpletask_new`, `simpletask_task`, and `simpletask_criteria`.
+**Note:** MCP clients automatically prefix tool names with the server name. When invoked through an MCP client (like OpenCode), these tools become `simpletask_get`, `simpletask_list`, `simpletask_new`, `simpletask_task`, `simpletask_criteria`, `simpletask_quality`, and `simpletask_design`.
 
 | Tool | Description | Parameters |
 |------|-------------|------------|
 | `get` | Get complete task specification with status summary | `branch` (str, optional): Branch name or None for current<br>`validate` (bool, optional): Include schema validation (default: false) |
 | `list` | List all task file branch names in the project | None |
 | `new` | Create a new task file | `branch` (str): Branch identifier<br>`title` (str): Task title<br>`prompt` (str): Original user request<br>`criteria` (list[str] \| None, optional): Acceptance criteria |
-| `task` | Manage implementation tasks (add/update/remove) | `action` (str): 'add', 'update', or 'remove'<br>`branch` (str, optional): Branch name or None for current<br>`task_id` (str, optional): Task ID (required for update/remove)<br>`name` (str, optional): Task name (required for add)<br>`goal` (str, optional): Task goal/description<br>`status` (str, optional): Status for update ('not_started', 'in_progress', 'completed', 'blocked')<br>`steps` (list[str] \| None, optional): Task steps for add action. None or [] adds placeholder ['To be defined'] |
-| `criteria` | Manage acceptance criteria (add/complete/remove) | `action` (str): 'add', 'complete', or 'remove'<br>`branch` (str, optional): Branch name or None for current<br>`criterion_id` (str, optional): Criterion ID (required for complete/remove)<br>`description` (str, optional): Description (required for add)<br>`completed` (bool, optional): Completion status for 'complete' (default: true) |
+| `task` | Manage implementation tasks (add/update/remove/get) | `action` (str): 'add', 'update', 'remove', or 'get'<br>`branch` (str, optional): Branch name or None for current<br>`task_id` (str, optional): Task ID (required for update/remove/get)<br>`name` (str, optional): Task name (required for add)<br>`goal` (str, optional): Task goal/description<br>`status` (str, optional): Status for update ('not_started', 'in_progress', 'completed', 'blocked')<br>`steps` (list[str] \| None, optional): Task steps for add action. None or [] adds placeholder ['To be defined'] |
+| `criteria` | Manage acceptance criteria (add/complete/remove/get) | `action` (str): 'add', 'complete', 'remove', or 'get'<br>`branch` (str, optional): Branch name or None for current<br>`criterion_id` (str, optional): Criterion ID (required for complete/remove/get)<br>`description` (str, optional): Description (required for add)<br>`completed` (bool, optional): Completion status for 'complete' (default: true) |
+| `quality` | Manage quality requirements (check/set/get/preset) | `action` (str): 'check', 'set', 'get', or 'preset'<br>`branch` (str, optional): Branch name or None for current<br>`config_type` (str, optional): 'linting', 'type-checking', 'testing', or 'security' (for set action)<br>`tool` (str, optional): Tool name from ToolName enum (for set action)<br>`args` (list[str], optional): Tool arguments (for set action)<br>`enabled` (bool, optional): Enable/disable check (for set action)<br>`min_coverage` (int, optional): Minimum coverage % (for testing config only)<br>`preset_name` (str, optional): Preset name (for preset action)<br>Check filters: `lint_only`, `test_only`, `type_only`, `security_only` (bool, for check action) |
+| `design` | Manage design section (set/get/remove) | `action` (str): 'set', 'get', or 'remove'<br>`branch` (str, optional): Branch name or None for current<br>`field` (str, optional): Field to modify: 'pattern', 'reference', 'constraint', 'security', 'error-handling' (for set/remove)<br>`value` (str, optional): Value to add (for set action)<br>`reason` (str, optional): Reason for reference (required when field='reference')<br>`index` (int, optional): Index to remove (for remove action on list fields)<br>`all` (bool, optional): Remove all items or entire section (for remove action) |
 
 ### Tool Details
 
@@ -532,6 +750,191 @@ result = criteria(
 - Criterion ID not found → raises `ValueError`
 - Removing last criterion → raises `InvalidTaskFileError` (schema constraint: min_length=1)
 
+#### quality
+
+Unified tool for managing quality requirements with four actions.
+
+**Parameters:**
+- `action`: Operation to perform ('check', 'set', 'get', 'preset')
+- `branch` (optional): Branch name, or None for current git branch
+- `config_type` (optional): Type of quality config to set ('linting', 'type-checking', 'testing', 'security') - required for set action
+- `tool` (optional): Tool name from ToolName enum (required for set action)
+- `args` (optional): List of tool arguments (for set action)
+- `enabled` (optional): Enable/disable the quality check (for set action)
+- `min_coverage` (optional): Minimum test coverage percentage 0-100 (only for testing config in set action)
+- `timeout` (optional): Timeout in seconds for the check (for set action, default: 300)
+- `preset_name` (optional): Preset name (required for preset action)
+- Check filters (for check action only): `lint_only`, `test_only`, `type_only`, `security_only` (bool)
+
+**Returns:**
+- `SimpleTaskQualityResponse` for check/get operations
+- `SimpleTaskWriteResponse` for set/preset operations
+
+**Response Structures:**
+
+Check/get operations return:
+```python
+{
+  "quality_requirements": QualityRequirements | None,  # The quality configuration
+  "check_results": list[QualityCheckResult] | None,  # Only present for check action
+  "file_path": str,
+  "summary": StatusSummary
+}
+```
+
+`QualityCheckResult` structure:
+```python
+{
+  "check_name": str,  # e.g., "Linting", "Testing"
+  "passed": bool,  # Whether the check passed
+  "command": str,  # Command that was executed
+  "stdout": str,  # Standard output
+  "stderr": str  # Standard error
+}
+```
+
+**Example Usage:**
+
+```python
+# Get current quality configuration
+result = quality(action="get", branch="feature/user-auth")
+
+# Run all enabled quality checks
+result = quality(action="check")
+# Returns: SimpleTaskQualityResponse with check_results list
+
+# Run only linting checks
+result = quality(action="check", lint_only=True)
+
+# Set linting configuration
+result = quality(
+    action="set",
+    config_type="linting",
+    tool="ruff",
+    args=["check", "."],
+    enabled=True,
+    timeout=300
+)
+
+# Set testing configuration with coverage threshold and timeout
+result = quality(
+    action="set",
+    config_type="testing",
+    tool="pytest",
+    args=["--cov=cli/simpletask", "--cov-report=term-missing"],
+    min_coverage=80,
+    timeout=600
+)
+
+# Apply a quality preset (fills gaps only)
+result = quality(action="preset", preset_name="python")
+```
+
+**Edge Cases:**
+- Missing required params → raises `ValueError`
+- Invalid config_type → raises `ValueError`
+- Invalid tool name (not in ToolName enum) → raises `ValueError`
+- min_coverage provided for non-testing config → raises `ValueError`
+- Check action with no enabled checks → returns empty check_results list
+
+#### design
+
+Unified tool for managing the design section with three actions.
+
+**Parameters:**
+- `action`: Operation to perform ('set', 'get', 'remove')
+- `branch` (optional): Branch name, or None for current git branch
+- `field` (optional): Field to modify ('pattern', 'reference', 'constraint', 'security', 'error-handling') - required for set/remove
+- `value` (optional): Value to add (required for set action)
+- `reason` (optional): Reason/explanation (required when field='reference' in set action)
+- `index` (optional): Index to remove from list fields (for remove action)
+- `all` (optional): Remove all items from field or entire design section (for remove action)
+
+**Returns:**
+- `SimpleTaskDesignResponse` for get operations
+- `SimpleTaskWriteResponse` for set/remove operations
+
+**Response Structures:**
+
+Get operations return:
+```python
+{
+  "design": Design | None,  # The design section
+  "file_path": str,
+  "summary": StatusSummary
+}
+```
+
+**Example Usage:**
+
+```python
+# Get current design section
+result = design(action="get")
+
+# Add a pattern to follow
+result = design(
+    action="set",
+    field="pattern",
+    value="Repository pattern for data access"
+)
+
+# Add a reference implementation
+result = design(
+    action="set",
+    field="reference",
+    value="cli/simpletask/mcp/server.py",
+    reason="MCP tool pattern to follow"
+)
+
+# Add an architectural constraint
+result = design(
+    action="set",
+    field="constraint",
+    value="Use Pydantic models with extra='forbid'"
+)
+
+# Add security consideration
+result = design(
+    action="set",
+    field="security",
+    value="Validate all user inputs"
+)
+
+# Set error handling pattern
+result = design(
+    action="set",
+    field="error-handling",
+    value="Use Pydantic ValidationError for input validation"
+)
+
+# Remove specific pattern by index
+result = design(
+    action="remove",
+    field="pattern",
+    index=0
+)
+
+# Remove all patterns
+result = design(
+    action="remove",
+    field="pattern",
+    all=True
+)
+
+# Remove entire design section
+result = design(
+    action="remove",
+    all=True
+)
+```
+
+**Edge Cases:**
+- Missing required params → raises `ValueError`
+- Invalid field name → raises `ValueError`
+- Reference without reason → raises `ValueError`
+- Invalid index for list field → raises `ValueError`
+- Remove from non-existent design section → raises `ValueError`
+
 ### Error Handling
 
 MCP tools raise exceptions for errors:
@@ -720,6 +1123,28 @@ class TestGitOperations:
 ```
 
 ## Boundaries
+
+### Schema Versioning
+
+SimpleTask uses semantic versioning for the task file schema:
+
+**Current version: 1.3** (default for new task files)
+
+**Version History:**
+- **v1.0** (2026-01-15): Initial schema with basic task structure
+- **v1.1** (2026-01-20): Added required `created` timestamp field
+- **v1.2** (skipped): Deprecated immediately due to security vulnerability (raw command strings)
+- **v1.3** (2026-01-23): Added optional `quality_requirements` and `design` fields with secure structured tool+args
+
+**Backward Compatibility:**
+- v1.3 is fully backward compatible with v1.0 and v1.1 files
+- v1.0 files missing the `created` field are auto-filled on write operations
+- No migration tooling is needed - old files continue to work
+
+**Best Practices:**
+- New task files automatically use v1.3
+- Don't manually change `schema_version` in existing files
+- The schema version is tracked for future compatibility if breaking changes occur
 
 ### Task Files (.tasks/ directory)
 

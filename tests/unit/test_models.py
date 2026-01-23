@@ -181,7 +181,7 @@ class TestSimpleTaskSpec:
             acceptance_criteria=[AcceptanceCriterion(id="AC1", description="Works correctly")],
         )
         assert spec.branch == "test-feature"
-        assert spec.schema_version == "1.1"
+        assert spec.schema_version == "1.3"
         assert len(spec.acceptance_criteria) == 1
         assert spec.tasks is None
 

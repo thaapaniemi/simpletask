@@ -1,0 +1,50 @@
+# Example custom quality presets file
+# 
+# Copy this file to:
+# - .simpletask/presets.yaml (project-specific, checked into git)
+# - ~/.config/simpletask/presets.yaml (user-specific, personal config)
+#
+# Custom presets override built-in presets with the same name.
+
+# Example: Custom Python preset with stricter settings
+strict-python:
+  linting:
+    enabled: true
+    tool: ruff
+    args: ["check", ".", "--select", "ALL"]
+  type_checking:
+    enabled: true
+    tool: mypy
+    args: [".", "--strict"]
+  testing:
+    enabled: true
+    tool: pytest
+    args: ["--cov=.", "--cov-report=html"]
+    min_coverage: 95
+  security_check:
+    enabled: true
+    tool: bandit
+    args: ["-r", ".", "-ll"]
+
+# Example: Custom Node.js preset
+my-node:
+  linting:
+    enabled: true
+    tool: eslint
+    args: [".", "--fix"]
+  testing:
+    enabled: true
+    tool: npm
+    args: ["test"]
+    min_coverage: 80
+  security_check:
+    enabled: true
+    tool: npm
+    args: ["audit", "--audit-level=moderate"]
+
+# Valid tool names (ToolName enum):
+# Python: ruff, mypy, pytest, bandit
+# TypeScript/Node: eslint, tsc, npm, prettier
+# Go: go, golangci-lint, gosec
+# Rust: cargo
+# Java: mvn, gradle

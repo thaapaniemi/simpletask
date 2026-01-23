@@ -20,6 +20,44 @@ class TaskStatus(str, Enum):
     BLOCKED = "blocked"
 
 
+class ToolName(str, Enum):
+    """Whitelisted tool names for quality checks.
+
+    Only these tools can be executed to prevent shell injection attacks.
+    """
+
+    # Python tools
+    RUFF = "ruff"
+    MYPY = "mypy"
+    PYTEST = "pytest"
+    BLACK = "black"
+    PYLINT = "pylint"
+    BANDIT = "bandit"
+
+    # TypeScript/JavaScript tools
+    ESLINT = "eslint"
+    TSC = "tsc"
+    NPM = "npm"
+    YARN = "yarn"
+    JEST = "jest"
+
+    # Go tools
+    GO = "go"
+    GOLANGCI_LINT = "golangci-lint"
+    GOSEC = "gosec"
+
+    # Rust tools
+    CARGO = "cargo"
+    CLIPPY = "clippy"
+
+    # Java tools
+    MVN = "mvn"
+    GRADLE = "gradle"
+
+    # Other tools
+    MAKE = "make"
+
+
 class AcceptanceCriterion(BaseModel):
     """A single acceptance criterion that must be met."""
 
@@ -49,6 +87,252 @@ class CodeExample(BaseModel):
     code: str = Field(..., description="The actual code")
 
 
+def validate_no_shell_metacharacters(args: list[str]) -> list[str]:
+    """Shared validator for rejecting dangerous shell metacharacters.
+
+    This prevents shell injection attacks while allowing legitimate characters
+    like parentheses, brackets, and braces that are commonly used in tool arguments.
+
+    Args:
+        args: List of command-line arguments to validate
+
+    Returns:
+        The validated args list
+
+    Raises:
+        ValueError: If any argument contains dangerous shell metacharacters
+    """
+    # Only block actually dangerous shell metacharacters
+    # Parentheses, brackets, braces are legitimate in many tool arguments
+    # Example: pytest -k "(test_user or test_admin) and not slow"
+    dangerous_chars = {";", "&", "|", "`", "$", ">", "<"}
+
+    for arg in args:
+        if any(char in arg for char in dangerous_chars):
+            raise ValueError(
+                f"Argument '{arg}' contains shell metacharacters ({', '.join(sorted(dangerous_chars))}). "
+                f"Use structured arguments only, not shell commands."
+            )
+    return args
+
+
+class LintingConfig(BaseModel):
+    """Configuration for code linting checks."""
+
+    model_config = {"extra": "forbid"}
+
+    enabled: bool = Field(..., description="Whether linting is enabled")
+    tool: ToolName = Field(..., description="Tool to run linting check")
+    args: list[str] = Field(default_factory=list, description="Arguments to pass to the tool")
+    timeout: int | None = Field(
+        default=300, ge=1, description="Timeout in seconds for linting check (default: 300)"
+    )
+
+    @field_validator("args")
+    @classmethod
+    def validate_args(cls, v: list[str]) -> list[str]:
+        """Validate that arguments don't contain dangerous shell metacharacters."""
+        return validate_no_shell_metacharacters(v)
+
+
+class TypeCheckConfig(BaseModel):
+    """Configuration for type checking."""
+
+    model_config = {"extra": "forbid"}
+
+    enabled: bool = Field(..., description="Whether type checking is enabled")
+    tool: ToolName = Field(..., description="Tool to run type check")
+    args: list[str] = Field(default_factory=list, description="Arguments to pass to the tool")
+    timeout: int | None = Field(
+        default=300, ge=1, description="Timeout in seconds for type checking (default: 300)"
+    )
+
+    @field_validator("args")
+    @classmethod
+    def validate_args(cls, v: list[str]) -> list[str]:
+        """Validate that arguments don't contain dangerous shell metacharacters."""
+        return validate_no_shell_metacharacters(v)
+
+
+class TestingConfig(BaseModel):
+    """Configuration for test execution."""
+
+    model_config = {"extra": "forbid"}
+
+    enabled: bool = Field(..., description="Whether testing is enabled")
+    tool: ToolName = Field(..., description="Tool to run tests")
+    args: list[str] = Field(default_factory=list, description="Arguments to pass to the tool")
+    min_coverage: int | None = Field(
+        None, ge=0, le=100, description="Minimum test coverage percentage (0-100)"
+    )
+    timeout: int | None = Field(
+        default=300, ge=1, description="Timeout in seconds for test execution (default: 300)"
+    )
+
+    @field_validator("args")
+    @classmethod
+    def validate_args(cls, v: list[str]) -> list[str]:
+        """Validate that arguments don't contain dangerous shell metacharacters."""
+        return validate_no_shell_metacharacters(v)
+
+
+class SecurityCheckConfig(BaseModel):
+    """Configuration for security checks."""
+
+    model_config = {"extra": "forbid"}
+
+    enabled: bool = Field(default=False, description="Whether security checks are enabled")
+    tool: ToolName | None = Field(None, description="Tool to run security check")
+    args: list[str] = Field(default_factory=list, description="Arguments to pass to the tool")
+    timeout: int | None = Field(
+        default=300, ge=1, description="Timeout in seconds for security check (default: 300)"
+    )
+
+    @field_validator("args")
+    @classmethod
+    def validate_args(cls, v: list[str]) -> list[str]:
+        """Validate that arguments don't contain dangerous shell metacharacters."""
+        return validate_no_shell_metacharacters(v)
+
+
+class DesignReference(BaseModel):
+    """A reference implementation to follow."""
+
+    model_config = {"extra": "forbid"}
+
+    path: str = Field(..., description="Path to the reference implementation")
+    reason: str = Field(..., description="Why this reference is relevant")
+
+    @field_validator("path")
+    @classmethod
+    def validate_path_safe(cls, v: str) -> str:
+        """Validate that path is safe and doesn't leak sensitive information.
+
+        Checks:
+        - Path doesn't contain suspicious patterns like secrets/credentials
+        - Path doesn't escape project with ../..
+        - Path uses forward slashes (normalized)
+
+        Note: We don't check if path exists because task files may be created
+        before the referenced files exist during planning.
+        """
+        # Normalize path separators
+        normalized = v.replace("\\", "/")
+
+        # Check for path traversal attempts
+        if ".." in normalized:
+            raise ValueError(
+                f"Path '{v}' contains '..' which may indicate path traversal. "
+                f"Use relative paths from project root without '..'."
+            )
+
+        # Check for absolute paths (should be relative to project)
+        if normalized.startswith("/") or (len(normalized) > 1 and normalized[1] == ":"):
+            raise ValueError(
+                f"Path '{v}' appears to be absolute. "
+                f"Use relative paths from project root (e.g., 'src/module/file.py')."
+            )
+
+        # Check for common sensitive file patterns
+        sensitive_patterns = [".env", ".key", ".pem", ".crt", "credentials", "secrets", "password"]
+        path_lower = normalized.lower()
+        for pattern in sensitive_patterns:
+            if pattern in path_lower:
+                raise ValueError(
+                    f"Path '{v}' may reference sensitive files (contains '{pattern}'). "
+                    f"Reference implementations should point to source code, not secrets/credentials."
+                )
+
+        return v
+
+
+class ArchitecturalPattern(str, Enum):
+    """Common architectural and design patterns."""
+
+    REPOSITORY = "repository"
+    SERVICE_LAYER = "service_layer"
+    FACTORY = "factory"
+    STRATEGY = "strategy"
+    ADAPTER = "adapter"
+    OBSERVER = "observer"
+    COMMAND = "command"
+    MVC = "mvc"
+    CLEAN_ARCHITECTURE = "clean_architecture"
+    HEXAGONAL = "hexagonal"
+    DEPENDENCY_INJECTION = "dependency_injection"
+    SINGLETON = "singleton"
+    BUILDER = "builder"
+    DECORATOR = "decorator"
+
+
+class ErrorHandlingStrategy(str, Enum):
+    """Error handling strategies."""
+
+    EXCEPTIONS = "exceptions"
+    RESULT_TYPE = "result_type"
+    ERROR_CODES = "error_codes"
+    CALLBACKS = "callbacks"
+    PANIC_RECOVER = "panic_recover"
+
+
+class SecurityCategory(str, Enum):
+    """Categories of security requirements."""
+
+    AUTHENTICATION = "authentication"
+    AUTHORIZATION = "authorization"
+    CRYPTOGRAPHY = "cryptography"
+    INPUT_VALIDATION = "input_validation"
+    OUTPUT_ENCODING = "output_encoding"
+    SESSION_MANAGEMENT = "session_management"
+    SECURE_COMMUNICATION = "secure_communication"
+    DATA_PROTECTION = "data_protection"
+    AUDIT_LOGGING = "audit_logging"
+
+
+class SecurityRequirement(BaseModel):
+    """A specific security requirement with category and description."""
+
+    model_config = {"extra": "forbid"}
+
+    category: SecurityCategory = Field(..., description="Security category")
+    description: str = Field(..., description="Specific security requirement")
+
+
+class Design(BaseModel):
+    """Design guidance and architectural context for implementation."""
+
+    model_config = {"extra": "forbid"}
+
+    patterns: list[ArchitecturalPattern] | None = Field(
+        None, description="Design patterns and architectural patterns to follow"
+    )
+    reference_implementations: list[DesignReference] | None = Field(
+        None, description="Existing code to use as reference"
+    )
+    architectural_constraints: list[str] | None = Field(
+        None, min_length=1, description="Architectural rules and constraints"
+    )
+    security: list[SecurityRequirement] | None = Field(
+        None, description="Security requirements and considerations"
+    )
+    error_handling: ErrorHandlingStrategy | None = Field(
+        None, description="Error handling strategy to use"
+    )
+
+
+class QualityRequirements(BaseModel):
+    """Quality requirements and checks for the task."""
+
+    model_config = {"extra": "forbid"}
+
+    linting: LintingConfig = Field(..., description="Linting configuration")
+    type_checking: TypeCheckConfig | None = Field(None, description="Type checking configuration")
+    testing: TestingConfig = Field(..., description="Testing configuration")
+    security_check: SecurityCheckConfig | None = Field(
+        None, description="Security check configuration"
+    )
+
+
 class Task(BaseModel):
     """A single implementation task."""
 
@@ -74,12 +358,21 @@ class SimpleTaskSpec(BaseModel):
 
     This represents the complete structure of a task definition file
     stored in ./.tasks/<branch>.yml
+
+    Schema Version History:
+    - v1.0 (2026-01-15): Initial schema
+    - v1.1 (2026-01-20): Added required 'created' timestamp field
+    - v1.2 (skipped): Had security vulnerability with raw command strings,
+                      deprecated immediately same day (commit 0a9e1fc→e936849)
+    - v1.3 (2026-01-23): Added optional 'quality_requirements' and 'design' fields
+                         with structured tool+args (secure). Fully backward compatible
+                         with v1.0 and v1.1 files.
     """
 
     model_config = {"extra": "forbid"}
 
     schema_version: str = Field(
-        default="1.1", description="Schema version for compatibility tracking"
+        default="1.3", description="Schema version for compatibility tracking"
     )
     branch: str = Field(
         ..., description="Branch name / unique task identifier (also git branch name)"
@@ -90,6 +383,10 @@ class SimpleTaskSpec(BaseModel):
     acceptance_criteria: list[AcceptanceCriterion] = Field(
         ..., min_length=1, description="Criteria that define task completion"
     )
+    quality_requirements: QualityRequirements | None = Field(
+        None, description="Quality gates and checks for the task"
+    )
+    design: Design | None = Field(None, description="Design guidance and architectural context")
     constraints: list[str] | None = Field(
         None, description="Boundaries and rules the agent must follow"
     )
@@ -122,8 +419,16 @@ class SimpleTaskSpec(BaseModel):
 __all__ = [
     "AcceptanceCriterion",
     "CodeExample",
+    "Design",
+    "DesignReference",
     "FileAction",
+    "LintingConfig",
+    "QualityRequirements",
+    "SecurityCheckConfig",
     "SimpleTaskSpec",
     "Task",
     "TaskStatus",
+    "TestingConfig",
+    "ToolName",
+    "TypeCheckConfig",
 ]

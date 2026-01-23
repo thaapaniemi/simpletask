@@ -154,7 +154,120 @@ Example acceptance criteria:
 - AC3: "All existing tests pass"
 - AC4: "New functionality is covered by unit tests"
 
-**Step 5: Plan Implementation Tasks**
+**Step 4.5: Codebase Analysis & Design (MANDATORY)**
+
+**Before creating implementation tasks, you MUST analyze the existing codebase to understand patterns, architecture, and quality requirements. This prevents review-phase issues.**
+
+### 4.5.1: Find Reference Implementations
+
+Search the codebase for similar features that can guide your implementation:
+
+**Preferred: Use MCP tool** (if simpletask MCP server is available)
+```
+Use Task tool with explore subagent to find reference implementations:
+- Search for similar features, components, or patterns
+- Analyze how existing code handles similar requirements
+- Identify naming conventions and code organization patterns
+- Find test patterns to follow
+```
+
+**Fallback: Use search commands** (if MCP tools not available)
+```bash
+# Search for similar features
+rg "pattern_name" --type py
+
+# Find test patterns
+find tests/ -name "*test_similar*.py"
+```
+
+### 4.5.2: Document Patterns to Follow
+
+Use simpletask_design() MCP tool to store design decisions:
+
+```
+Use simpletask_design() MCP tool:
+- Call simpletask_design(action="set", section="architecture", content="Description of patterns to follow")
+- Call simpletask_design(action="set", section="patterns", content="Code patterns and conventions identified")
+- Call simpletask_design(action="set", section="testing", content="Test patterns to follow")
+```
+
+Example design sections:
+- **architecture**: "Follow MVC pattern, controllers in src/api/, models in src/models/"
+- **patterns**: "Use dependency injection for services, follow existing error handling with try/except"
+- **testing**: "Use pytest fixtures from conftest.py, follow AAA pattern"
+
+### 4.5.3: Define Architectural Constraints
+
+Identify constraints from the codebase:
+- File organization rules (where different types of code belong)
+- Naming conventions (function names, class names, variables)
+- Import patterns (absolute vs relative, organization)
+- Dependency rules (what can import what)
+
+Add to task file constraints using simpletask_design():
+```
+simpletask_design(action="set", section="constraints", content="List of architectural constraints")
+```
+
+### 4.5.4: Identify Security Considerations
+
+Check for security patterns in the codebase:
+- Authentication/authorization patterns
+- Input validation approaches
+- Error message handling (don't leak sensitive info)
+- Secrets management
+- SQL injection prevention
+- XSS prevention (if web app)
+
+Document in design section:
+```
+simpletask_design(action="set", section="security", content="Security considerations and patterns")
+```
+
+### 4.5.5: Define Error Handling Pattern
+
+Analyze how errors are handled:
+- Custom exception classes?
+- Error logging patterns?
+- User-facing error messages?
+- Validation error handling?
+
+Document the pattern:
+```
+simpletask_design(action="set", section="error_handling", content="Error handling patterns to follow")
+```
+
+### 4.5.6: Define Quality Requirements
+
+**Set quality requirements using simpletask_quality() MCP tool based on tech stack:**
+
+**Option A: Use preset for common stacks**
+```
+Use simpletask_quality() MCP tool:
+- Call simpletask_quality(action="preset", preset_name="[tech-stack]", branch="[branch-name]")
+- Available presets: python, typescript, node, go, rust, java-maven, java-gradle
+```
+
+**Option B: Configure manually**
+```
+Use simpletask_quality() MCP tool to configure each requirement:
+- simpletask_quality(action="set", config_type="linting", command="ruff check .", enable=True)
+- simpletask_quality(action="set", config_type="testing", command="pytest", enable=True, min_coverage=80)
+- simpletask_quality(action="set", config_type="type_checking", command="mypy src/", enable=True)
+- simpletask_quality(action="set", config_type="formatting", command="black --check .", enable=True)
+```
+
+**Fallback: Use CLI** (if MCP tools not available)
+```bash
+simpletask quality preset python -b [branch-name]
+# or manually configure:
+simpletask quality set linting --command "ruff check ." --enable -b [branch-name]
+simpletask quality set testing --command "pytest" --enable --min-coverage 80 -b [branch-name]
+```
+
+**Available presets:** python, typescript, node, go, rust, java-maven, java-gradle
+
+**Step 6: Plan Implementation Tasks**
 
 Add detailed implementation tasks. Each task MUST be:
 - Completable in 5-30 minutes
@@ -207,7 +320,7 @@ tasks:
               pass
 ```
 
-**Step 6: Add Context and Constraints**
+**Step 7: Add Context and Constraints**
 
 Edit `.tasks/[branch-name].yml` directly to add:
 
@@ -234,7 +347,7 @@ Edit `.tasks/[branch-name].yml` directly to add:
        - "Known pitfall to avoid"
    ```
 
-**Step 7: Validate and Summarize**
+**Step 8: Validate and Summarize**
 
 1. Validate the task file:
    
