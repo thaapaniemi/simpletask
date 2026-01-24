@@ -359,20 +359,13 @@ class SimpleTaskSpec(BaseModel):
     This represents the complete structure of a task definition file
     stored in ./.tasks/<branch>.yml
 
-    Schema Version History:
-    - v1.0 (2026-01-15): Initial schema
-    - v1.1 (2026-01-20): Added required 'created' timestamp field
-    - v1.2 (skipped): Had security vulnerability with raw command strings,
-                      deprecated immediately same day (commit 0a9e1fc→e936849)
-    - v1.3 (2026-01-23): Added optional 'quality_requirements' and 'design' fields
-                         with structured tool+args (secure). Fully backward compatible
-                         with v1.0 and v1.1 files.
+    Current schema version: 1.0
     """
 
     model_config = {"extra": "forbid"}
 
     schema_version: str = Field(
-        default="1.3", description="Schema version for compatibility tracking"
+        default="1.0", description="Schema version for compatibility tracking"
     )
     branch: str = Field(
         ..., description="Branch name / unique task identifier (also git branch name)"

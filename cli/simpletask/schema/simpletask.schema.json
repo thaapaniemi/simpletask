@@ -9,7 +9,7 @@
     "schema_version": {
       "type": "string",
       "description": "Schema version for compatibility tracking",
-      "examples": ["1.1"]
+      "examples": ["1.0"]
     },
     "branch": {
       "type": "string",

@@ -270,7 +270,7 @@ simpletask quality preset --list
 simpletask quality preset my-custom-preset
 ```
 
-**Quality Config Structure (Schema v1.3):**
+**Quality Config Structure:**
 
 Quality configurations use structured `tool + args` instead of raw command strings to prevent shell injection:
 
@@ -1124,27 +1124,13 @@ class TestGitOperations:
 
 ## Boundaries
 
-### Schema Versioning
+### Schema Version
 
-SimpleTask uses semantic versioning for the task file schema:
+**Current schema version: 1.0**
 
-**Current version: 1.3** (default for new task files)
+SimpleTask uses a simple versioning system for task file schema. Since this project is under active development and has not yet been published, there is currently only one schema version (1.0) and no backward compatibility or migration paths are implemented or needed.
 
-**Version History:**
-- **v1.0** (2026-01-15): Initial schema with basic task structure
-- **v1.1** (2026-01-20): Added required `created` timestamp field
-- **v1.2** (skipped): Deprecated immediately due to security vulnerability (raw command strings)
-- **v1.3** (2026-01-23): Added optional `quality_requirements` and `design` fields with secure structured tool+args
-
-**Backward Compatibility:**
-- v1.3 is fully backward compatible with v1.0 and v1.1 files
-- v1.0 files missing the `created` field are auto-filled on write operations
-- No migration tooling is needed - old files continue to work
-
-**Best Practices:**
-- New task files automatically use v1.3
-- Don't manually change `schema_version` in existing files
-- The schema version is tracked for future compatibility if breaking changes occur
+**When the project reaches a stable release, schema versioning will be used to track breaking changes and provide migration paths for users.**
 
 ### Task Files (.tasks/ directory)
 

@@ -35,7 +35,7 @@ from simpletask.core.models import (
 def sample_spec_with_quality() -> SimpleTaskSpec:
     """Create a sample task spec with quality requirements."""
     return SimpleTaskSpec(
-        schema_version="1.3",
+        schema_version="1.0",
         branch="test-feature",
         title="Test Feature",
         original_prompt="Test prompt",
@@ -183,7 +183,7 @@ class TestCheckCommand:
     def test_check_no_enabled_checks(self, mock_get_path, mock_parse):
         """No enabled checks prints warning and returns."""
         spec = SimpleTaskSpec(
-            schema_version="1.3",
+            schema_version="1.0",
             branch="test-feature",
             title="Test Feature",
             original_prompt="Test prompt",
@@ -332,7 +332,7 @@ class TestPresetCommand:
         """Applying python preset fills gaps."""
         # Spec with no type checking
         spec = SimpleTaskSpec(
-            schema_version="1.3",
+            schema_version="1.0",
             branch="test-feature",
             title="Test Feature",
             original_prompt="Test prompt",

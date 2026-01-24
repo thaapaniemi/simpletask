@@ -5,7 +5,6 @@ Task definition schema for simpletask YAML files (JSON Schema Draft 2020-12).
 ## Table of Contents
 
 - [Overview](#overview)
-- [Schema Evolution](#schema-evolution)
 - [Schema Structure](#schema-structure)
   - [Required Fields](#required-fields)
   - [Optional Fields](#optional-fields)
@@ -26,49 +25,7 @@ Task files are YAML documents that define:
 - How to implement it (tasks with steps)
 - What to avoid (constraints)
 
-## Schema Evolution
-
-SimpleTask schema has evolved through the following versions:
-
-| Version | Released | Key Changes | Breaking? |
-|---------|----------|-------------|-----------|
-| **v1.0** | 2026-01-15 | Initial schema with basic task structure | - |
-| **v1.1** | 2026-01-20 | Added required `created` timestamp field | Yes (requires timestamp) |
-| **v1.2** | Skipped | Security issue: used raw command strings | Yes (deprecated immediately) |
-| **v1.3** | 2026-01-23 | Added optional `quality_requirements` and `design` fields with structured tool+args | No (fully backward compatible) |
-
-### Why v1.2 Was Skipped
-
-Version 1.2 was introduced in commit `0a9e1fc` but immediately deprecated in commit `e936849` (same day) due to a security vulnerability. It used raw command strings for quality checks:
-
-```yaml
-# v1.2 format (INSECURE - do not use)
-quality_requirements:
-  linting:
-    command: "ruff check ."  # Raw shell command - vulnerable to injection
-```
-
-This was replaced in v1.3 with structured, validated tool+args:
-
-```yaml
-# v1.3 format (SECURE)
-quality_requirements:
-  linting:
-    enabled: true
-    tool: ruff  # Whitelisted from ToolName enum
-    args: ["check", "."]  # Validated arguments, no shell metacharacters
-```
-
-### Backward Compatibility
-
-The current schema (v1.3) maintains backward compatibility:
-
-- **v1.0 files**: Load successfully. Missing `created` field is auto-filled on write operations.
-- **v1.1 files**: Load successfully. Work exactly as designed.
-- **v1.2 files**: Will fail validation (but none should exist in practice).
-- **v1.3 files**: Current format. `quality_requirements` and `design` are optional.
-
-**Migration Strategy**: Since v1.2 never entered production and v1.3 is backward compatible with v1.0/v1.1, no migration tooling is needed. All existing task files continue to work.
+**Note:** This project is under active development and has not yet been published. The schema version is currently **1.0**. No backward compatibility or migration paths are implemented or needed at this stage.
 
 ## Schema Structure
 
@@ -76,7 +33,7 @@ The current schema (v1.3) maintains backward compatibility:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `schema_version` | string | Schema version (current: "1.3") |
+| `schema_version` | string | Schema version (current: "1.0") |
 | `branch` | string | Git branch name / task identifier |
 | `title` | string | Human-readable task title |
 | `original_prompt` | string | Verbatim user request that initiated the task |
@@ -87,8 +44,8 @@ The current schema (v1.3) maintains backward compatibility:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `quality_requirements` | object | Quality gates and checks (v1.3+, optional) |
-| `design` | object | Design guidance and architectural context (v1.3+, optional) |
+| `quality_requirements` | object | Quality gates and checks (optional) |
+| `design` | object | Design guidance and architectural context (optional) |
 | `constraints` | array[string] | Boundaries the agent must follow |
 | `context` | object | Flexible context (requirements, dependencies, etc.) |
 | `tasks` | array | Implementation tasks |

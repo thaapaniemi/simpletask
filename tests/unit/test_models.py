@@ -181,14 +181,14 @@ class TestSimpleTaskSpec:
             acceptance_criteria=[AcceptanceCriterion(id="AC1", description="Works correctly")],
         )
         assert spec.branch == "test-feature"
-        assert spec.schema_version == "1.3"
+        assert spec.schema_version == "1.0"
         assert len(spec.acceptance_criteria) == 1
         assert spec.tasks is None
 
     def test_valid_complete_spec(self):
         """Valid complete task spec validates correctly."""
         spec = SimpleTaskSpec(
-            schema_version="1.1",
+            schema_version="1.0",
             branch="test-feature",
             title="Test Feature",
             original_prompt="Build a test feature",

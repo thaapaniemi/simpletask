@@ -423,7 +423,7 @@ class TestSimpleTaskSpecWithQualityAndDesign:
     def test_spec_with_quality_requirements(self):
         """Spec with quality_requirements validates correctly."""
         spec = SimpleTaskSpec(
-            schema_version="1.3",
+            schema_version="1.0",
             branch="test-feature",
             title="Test Feature",
             original_prompt="Build a test feature",
@@ -443,7 +443,7 @@ class TestSimpleTaskSpecWithQualityAndDesign:
     def test_spec_with_design(self):
         """Spec with design field validates correctly."""
         spec = SimpleTaskSpec(
-            schema_version="1.3",
+            schema_version="1.0",
             branch="test-feature",
             title="Test Feature",
             original_prompt="Build a test feature",
@@ -465,7 +465,7 @@ class TestSimpleTaskSpecWithQualityAndDesign:
     def test_spec_with_quality_and_design(self):
         """Spec with both quality and design validates correctly."""
         spec = SimpleTaskSpec(
-            schema_version="1.3",
+            schema_version="1.0",
             branch="test-feature",
             title="Test Feature",
             original_prompt="Build a test feature",
@@ -483,7 +483,7 @@ class TestSimpleTaskSpecWithQualityAndDesign:
     def test_spec_without_design(self):
         """Spec without design field validates correctly (design is optional)."""
         spec = SimpleTaskSpec(
-            schema_version="1.3",
+            schema_version="1.0",
             branch="test-feature",
             title="Test Feature",
             original_prompt="Build a test feature",

@@ -36,7 +36,7 @@ from simpletask.core.models import (
 def sample_spec_with_design() -> SimpleTaskSpec:
     """Create a sample task spec with design section."""
     return SimpleTaskSpec(
-        schema_version="1.3",
+        schema_version="1.0",
         branch="test-feature",
         title="Test Feature",
         original_prompt="Test prompt",
@@ -73,7 +73,7 @@ def sample_spec_with_design() -> SimpleTaskSpec:
 def sample_spec_without_design() -> SimpleTaskSpec:
     """Create a sample task spec without design section."""
     return SimpleTaskSpec(
-        schema_version="1.3",
+        schema_version="1.0",
         branch="test-feature",
         title="Test Feature",
         original_prompt="Test prompt",
