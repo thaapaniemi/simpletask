@@ -131,38 +131,89 @@ The `normalize_branch_name()` function in `cli/simpletask/core/project.py` conve
 
 ## Commands
 
-### Python Virtual Environment
+### Earthly Development Environment
 
-**IMPORTANT:** Always use the `.venv` virtual environment for development and testing to ensure all necessary modules are available.
+**IMPORTANT:** Use Earthly for all development and testing. This ensures a completely isolated, reproducible environment matching CI.
+
+#### Prerequisites
+
+- [Earthly](https://earthly.dev/get-earthly) installed (`earthly --version`)
+- Docker running
+
+#### Quick Start
 
 ```bash
-# Activate the virtual environment
-source .venv/bin/activate
+# Run all tests and quality checks
+earthly +all
 
-# Verify activation (should show .venv path)
-which python
+# Run just tests
+earthly +test
 
-# Deactivate when done
-deactivate
+# Run just linting
+earthly +lint
+
+# Run all quality checks (lint + format + types)
+earthly +check
+
+# Interactive development shell
+earthly -i +dev
 ```
 
-The `.venv` environment contains all dependencies from `pyproject.toml` including:
-- Runtime dependencies (typer, pydantic, rich, etc.)
-- Development tools (pytest, black, ruff, mypy)
-- Test dependencies (pytest-cov, pytest plugins)
+#### Available Targets
 
-**All pytest, black, ruff, and mypy commands must be run within the activated `.venv` environment.**
+| Target | Description |
+|--------|-------------|
+| `+test` | Run pytest with coverage |
+| `+lint` | Run ruff linter |
+| `+format-check` | Check black formatting |
+| `+format` | Fix formatting (black + ruff --fix) |
+| `+type-check` | Run mypy type checking |
+| `+check` | Run all quality checks |
+| `+all` | Run tests + all quality checks |
+| `+dev` | Interactive shell for debugging |
+
+#### Testing Local Changes
+
+Your local code is automatically mounted when running Earthly targets:
+
+```bash
+# Edit code locally, then test
+earthly +test
+
+# Quick lint check after changes
+earthly +lint
+
+# Fix formatting issues automatically
+earthly +format
+```
+
+#### Interactive Development
+
+For exploratory work or debugging:
+
+```bash
+# Start interactive shell with all dependencies
+earthly -i +dev
+
+# Inside the container:
+simpletask --help
+pytest tests/unit/test_models.py -v
+black .
+ruff check .
+```
 
 ### Development
 
-```bash
-# Install in editable mode (within .venv)
-pip install -e .
+The simpletask CLI can be tested using Earthly's interactive mode:
 
-# Run the CLI
+```bash
+# Start dev shell
+earthly -i +dev
+
+# Inside the container, simpletask is available:
 simpletask --help
-simpletask task list
-simpletask criteria add <task-id> "New criterion"
+simpletask list
+simpletask show <branch-name>
 simpletask quality check
 simpletask design show
 ```
@@ -363,35 +414,51 @@ design:
 
 ```bash
 # Run all tests
+earthly +test
+
+# Run just tests and quality checks
+earthly +all
+```
+
+For interactive testing/debugging:
+
+```bash
+# Start dev shell
+earthly -i +dev
+
+# Inside the container:
 pytest
-
-# Run with coverage
 pytest --cov=cli/simpletask --cov-report=term-missing
-
-# Run specific test file
 pytest tests/unit/test_models.py
-
-# Run specific test class
 pytest tests/unit/test_models.py::TestGetNextCriterionId
-
-# Run with verbose output
 pytest -v
 ```
 
 ### Code Quality
 
 ```bash
-# Format code
-black .
+# Run all quality checks
+earthly +check
 
-# Lint code
-ruff check .
+# Run individual checks
+earthly +lint          # ruff check .
+earthly +format-check  # black --check .
+earthly +type-check    # mypy cli/simpletask
 
-# Fix auto-fixable lint issues
-ruff check --fix .
+# Fix formatting issues
+earthly +format        # black . && ruff check --fix .
+```
 
-# Type checking
-mypy cli/simpletask
+For interactive fixing:
+
+```bash
+earthly -i +dev
+
+# Inside container:
+black .                    # Format code
+ruff check .               # Lint code  
+ruff check --fix .         # Auto-fix lint issues
+mypy cli/simpletask        # Type checking
 ```
 
 ## MCP Server
