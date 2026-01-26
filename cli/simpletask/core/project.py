@@ -2,6 +2,7 @@
 
 import re
 import unicodedata
+from datetime import datetime
 from pathlib import Path
 
 from ..utils.console import warning
@@ -143,15 +144,15 @@ class Project:
 
         return sorted(tasks)
 
-    def list_tasks_by_mtime(self) -> list[tuple[str, Path]]:
-        """List all task branch names sorted by file modification time (newest first).
+    def list_tasks_by_mtime(self) -> list[tuple[str, Path, datetime]]:
+        """List all task branch names sorted by file modification time (oldest first).
 
         Reads the 'branch' field from each YAML file to return original branch names,
-        not normalized filenames. Returns tuples of (branch_name, file_path) sorted
-        by modification time in descending order.
+        not normalized filenames. Returns tuples of (branch_name, file_path, mtime)
+        sorted by modification time in ascending order (oldest to newest).
 
         Returns:
-            List of (branch_name, file_path) tuples, sorted by mtime descending
+            List of (branch_name, file_path, mtime) tuples, sorted by mtime ascending
         """
         if not self.tasks_dir.exists():
             return []
@@ -161,14 +162,15 @@ class Project:
             if item.is_file() and item.suffix == TASK_FILE_EXTENSION:
                 try:
                     spec = parse_task_file(item)
-                    tasks.append((spec.branch, item))
+                    mtime = datetime.fromtimestamp(item.stat().st_mtime)
+                    tasks.append((spec.branch, item, mtime))
                 except Exception as e:
                     # Warn about invalid task files instead of silently skipping
                     warning(f"Skipping invalid task file {item.name}: {e}")
                     continue
 
-        # Sort by modification time (newest first)
-        return sorted(tasks, key=lambda x: x[1].stat().st_mtime, reverse=True)
+        # Sort by modification time (oldest first)
+        return sorted(tasks, key=lambda x: x[2], reverse=False)
 
     def is_git_project(self) -> bool:
         """Check if project uses Git."""

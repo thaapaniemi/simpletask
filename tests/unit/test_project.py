@@ -384,3 +384,171 @@ class TestGetTaskFilePath:
 
         with pytest.raises(ValueError, match="Not on a git branch"):
             get_task_file_path()
+
+
+class TestProjectListTasksByMtime:
+    """Tests for Project.list_tasks_by_mtime() method."""
+
+    def test_list_tasks_by_mtime_empty(self, tmp_path):
+        """Test list_tasks_by_mtime returns empty list when no tasks exist."""
+        # Create project without .tasks directory
+        project_root = tmp_path / "empty-project"
+        project_root.mkdir()
+        git_dir = project_root / ".git"
+        git_dir.mkdir()
+
+        project = Project(root=project_root)
+        tasks = project.list_tasks_by_mtime()
+        assert tasks == []
+
+    def test_list_tasks_by_mtime_single(self, tmp_project_with_task):
+        """Test list_tasks_by_mtime returns single task with mtime."""
+        project_root, task_file = tmp_project_with_task
+        project = Project(root=project_root)
+        tasks = project.list_tasks_by_mtime()
+
+        assert len(tasks) == 1
+        branch, path, mtime = tasks[0]
+        assert branch == "test-feature"
+        assert path == task_file
+        # Verify mtime is a datetime object
+        from datetime import datetime
+
+        assert isinstance(mtime, datetime)
+
+    def test_list_tasks_by_mtime_multiple_oldest_first(self, tmp_project):
+        """Test list_tasks_by_mtime returns multiple tasks sorted oldest to newest."""
+        import time
+        from datetime import datetime
+
+        tasks_dir = tmp_project / ".tasks"
+
+        # Create YAML files with different modification times
+        yaml_a = """schema_version: '1.0'
+branch: feature-a
+title: Feature A
+original_prompt: Test
+created: '2024-01-01T00:00:00Z'
+acceptance_criteria:
+  - id: AC1
+    description: Test
+    completed: false
+"""
+        yaml_b = """schema_version: '1.0'
+branch: feature-b
+title: Feature B
+original_prompt: Test
+created: '2024-01-01T00:00:00Z'
+acceptance_criteria:
+  - id: AC1
+    description: Test
+    completed: false
+"""
+        yaml_c = """schema_version: '1.0'
+branch: feature-c
+title: Feature C
+original_prompt: Test
+created: '2024-01-01T00:00:00Z'
+acceptance_criteria:
+  - id: AC1
+    description: Test
+    completed: false
+"""
+
+        # Write files with delays to ensure different mtimes
+        (tasks_dir / "feature-a.yml").write_text(yaml_a)
+        time.sleep(0.01)  # Small delay to ensure different mtime
+        (tasks_dir / "feature-b.yml").write_text(yaml_b)
+        time.sleep(0.01)
+        (tasks_dir / "feature-c.yml").write_text(yaml_c)
+
+        project = Project(root=tmp_project)
+        tasks = project.list_tasks_by_mtime()
+
+        # Should have 3 tasks
+        assert len(tasks) == 3
+
+        # Extract branches and mtimes
+        branches = [t[0] for t in tasks]
+        mtimes = [t[2] for t in tasks]
+
+        # Verify all items are tuples with 3 elements
+        for task in tasks:
+            assert len(task) == 3
+            branch, path, mtime = task
+            assert isinstance(branch, str)
+            assert isinstance(mtime, datetime)
+
+        # Verify oldest to newest ordering
+        assert branches == ["feature-a", "feature-b", "feature-c"]
+
+        # Verify mtimes are in ascending order
+        for i in range(len(mtimes) - 1):
+            assert mtimes[i] <= mtimes[i + 1], "Tasks should be sorted oldest to newest"
+
+    def test_list_tasks_by_mtime_warns_on_invalid_files(self, tmp_project, capsys):
+        """Test that list_tasks_by_mtime warns about invalid task files."""
+        tasks_dir = tmp_project / ".tasks"
+
+        # Create invalid YAML file
+        (tasks_dir / "invalid.yml").write_text("this is: not: valid: yaml:::")
+
+        # Create valid YAML file
+        valid_yaml = """schema_version: '1.0'
+branch: valid-task
+title: Valid Task
+original_prompt: Test
+created: '2024-01-01T00:00:00Z'
+acceptance_criteria:
+  - id: AC1
+    description: Test
+    completed: false
+"""
+        (tasks_dir / "valid-task.yml").write_text(valid_yaml)
+
+        project = Project(root=tmp_project)
+        tasks = project.list_tasks_by_mtime()
+
+        # Should only include the valid task
+        assert len(tasks) == 1
+        assert tasks[0][0] == "valid-task"
+
+        # Should have warned about the invalid file
+        captured = capsys.readouterr()
+        assert "Skipping invalid task file invalid.yml" in captured.out
+
+    def test_list_tasks_by_mtime_ignores_directories(self, tmp_project):
+        """Test list_tasks_by_mtime ignores directories."""
+        tasks_dir = tmp_project / ".tasks"
+
+        # Create YAML with branch matching expected name
+        yaml_content = """schema_version: '1.0'
+branch: feature
+title: Feature
+original_prompt: Test
+created: '2024-01-01T00:00:00Z'
+acceptance_criteria:
+  - id: AC1
+    description: Test
+    completed: false
+"""
+        (tasks_dir / "feature.yml").write_text(yaml_content)
+        (tasks_dir / "subdir").mkdir()
+
+        project = Project(root=tmp_project)
+        tasks = project.list_tasks_by_mtime()
+
+        assert len(tasks) == 1
+        assert tasks[0][0] == "feature"
+
+    def test_list_tasks_by_mtime_no_tasks_dir(self, tmp_path):
+        """Test list_tasks_by_mtime returns empty when .tasks/ doesn't exist."""
+        # Create project without tasks directory
+        project_root = tmp_path / "no-tasks-project"
+        project_root.mkdir()
+        git_dir = project_root / ".git"
+        git_dir.mkdir()
+
+        project = Project(root=project_root)
+        tasks = project.list_tasks_by_mtime()
+        assert tasks == []

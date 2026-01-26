@@ -7,6 +7,7 @@ import typer
 from ..core.project import ensure_project
 from ..core.yaml_parser import InvalidTaskFileError, parse_task_file
 from ..utils.console import console, create_table, error, info
+from ..utils.datetime_format import format_datetime
 
 
 def list_tasks(
@@ -22,12 +23,13 @@ def list_tasks(
     """Display status summary of all tasks.
 
     By default, shows a table with:
+    - File modification date
     - Branch name
     - Title
     - Acceptance criteria progress
     - Task progress (if tasks defined)
 
-    Tasks are sorted by file modification time (newest first).
+    Tasks are sorted by file modification time (oldest first).
 
     With --simple flag, outputs only branch names (one per line) for scripting.
 
@@ -48,15 +50,17 @@ def list_tasks(
 
         # Simple output for scripting
         if simple:
-            for branch, _path in tasks_with_paths:
+            for branch, _path, _mtime in tasks_with_paths:
                 console.print(branch)
             return
 
         # Rich table output (default)
-        table = create_table("Task Status Summary", ["Branch", "Title", "AC Progress", "Tasks"])
+        table = create_table(
+            "Task Status Summary", ["Modified", "Branch", "Title", "AC Progress", "Tasks"]
+        )
 
         # Populate table
-        for branch, task_file in tasks_with_paths:
+        for branch, task_file, mtime in tasks_with_paths:
             try:
                 spec = parse_task_file(task_file)
 
@@ -76,7 +80,11 @@ def list_tasks(
                 # Truncate title if too long
                 title = spec.title if len(spec.title) <= 40 else spec.title[:37] + "..."
 
+                # Format modification time (without timezone for cleaner display)
+                formatted_mtime = format_datetime(mtime, include_timezone=False)
+
                 table.add_row(
+                    formatted_mtime,
                     branch,
                     title,
                     ac_progress,
@@ -85,7 +93,7 @@ def list_tasks(
 
             except (FileNotFoundError, InvalidTaskFileError):
                 # Skip invalid task files
-                table.add_row(branch, "[red]Error[/red]", "-", "-")
+                table.add_row("-", branch, "[red]Error[/red]", "-", "-")
 
         console.print()
         console.print(table)
