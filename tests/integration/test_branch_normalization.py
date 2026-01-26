@@ -105,14 +105,14 @@ class TestBranchNormalizationIntegration:
         )
         assert result.returncode == 0, f"criteria list failed: {result.stderr}"
 
-        # Test 'simpletask status'
+        # Test 'simpletask list'
         result = subprocess.run(
-            ["simpletask", "status"],
+            ["simpletask", "list"],
             cwd=project_root,
             capture_output=True,
             text=True,
         )
-        assert result.returncode == 0, f"status failed: {result.stderr}"
+        assert result.returncode == 0, f"list failed: {result.stderr}"
 
         # Test 'simpletask schema validate'
         result = subprocess.run(

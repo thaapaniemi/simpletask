@@ -11,7 +11,7 @@ Tests cover:
 
 from datetime import UTC, datetime
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 import typer
@@ -81,7 +81,7 @@ class TestCheckCommand:
         ]
         mock_run_checks.return_value = (check_results, True)
 
-        with pytest.raises(typer.Exit) as exc_info:
+        with pytest.raises(typer.Exit):
             check_command()
 
         # Verify run_quality_checks was called

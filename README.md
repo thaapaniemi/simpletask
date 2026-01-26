@@ -138,6 +138,14 @@ Shows the task associated with the current git branch.
 simpletask list
 ```
 
+Shows a table with all tasks, their completion progress, sorted by most recently modified.
+
+For scripting, use the `--simple` flag to output just branch names:
+
+```sh
+simpletask list --simple
+```
+
 #### Add acceptance criteria
 
 ```sh
@@ -148,12 +156,6 @@ simpletask criteria add "Users can log in with email and password"
 
 ```sh
 simpletask criteria complete AC1
-```
-
-#### Check task status
-
-```sh
-simpletask status
 ```
 
 ## Task File Format
@@ -205,8 +207,7 @@ See [docs/SCHEMA.md](docs/SCHEMA.md) for the complete schema documentation.
 |---------|-------------|
 | `simpletask new` | Create a new task file |
 | `simpletask show` | Display current branch's task |
-| `simpletask list` | List all tasks |
-| `simpletask status` | Show task completion status |
+| `simpletask list` | List all tasks with status (use --simple for plain output) |
 | `simpletask criteria add` | Add acceptance criterion |
 | `simpletask criteria complete` | Mark criterion as complete |
 | `simpletask criteria list` | List all criteria |

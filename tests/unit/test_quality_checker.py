@@ -3,7 +3,6 @@
 from unittest.mock import Mock
 
 import pytest
-
 from simpletask.core.models import (
     LintingConfig,
     QualityRequirements,

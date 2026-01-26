@@ -143,6 +143,33 @@ class Project:
 
         return sorted(tasks)
 
+    def list_tasks_by_mtime(self) -> list[tuple[str, Path]]:
+        """List all task branch names sorted by file modification time (newest first).
+
+        Reads the 'branch' field from each YAML file to return original branch names,
+        not normalized filenames. Returns tuples of (branch_name, file_path) sorted
+        by modification time in descending order.
+
+        Returns:
+            List of (branch_name, file_path) tuples, sorted by mtime descending
+        """
+        if not self.tasks_dir.exists():
+            return []
+
+        tasks = []
+        for item in self.tasks_dir.iterdir():
+            if item.is_file() and item.suffix == TASK_FILE_EXTENSION:
+                try:
+                    spec = parse_task_file(item)
+                    tasks.append((spec.branch, item))
+                except Exception as e:
+                    # Warn about invalid task files instead of silently skipping
+                    warning(f"Skipping invalid task file {item.name}: {e}")
+                    continue
+
+        # Sort by modification time (newest first)
+        return sorted(tasks, key=lambda x: x[1].stat().st_mtime, reverse=True)
+
     def is_git_project(self) -> bool:
         """Check if project uses Git."""
         return is_git_repo(self.root)

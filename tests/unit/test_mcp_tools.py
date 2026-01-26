@@ -236,9 +236,9 @@ class TestMCPServerRegistration:
 
         # Verify all 7 tools are registered with simple names
         expected_tools = {"get", "list", "new", "task", "criteria", "quality", "design"}
-        assert registered_tools == expected_tools, (
-            f"Expected tools {expected_tools}, but found {registered_tools}"
-        )
+        assert (
+            registered_tools == expected_tools
+        ), f"Expected tools {expected_tools}, but found {registered_tools}"
 
         # Verify no tools have the simpletask_ prefix (that's added by MCP client)
         prefixed_tools = {name for name in registered_tools if name.startswith("simpletask_")}

@@ -48,7 +48,9 @@ QUALITY_PRESETS: dict[str, QualityRequirements] = {
     "go": QualityRequirements(
         linting=LintingConfig(enabled=True, tool=ToolName.GOLANGCI_LINT, args=["run"]),
         type_checking=None,  # Go has built-in type checking at compile time
-        testing=TestingConfig(enabled=True, tool=ToolName.GO, args=["test", "./..."], min_coverage=80),
+        testing=TestingConfig(
+            enabled=True, tool=ToolName.GO, args=["test", "./..."], min_coverage=80
+        ),
         security_check=SecurityCheckConfig(enabled=True, tool=ToolName.GOSEC, args=["./..."]),
     ),
     "rust": QualityRequirements(

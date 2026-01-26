@@ -1,12 +1,12 @@
 """simpletask: A Python CLI for managing AI-friendly task definition YAML files."""
 
-__version__ = "0.15.0"
+__version__ = "0.15.1"
 
 import typer
 
 # Import top-level commands
 # Import subcommand groups
-from .commands import ai, criteria, design, new, quality, schema, serve, show, status, task
+from .commands import ai, criteria, design, new, quality, schema, serve, show, task
 from .commands import list as list_cmd
 
 
@@ -44,7 +44,6 @@ def main(
 app.command(name="new")(new.new)
 app.command(name="list")(list_cmd.list_tasks)
 app.command(name="show")(show.show)
-app.command(name="status")(status.status)
 app.command(name="serve")(serve.serve)
 
 # Register subcommand groups

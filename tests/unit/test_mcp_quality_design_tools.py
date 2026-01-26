@@ -9,8 +9,7 @@ Tests cover:
 
 from datetime import UTC, datetime
 from pathlib import Path
-from subprocess import CompletedProcess
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 from simpletask.core.models import (
@@ -524,7 +523,7 @@ class TestDesignToolRemove:
         mock_get_path.return_value = Path(".tasks/test-feature.yml")
         mock_parse.return_value = sample_spec_with_design
 
-        with pytest.raises(ValueError, match="Index .* out of range"):
+        with pytest.raises(ValueError, match=r"Index .* out of range"):
             design(action="remove", field="pattern", index=999)
 
     @patch("simpletask.mcp.server.parse_task_file")

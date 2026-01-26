@@ -10,7 +10,6 @@ Tests cover:
 """
 
 import pytest
-from pathlib import Path
 from simpletask.core.models import (
     LintingConfig,
     QualityRequirements,
@@ -25,8 +24,8 @@ from simpletask.core.presets import (
     build_command,
     get_preset,
     list_presets,
-    load_presets_from_file,
     load_all_presets,
+    load_presets_from_file,
 )
 
 
@@ -407,7 +406,7 @@ class TestLoadAllPresets:
         all_presets = load_all_presets()
 
         # Should contain all built-in presets
-        for name in QUALITY_PRESETS.keys():
+        for name in QUALITY_PRESETS:
             assert name in all_presets
 
     def test_custom_presets_override_builtin(self, tmp_path, monkeypatch):
