@@ -5,6 +5,8 @@ import unicodedata
 from datetime import datetime
 from pathlib import Path
 
+import yaml
+
 from ..utils.console import warning
 from .git import current_branch, is_git_repo
 from .yaml_parser import parse_task_file
@@ -125,6 +127,9 @@ class Project:
         Reads the 'branch' field from each YAML file to return original branch names,
         not normalized filenames.
 
+        Optimized for performance: only parses the 'branch' field without full
+        Pydantic validation to avoid expensive I/O during MCP server initialization.
+
         Returns:
             List of branch names (original, not normalized), sorted alphabetically
         """
@@ -135,11 +140,14 @@ class Project:
         for item in sorted(self.tasks_dir.iterdir()):
             if item.is_file() and item.suffix == TASK_FILE_EXTENSION:
                 try:
-                    spec = parse_task_file(item)
-                    tasks.append(spec.branch)
-                except Exception as e:
-                    # Warn about invalid task files instead of silently skipping
-                    warning(f"Skipping invalid task file {item.name}: {e}")
+                    # Lightweight parsing: only extract branch field
+                    content = item.read_text(encoding="utf-8")
+                    data = yaml.safe_load(content)
+                    if isinstance(data, dict) and "branch" in data:
+                        tasks.append(data["branch"])
+                except Exception:
+                    # Skip invalid files silently during lightweight listing
+                    # Full validation happens when files are actually loaded
                     continue
 
         return sorted(tasks)
@@ -151,6 +159,9 @@ class Project:
         not normalized filenames. Returns tuples of (branch_name, file_path, mtime)
         sorted by modification time in ascending order (oldest to newest).
 
+        Optimized for performance: only parses the 'branch' field without full
+        Pydantic validation to avoid expensive I/O.
+
         Returns:
             List of (branch_name, file_path, mtime) tuples, sorted by mtime ascending
         """
@@ -161,12 +172,15 @@ class Project:
         for item in self.tasks_dir.iterdir():
             if item.is_file() and item.suffix == TASK_FILE_EXTENSION:
                 try:
-                    spec = parse_task_file(item)
-                    mtime = datetime.fromtimestamp(item.stat().st_mtime)
-                    tasks.append((spec.branch, item, mtime))
-                except Exception as e:
-                    # Warn about invalid task files instead of silently skipping
-                    warning(f"Skipping invalid task file {item.name}: {e}")
+                    # Lightweight parsing: only extract branch field
+                    content = item.read_text(encoding="utf-8")
+                    data = yaml.safe_load(content)
+                    if isinstance(data, dict) and "branch" in data:
+                        mtime = datetime.fromtimestamp(item.stat().st_mtime)
+                        tasks.append((data["branch"], item, mtime))
+                except Exception:
+                    # Skip invalid files silently during lightweight listing
+                    # Full validation happens when files are actually loaded
                     continue
 
         # Sort by modification time (oldest first)

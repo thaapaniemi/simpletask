@@ -184,7 +184,7 @@ acceptance_criteria:
         assert tasks == ["bugfix-x", "feature-a", "feature-b"]
 
     def test_list_tasks_warns_on_invalid_files(self, tmp_project, capsys):
-        """Test that list_tasks warns about invalid task files instead of silently skipping."""
+        """Test that list_tasks silently skips invalid task files for performance."""
         tasks_dir = tmp_project / ".tasks"
 
         # Create invalid YAML file
@@ -206,12 +206,13 @@ acceptance_criteria:
         project = Project(root=tmp_project)
         tasks = project.list_tasks()
 
-        # Should only include the valid task
+        # Should only include the valid task (invalid file skipped silently)
         assert tasks == ["valid-task"]
 
-        # Should have warned about the invalid file
+        # Performance optimization: no warnings during lightweight listing
+        # Full validation happens when files are actually loaded
         captured = capsys.readouterr()
-        assert "Skipping invalid task file invalid.yml" in captured.out
+        assert captured.out == ""  # No output during listing
 
     def test_list_tasks_ignores_directories(self, tmp_project):
         """Test list_tasks ignores directories."""
@@ -487,7 +488,7 @@ acceptance_criteria:
             assert mtimes[i] <= mtimes[i + 1], "Tasks should be sorted oldest to newest"
 
     def test_list_tasks_by_mtime_warns_on_invalid_files(self, tmp_project, capsys):
-        """Test that list_tasks_by_mtime warns about invalid task files."""
+        """Test that list_tasks_by_mtime silently skips invalid task files for performance."""
         tasks_dir = tmp_project / ".tasks"
 
         # Create invalid YAML file
@@ -509,13 +510,14 @@ acceptance_criteria:
         project = Project(root=tmp_project)
         tasks = project.list_tasks_by_mtime()
 
-        # Should only include the valid task
+        # Should only include the valid task (invalid file skipped silently)
         assert len(tasks) == 1
         assert tasks[0][0] == "valid-task"
 
-        # Should have warned about the invalid file
+        # Performance optimization: no warnings during lightweight listing
+        # Full validation happens when files are actually loaded
         captured = capsys.readouterr()
-        assert "Skipping invalid task file invalid.yml" in captured.out
+        assert captured.out == ""  # No output during listing
 
     def test_list_tasks_by_mtime_ignores_directories(self, tmp_project):
         """Test list_tasks_by_mtime ignores directories."""
