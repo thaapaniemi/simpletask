@@ -194,6 +194,7 @@ def new(
         message=f"Created task file for '{title}' with {len(spec.acceptance_criteria)} criteria",
         file_path=str(file_path),
         summary=summary,
+        new_item_id=None,
     )
 
 
@@ -264,6 +265,7 @@ def task(
                 message=f"Added task '{name}' ({new_task.id if new_task else 'unknown'})",
                 file_path=str(file_path),
                 summary=summary,
+                new_item_id=new_task.id if new_task else None,
             )
 
         case "update":
@@ -285,6 +287,7 @@ def task(
                 message=f"Updated task {task_id}",
                 file_path=str(file_path),
                 summary=summary,
+                new_item_id=None,
             )
 
         case "remove":
@@ -299,6 +302,7 @@ def task(
                 message=f"Removed task {task_id}",
                 file_path=str(file_path),
                 summary=summary,
+                new_item_id=None,
             )
 
 
@@ -363,6 +367,7 @@ def criteria(
                 message=f"Added criterion ({new_criterion.id if new_criterion else 'unknown'}): {description}",
                 file_path=str(file_path),
                 summary=summary,
+                new_item_id=new_criterion.id if new_criterion else None,
             )
 
         case "complete":
@@ -378,6 +383,7 @@ def criteria(
                 message=f"Marked criterion {criterion_id} as {status_word}",
                 file_path=str(file_path),
                 summary=summary,
+                new_item_id=None,
             )
 
         case "remove":
@@ -392,6 +398,7 @@ def criteria(
                 message=f"Removed criterion {criterion_id}",
                 file_path=str(file_path),
                 summary=summary,
+                new_item_id=None,
             )
 
 
@@ -517,6 +524,7 @@ def quality(
                 message=f"Updated quality configuration for {config_type}",
                 file_path=str(file_path),
                 summary=summary,
+                new_item_id=None,
             )
 
         case "preset":
@@ -536,6 +544,7 @@ def quality(
                 message=f"Applied preset '{preset_name}' (filled gaps only)",
                 file_path=str(file_path),
                 summary=summary,
+                new_item_id=None,
             )
 
 
@@ -671,6 +680,7 @@ def design(
                 message=message,
                 file_path=str(file_path),
                 summary=summary,
+                new_item_id=None,
             )
 
         case "remove":
@@ -694,6 +704,7 @@ def design(
                 message=message,
                 file_path=str(file_path),
                 summary=summary,
+                new_item_id=None,
             )
 
 

@@ -31,7 +31,7 @@ def add_command(
         )
 
         # Extract task ID from result
-        new_id = result.spec.tasks[-1].id
+        new_id = result.new_item_id or "unknown"
         success(f"Added task {new_id}: {name}")
 
     except (ValueError, FileNotFoundError, InvalidTaskFileError) as e:

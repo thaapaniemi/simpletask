@@ -28,7 +28,7 @@ def add_command(
         )
 
         # Extract criterion ID from result
-        new_id = result.spec.acceptance_criteria[-1].id
+        new_id = result.new_item_id or "unknown"
         success(f"Added criterion {new_id}: {description}")
 
     except (ValueError, FileNotFoundError, InvalidTaskFileError) as e:

@@ -95,6 +95,9 @@ class SimpleTaskWriteResponse(BaseModel):
     message: str = Field(..., description="Human-readable confirmation message")
     file_path: str = Field(..., description="Path to task file")
     summary: StatusSummary = Field(..., description="Pre-computed status summary")
+    new_item_id: str | None = Field(
+        None, description="ID of newly created item (for add operations)"
+    )
 
 
 class SimpleTaskItemResponse(BaseModel):
