@@ -264,7 +264,7 @@ A `SimpleTaskGetResponse` object with:
       {
         id: string
         name: string
-        status: "not_started" | "in_progress" | "completed" | "blocked"
+        status: "not_started" | "in_progress" | "completed" | "blocked" | "paused"
         goal: string
         done_when?: string[]
         steps?: string[]
@@ -286,6 +286,7 @@ A `SimpleTaskGetResponse` object with:
     tasks_in_progress: number
     tasks_not_started: number
     tasks_blocked: number
+    tasks_paused: number
   }
   validation?: {
     valid: boolean
@@ -397,7 +398,7 @@ Manage implementation tasks (add, update, remove).
 | `task_id` | string | Conditional | - | Task ID (required for update/remove, e.g., `T001`) |
 | `name` | string | Conditional | - | Task name (required for add) |
 | `goal` | string | No | - | Task goal/description |
-| `status` | string | No | - | Status for update: `not_started`, `in_progress`, `completed`, `blocked` |
+| `status` | string | No | - | Status for update: `not_started`, `in_progress`, `completed`, `blocked`, `paused` |
 
 **Returns:**
 
@@ -795,7 +796,7 @@ Ready to work on T007. The task goal is: "Allow users to reset forgotten passwor
    Required: `schema_version`, `branch`, `title`, `original_prompt`, `created`, `acceptance_criteria`
 
 4. **Check enum values:**
-   - Status: `not_started`, `in_progress`, `completed`, `blocked`
+   - Status: `not_started`, `in_progress`, `completed`, `blocked`, `paused`
    - No typos or custom values
 
 5. **Validate with CLI:**

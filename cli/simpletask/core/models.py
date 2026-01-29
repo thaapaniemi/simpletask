@@ -18,6 +18,7 @@ class TaskStatus(str, Enum):
     IN_PROGRESS = "in_progress"
     COMPLETED = "completed"
     BLOCKED = "blocked"
+    PAUSED = "paused"
 
 
 class ToolName(str, Enum):

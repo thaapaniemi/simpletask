@@ -119,6 +119,7 @@ Used for `tasks[].status`:
 | `not_started` | Work has not begun |
 | `in_progress` | Currently being worked on |
 | `blocked` | Cannot proceed (dependency/issue) |
+| `paused` | Intentionally deferred |
 | `completed` | Done |
 
 ## Example

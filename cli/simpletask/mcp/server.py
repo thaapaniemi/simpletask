@@ -216,7 +216,7 @@ def task(
         task_id: Task ID (required for update/remove/get)
         name: Task name (required for add)
         goal: Task goal/description
-        status: Task status for 'update' only: not_started, in_progress, completed, blocked
+        status: Task status for 'update' only: not_started, in_progress, completed, blocked, paused
                Note: 'add' action ignores this - new tasks always start as not_started
         steps: List of detailed task steps (optional for add). None or [] adds placeholder step ['To be defined'].
                Only applies to action='add'.

@@ -16,6 +16,8 @@ def _get_status_icon(status: TaskStatus) -> str:
         return "[yellow]▶[/yellow]"
     elif status == TaskStatus.BLOCKED:
         return "[red]✗[/red]"
+    elif status == TaskStatus.PAUSED:
+        return "[blue]⏸[/blue]"
     else:  # not_started
         return "[dim]○[/dim]"
 
@@ -25,7 +27,7 @@ def list_command(
         None,
         "--status",
         "-s",
-        help="Filter by status (not_started, in_progress, completed, blocked)",
+        help="Filter by status (not_started, in_progress, completed, blocked, paused)",
     ),
     branch: str | None = typer.Option(
         None, "--branch", "-b", help="Branch name (defaults to current git branch)"
@@ -55,7 +57,7 @@ def list_command(
                 tasks = [t for t in tasks if t.status == status_enum]
             except ValueError:
                 error(
-                    f"Invalid status: {status}. Valid values: not_started, in_progress, completed, blocked"
+                    f"Invalid status: {status}. Valid values: not_started, in_progress, completed, blocked, paused"
                 )
 
         # Display tasks

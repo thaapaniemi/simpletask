@@ -55,6 +55,7 @@ class StatusSummary(BaseModel):
     tasks_in_progress: int = Field(0, description="In-progress tasks")
     tasks_not_started: int = Field(0, description="Not started tasks")
     tasks_blocked: int = Field(0, description="Blocked tasks")
+    tasks_paused: int = Field(0, description="Paused tasks")
 
 
 class ValidationResult(BaseModel):
@@ -175,6 +176,7 @@ def compute_status_summary(spec: SimpleTaskSpec) -> StatusSummary:
     tasks_in_progress = 0
     tasks_not_started = 0
     tasks_blocked = 0
+    tasks_paused = 0
 
     if spec.tasks:
         tasks_total = len(spec.tasks)
@@ -188,10 +190,15 @@ def compute_status_summary(spec: SimpleTaskSpec) -> StatusSummary:
                     tasks_not_started += 1
                 case TaskStatus.BLOCKED:
                     tasks_blocked += 1
+                case TaskStatus.PAUSED:
+                    tasks_paused += 1
 
     # Derive overall status
+    # Priority: blocked > paused > in_progress > completed > not_started
     if tasks_blocked > 0:
         overall_status = TaskStatus.BLOCKED
+    elif tasks_paused > 0:
+        overall_status = TaskStatus.PAUSED
     elif tasks_in_progress > 0:
         overall_status = TaskStatus.IN_PROGRESS
     elif tasks_total > 0 and tasks_completed == tasks_total:
@@ -210,4 +217,5 @@ def compute_status_summary(spec: SimpleTaskSpec) -> StatusSummary:
         tasks_in_progress=tasks_in_progress,
         tasks_not_started=tasks_not_started,
         tasks_blocked=tasks_blocked,
+        tasks_paused=tasks_paused,
     )

@@ -281,6 +281,17 @@ def sample_spec_mixed_statuses() -> SimpleTaskSpec:
                 prerequisites=None,
                 files=None,
             ),
+            Task(
+                id="T005",
+                name="Paused",
+                status=TaskStatus.PAUSED,
+                goal="G",
+                steps=["S"],
+                done_when=None,
+                code_examples=None,
+                prerequisites=None,
+                files=None,
+            ),
         ],
     )
 
@@ -342,4 +353,143 @@ def sample_spec_minimal() -> SimpleTaskSpec:
         constraints=None,
         context=None,
         tasks=None,
+    )
+
+
+@pytest.fixture
+def sample_spec_blocked_paused_in_progress() -> SimpleTaskSpec:
+    """Spec with blocked, paused, and in_progress tasks - blocked should win."""
+    return SimpleTaskSpec(
+        schema_version="1.0",
+        branch="test",
+        title="Test",
+        original_prompt="Test",
+        created=datetime.now(UTC),
+        acceptance_criteria=[AcceptanceCriterion(id="AC1", description="Test", completed=False)],
+        constraints=None,
+        context=None,
+        tasks=[
+            Task(
+                id="T001",
+                name="Blocked task",
+                status=TaskStatus.BLOCKED,
+                goal="G",
+                steps=["S"],
+                done_when=None,
+                code_examples=None,
+                prerequisites=None,
+                files=None,
+            ),
+            Task(
+                id="T002",
+                name="Paused task",
+                status=TaskStatus.PAUSED,
+                goal="G",
+                steps=["S"],
+                done_when=None,
+                code_examples=None,
+                prerequisites=None,
+                files=None,
+            ),
+            Task(
+                id="T003",
+                name="In progress task",
+                status=TaskStatus.IN_PROGRESS,
+                goal="G",
+                steps=["S"],
+                done_when=None,
+                code_examples=None,
+                prerequisites=None,
+                files=None,
+            ),
+        ],
+    )
+
+
+@pytest.fixture
+def sample_spec_paused_and_in_progress() -> SimpleTaskSpec:
+    """Spec with paused and in_progress tasks - paused should win."""
+    return SimpleTaskSpec(
+        schema_version="1.0",
+        branch="test",
+        title="Test",
+        original_prompt="Test",
+        created=datetime.now(UTC),
+        acceptance_criteria=[AcceptanceCriterion(id="AC1", description="Test", completed=False)],
+        constraints=None,
+        context=None,
+        tasks=[
+            Task(
+                id="T001",
+                name="Paused task",
+                status=TaskStatus.PAUSED,
+                goal="G",
+                steps=["S"],
+                done_when=None,
+                code_examples=None,
+                prerequisites=None,
+                files=None,
+            ),
+            Task(
+                id="T002",
+                name="In progress task",
+                status=TaskStatus.IN_PROGRESS,
+                goal="G",
+                steps=["S"],
+                done_when=None,
+                code_examples=None,
+                prerequisites=None,
+                files=None,
+            ),
+            Task(
+                id="T003",
+                name="Completed task",
+                status=TaskStatus.COMPLETED,
+                goal="G",
+                steps=["S"],
+                done_when=None,
+                code_examples=None,
+                prerequisites=None,
+                files=None,
+            ),
+        ],
+    )
+
+
+@pytest.fixture
+def sample_spec_only_paused() -> SimpleTaskSpec:
+    """Spec with only paused tasks."""
+    return SimpleTaskSpec(
+        schema_version="1.0",
+        branch="test",
+        title="Test",
+        original_prompt="Test",
+        created=datetime.now(UTC),
+        acceptance_criteria=[AcceptanceCriterion(id="AC1", description="Test", completed=False)],
+        constraints=None,
+        context=None,
+        tasks=[
+            Task(
+                id="T001",
+                name="Paused task 1",
+                status=TaskStatus.PAUSED,
+                goal="G",
+                steps=["S"],
+                done_when=None,
+                code_examples=None,
+                prerequisites=None,
+                files=None,
+            ),
+            Task(
+                id="T002",
+                name="Paused task 2",
+                status=TaskStatus.PAUSED,
+                goal="G",
+                steps=["S"],
+                done_when=None,
+                code_examples=None,
+                prerequisites=None,
+                files=None,
+            ),
+        ],
     )

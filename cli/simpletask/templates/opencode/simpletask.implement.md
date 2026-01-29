@@ -317,16 +317,18 @@ After completing ALL tasks, evaluate which acceptance criteria are now satisfied
    **Preferred: Use MCP tool** (if simpletask MCP server is available)
    ```
    From simpletask_get() response:
-   - Filter spec.tasks where status == "not_started" 
-   - Filter spec.tasks where status == "in_progress"
-   - Filter spec.tasks where status == "blocked"
+    - Filter spec.tasks where status == "not_started" 
+    - Filter spec.tasks where status == "in_progress"
+    - Filter spec.tasks where status == "blocked"
+    - Filter spec.tasks where status == "paused"
    ```
    
    **Fallback: Use CLI** (if MCP tools not available)
    ```bash
-   simpletask task list --status not_started
-   simpletask task list --status in_progress
-   simpletask task list --status blocked
+    simpletask task list --status not_started
+    simpletask task list --status in_progress
+    simpletask task list --status blocked
+    simpletask task list --status paused
    ```
 
 4a. Run Final Quality Check (MANDATORY):
@@ -444,11 +446,14 @@ If a task cannot be completed:
 ```
 Use simpletask_task() MCP tool:
 - Call simpletask_task(action="update", task_id="[TASK_ID]", status="blocked")
+- Or use status="paused" for tasks intentionally deferred
 ```
 
 **Fallback: Use CLI** (if MCP tools not available)
 ```bash
 simpletask task update [TASK_ID] --status blocked
+# Or mark as paused if intentionally deferred
+simpletask task update [TASK_ID] --status paused
 ```
 
 Document the blocker in the task file or commit message.
@@ -475,7 +480,7 @@ Use simpletask_get() MCP tool to retrieve complete task data:
 - summary: pre-computed status counts
 
 Filter and query the response data:
-- Filter spec.tasks by status field: "not_started", "in_progress", "completed", "blocked"
+- Filter spec.tasks by status field: "not_started", "in_progress", "completed", "blocked", "paused"
 - Filter spec.acceptance_criteria by completed field: true/false
 - Use summary fields for quick counts
 ```
@@ -493,6 +498,7 @@ simpletask task list --status not_started
 simpletask task list --status in_progress
 simpletask task list --status completed
 simpletask task list --status blocked
+simpletask task list --status paused
 
 # List acceptance criteria
 simpletask criteria list
@@ -515,6 +521,9 @@ simpletask_task(action="update", task_id="T001", status="completed")
 # Mark task as blocked
 simpletask_task(action="update", task_id="T001", status="blocked")
 
+# Mark task as paused (intentionally deferred)
+simpletask_task(action="update", task_id="T001", status="paused")
+
 # Update task name or goal
 simpletask_task(action="update", task_id="T001", name="New name")
 simpletask_task(action="update", task_id="T001", goal="Updated goal")
@@ -530,6 +539,9 @@ simpletask task update T001 --status completed
 
 # Mark task as blocked
 simpletask task update T001 --status blocked
+
+# Mark task as paused (intentionally deferred)
+simpletask task update T001 --status paused
 
 # Update task name or goal
 simpletask task update T001 --name "New name"

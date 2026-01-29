@@ -31,6 +31,7 @@ class TestTaskStatus:
         assert TaskStatus.IN_PROGRESS.value == "in_progress"
         assert TaskStatus.COMPLETED.value == "completed"
         assert TaskStatus.BLOCKED.value == "blocked"
+        assert TaskStatus.PAUSED.value == "paused"
 
 
 class TestAcceptanceCriterion:

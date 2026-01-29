@@ -100,7 +100,7 @@
         },
         "status": {
           "type": "string",
-          "enum": ["not_started", "in_progress", "completed", "blocked"],
+          "enum": ["not_started", "in_progress", "completed", "blocked", "paused"],
           "description": "Current status of this task"
         },
         "goal": {

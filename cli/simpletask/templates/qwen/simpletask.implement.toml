@@ -319,6 +319,7 @@ After completing ALL tasks, evaluate which acceptance criteria are now satisfied
    - Filter spec.tasks where status == "not_started" 
    - Filter spec.tasks where status == "in_progress"
    - Filter spec.tasks where status == "blocked"
+   - Filter spec.tasks where status == "paused"
    ```
    
    **Fallback: Use CLI** (if MCP tools not available)
@@ -326,6 +327,7 @@ After completing ALL tasks, evaluate which acceptance criteria are now satisfied
    simpletask task list --status not_started
    simpletask task list --status in_progress
    simpletask task list --status blocked
+   simpletask task list --status paused
    ```
 
 4a. Run Final Quality Check (MANDATORY):
@@ -474,7 +476,7 @@ Use simpletask_get() MCP tool to retrieve complete task data:
 - summary: pre-computed status counts
 
 Filter and query the response data:
-- Filter spec.tasks by status field: "not_started", "in_progress", "completed", "blocked"
+- Filter spec.tasks by status field: "not_started", "in_progress", "completed", "blocked", "paused"
 - Filter spec.acceptance_criteria by completed field: true/false
 - Use summary fields for quick counts
 ```
@@ -492,6 +494,7 @@ simpletask task list --status not_started
 simpletask task list --status in_progress
 simpletask task list --status completed
 simpletask task list --status blocked
+simpletask task list --status paused
 
 # List acceptance criteria
 simpletask criteria list

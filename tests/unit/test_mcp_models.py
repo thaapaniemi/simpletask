@@ -36,14 +36,50 @@ class TestComputeStatusSummary:
         assert summary.tasks_blocked == 0
 
     def test_mixed_task_statuses(self, sample_spec_mixed_statuses: SimpleTaskSpec):
-        """Verify COMPLETED, IN_PROGRESS, BLOCKED, NOT_STARTED counting."""
+        """Verify COMPLETED, IN_PROGRESS, BLOCKED, NOT_STARTED, PAUSED counting."""
         summary = compute_status_summary(sample_spec_mixed_statuses)
 
-        assert summary.tasks_total == 4
+        assert summary.tasks_total == 5
         assert summary.tasks_completed == 1
         assert summary.tasks_in_progress == 1
         assert summary.tasks_not_started == 1
         assert summary.tasks_blocked == 1
+        assert summary.tasks_paused == 1
+
+    def test_overall_status_paused_priority(self, sample_spec_mixed_statuses: SimpleTaskSpec):
+        """Verify overall status priority: blocked > paused > in_progress > completed > not_started."""
+        summary = compute_status_summary(sample_spec_mixed_statuses)
+        # With blocked task present, overall should be blocked
+        assert summary.overall_status.value == "blocked"
+
+    def test_overall_status_blocked_trumps_all(
+        self, sample_spec_blocked_paused_in_progress: SimpleTaskSpec
+    ):
+        """Verify blocked has highest priority even with paused and in_progress tasks."""
+        summary = compute_status_summary(sample_spec_blocked_paused_in_progress)
+        assert summary.overall_status.value == "blocked"
+        assert summary.tasks_blocked == 1
+        assert summary.tasks_paused == 1
+        assert summary.tasks_in_progress == 1
+
+    def test_overall_status_paused_trumps_in_progress(
+        self, sample_spec_paused_and_in_progress: SimpleTaskSpec
+    ):
+        """Verify paused takes priority over in_progress when no blocked tasks."""
+        summary = compute_status_summary(sample_spec_paused_and_in_progress)
+        assert summary.overall_status.value == "paused"
+        assert summary.tasks_blocked == 0
+        assert summary.tasks_paused == 1
+        assert summary.tasks_in_progress == 1
+        assert summary.tasks_completed == 1
+
+    def test_overall_status_only_paused(self, sample_spec_only_paused: SimpleTaskSpec):
+        """Verify overall status is PAUSED when only paused tasks exist."""
+        summary = compute_status_summary(sample_spec_only_paused)
+        assert summary.overall_status.value == "paused"
+        assert summary.tasks_paused == 2
+        assert summary.tasks_blocked == 0
+        assert summary.tasks_in_progress == 0
 
     def test_completed_criteria(self, sample_spec_mixed_statuses: SimpleTaskSpec):
         """Verify criteria_completed count."""

@@ -57,10 +57,11 @@ You are conducting a thorough, technically precise code review. Be brutally hone
    simpletask task list
    
    # Count tasks by status
-   simpletask task list --status completed
-   simpletask task list --status in_progress
-   simpletask task list --status not_started
-   simpletask task list --status blocked
+    simpletask task list --status completed
+    simpletask task list --status in_progress
+    simpletask task list --status not_started
+    simpletask task list --status blocked
+    simpletask task list --status paused
    ```
 
 2. Parse task data to determine:
@@ -69,6 +70,7 @@ You are conducting a thorough, technically precise code review. Be brutally hone
    - Tasks with `status: in_progress` (should be 0 after implementation)
    - Tasks with `status: not_started` (incomplete)
    - Tasks with `status: blocked` (need attention)
+   - Tasks with `status: paused` (intentionally deferred)
 
 3. Identify tasks that CLAIM completion but may lack quality:
    - Check if `done_when` conditions are actually satisfied
@@ -421,7 +423,7 @@ Use simpletask_get() MCP tool to retrieve complete task data:
 - summary: pre-computed status counts
 
 Filter and query the response data:
-- Filter spec.tasks by status field: "not_started", "in_progress", "completed", "blocked"
+- Filter spec.tasks by status field: "not_started", "in_progress", "completed", "blocked", "paused"
 - Filter spec.acceptance_criteria by completed field: true/false
 - Use summary fields for quick counts
 ```

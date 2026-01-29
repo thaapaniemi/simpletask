@@ -1,4 +1,5 @@
-"""Show command - Display task details."""
+"""
+Show command - Display task details."""
 
 import typer
 
@@ -170,16 +171,21 @@ def show(
         if spec.tasks:
             console.print("\n[bold green]Implementation Tasks:[/bold green]")
             for task in spec.tasks:
-                status_icon = "✓" if task.status.value == "completed" else "○"
-                status_color = (
-                    "green"
-                    if task.status.value == "completed"
-                    else (
-                        "yellow"
-                        if task.status.value == "in_progress"
-                        else "red" if task.status.value == "blocked" else "white"
-                    )
-                )
+                if task.status.value == "completed":
+                    status_icon = "✓"
+                    status_color = "green"
+                elif task.status.value == "in_progress":
+                    status_icon = "▶"
+                    status_color = "yellow"
+                elif task.status.value == "blocked":
+                    status_icon = "✗"
+                    status_color = "red"
+                elif task.status.value == "paused":
+                    status_icon = "⏸"
+                    status_color = "blue"
+                else:  # not_started
+                    status_icon = "○"
+                    status_color = "white"
                 console.print(
                     f"  [{status_color}]{status_icon}[/{status_color}] {task.id}: {task.name} ({task.status.value})"
                 )

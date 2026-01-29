@@ -637,7 +637,7 @@ The MCP server exposes 7 tools for task management:
 | `get` | Get complete task specification with status summary | `branch` (str, optional): Branch name or None for current<br>`validate` (bool, optional): Include schema validation (default: false) |
 | `list` | List all task file branch names in the project | None |
 | `new` | Create a new task file | `branch` (str): Branch identifier<br>`title` (str): Task title<br>`prompt` (str): Original user request<br>`criteria` (list[str] \| None, optional): Acceptance criteria |
-| `task` | Manage implementation tasks (add/update/remove/get) | `action` (str): 'add', 'update', 'remove', or 'get'<br>`branch` (str, optional): Branch name or None for current<br>`task_id` (str, optional): Task ID (required for update/remove/get)<br>`name` (str, optional): Task name (required for add)<br>`goal` (str, optional): Task goal/description<br>`status` (str, optional): Status for update ('not_started', 'in_progress', 'completed', 'blocked')<br>`steps` (list[str] \| None, optional): Task steps for add action. None or [] adds placeholder ['To be defined'] |
+| `task` | Manage implementation tasks (add/update/remove/get) | `action` (str): 'add', 'update', 'remove', or 'get'<br>`branch` (str, optional): Branch name or None for current<br>`task_id` (str, optional): Task ID (required for update/remove/get)<br>`name` (str, optional): Task name (required for add)<br>`goal` (str, optional): Task goal/description<br>`status` (str, optional): Status for update ('not_started', 'in_progress', 'completed', 'blocked', 'paused')<br>`steps` (list[str] \| None, optional): Task steps for add action. None or [] adds placeholder ['To be defined'] |
 | `criteria` | Manage acceptance criteria (add/complete/remove/get) | `action` (str): 'add', 'complete', 'remove', or 'get'<br>`branch` (str, optional): Branch name or None for current<br>`criterion_id` (str, optional): Criterion ID (required for complete/remove/get)<br>`description` (str, optional): Description (required for add)<br>`completed` (bool, optional): Completion status for 'complete' (default: true) |
 | `quality` | Manage quality requirements (check/set/get/preset) | `action` (str): 'check', 'set', 'get', or 'preset'<br>`branch` (str, optional): Branch name or None for current<br>`config_type` (str, optional): 'linting', 'type-checking', 'testing', or 'security' (for set action)<br>`tool` (str, optional): Tool name from ToolName enum (for set action)<br>`args` (list[str], optional): Tool arguments (for set action)<br>`enabled` (bool, optional): Enable/disable check (for set action)<br>`min_coverage` (int, optional): Minimum coverage % (for testing config only)<br>`preset_name` (str, optional): Preset name (for preset action)<br>Check filters: `lint_only`, `test_only`, `type_only`, `security_only` (bool, for check action) |
 | `design` | Manage design section (set/get/remove) | `action` (str): 'set', 'get', or 'remove'<br>`branch` (str, optional): Branch name or None for current<br>`field` (str, optional): Field to modify: 'pattern', 'reference', 'constraint', 'security', 'error-handling' (for set/remove)<br>`value` (str, optional): Value to add (for set action)<br>`reason` (str, optional): Reason for reference (required when field='reference')<br>`index` (int, optional): Index to remove (for remove action on list fields)<br>`all` (bool, optional): Remove all items or entire section (for remove action) |
@@ -657,9 +657,9 @@ Returns enriched task data with pre-computed status counts:
 - `file_path`: Path to task YAML file
 - `summary`: Pre-computed `StatusSummary` with:
   - `branch`, `title`
-  - `overall_status`: Computed from task states (blocked > in_progress > completed > not_started)
+  - `overall_status`: Computed from task states (blocked > paused > in_progress > completed > not_started)
   - `criteria_total`, `criteria_completed`
-  - `tasks_total`, `tasks_completed`, `tasks_in_progress`, `tasks_not_started`, `tasks_blocked`
+  - `tasks_total`, `tasks_completed`, `tasks_in_progress`, `tasks_not_started`, `tasks_blocked`, `tasks_paused`
 - `validation` (optional): `ValidationResult` with `valid` (bool) and `errors` (list)
 
 **Example Response Structure:**
@@ -683,7 +683,8 @@ Returns enriched task data with pre-computed status counts:
     "tasks_completed": 5,
     "tasks_in_progress": 1,
     "tasks_not_started": 5,
-    "tasks_blocked": 0
+    "tasks_blocked": 0,
+    "tasks_paused": 0
   },
   "validation": null
 }
@@ -758,7 +759,7 @@ Unified tool for managing implementation tasks with four actions.
 - `task_id` (optional): Task ID (required for update/remove/get, e.g., 'T001')
 - `name` (optional): Task name (required for add)
 - `goal` (optional): Task goal/description
-- `status` (optional): Task status for update only. Valid values: 'not_started', 'in_progress', 'completed', 'blocked'. **Note:** 'add' action ignores this parameter - new tasks always start as `not_started`.
+- `status` (optional): Task status for update only. Valid values: 'not_started', 'in_progress', 'completed', 'blocked', 'paused'. **Note:** 'add' action ignores this parameter - new tasks always start as `not_started`.
 - `steps` (optional): List of detailed task steps for add action. None or [] adds placeholder step ['To be defined']. Only applies when action='add'.
 
 **Returns:** 
