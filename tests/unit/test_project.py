@@ -476,7 +476,7 @@ acceptance_criteria:
         # Verify all items are tuples with 3 elements
         for task in tasks:
             assert len(task) == 3
-            branch, path, mtime = task
+            branch, _path, mtime = task
             assert isinstance(branch, str)
             assert isinstance(mtime, datetime)
 

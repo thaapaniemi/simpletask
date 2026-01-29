@@ -803,3 +803,160 @@ class TestGeminiTemplatesIdenticalToQwen:
                 f"Template {qwen_path.name} differs between Qwen and Gemini. "
                 "These should be identical since Gemini CLI uses the same TOML format."
             )
+
+
+class TestSplitTemplateContent:
+    """Validate split template content structure and completeness."""
+
+    def test_opencode_split_template_has_essential_sections(self):
+        """OpenCode split template should contain all essential sections."""
+        templates = get_bundled_templates()
+        split_template = next((t for t in templates if t.name == "simpletask.split.md"), None)
+        assert split_template is not None, "simpletask.split.md not found"
+
+        content = split_template.read_text()
+
+        # Essential sections that must be present
+        essential_sections = [
+            "## Step 1: Load Task File",
+            "## Step 2: Identify Tasks to Split",
+            "## Step 3: Analyze and Generate Subtasks",
+            "## Step 4: Remove Original Complex Tasks",
+            "## Step 5: Add Generated Subtasks",
+            "## Step 6: Renumber Task IDs Sequentially",
+            "## Step 7: Validate and Report",
+            "## Edge Cases",
+            "## MCP Tool Reference",
+            "## Important Reminders",
+        ]
+
+        for section in essential_sections:
+            assert section in content, f"Missing essential section: {section}"
+
+    def test_opencode_split_template_has_splitting_criteria(self):
+        """OpenCode split template should define splitting criteria."""
+        templates = get_bundled_templates()
+        split_template = next((t for t in templates if t.name == "simpletask.split.md"), None)
+        assert split_template is not None
+
+        content = split_template.read_text()
+
+        # Splitting criteria markers
+        splitting_criteria = [
+            ">2 steps",
+            ">1 file",
+            ">3 conditions",
+            ">100 characters",
+        ]
+
+        for criterion in splitting_criteria:
+            assert criterion in content, f"Missing splitting criterion: {criterion}"
+
+    def test_opencode_split_template_has_mcp_instructions(self):
+        """OpenCode split template should include MCP tool usage."""
+        templates = get_bundled_templates()
+        split_template = next((t for t in templates if t.name == "simpletask.split.md"), None)
+        assert split_template is not None
+
+        content = split_template.read_text()
+
+        # MCP tool references
+        mcp_tools = [
+            "simpletask_get",
+            "simpletask_task",
+        ]
+
+        for tool in mcp_tools:
+            assert tool in content, f"Missing MCP tool reference: {tool}"
+
+    def test_opencode_split_template_has_cli_fallback(self):
+        """OpenCode split template should include CLI fallback commands."""
+        templates = get_bundled_templates()
+        split_template = next((t for t in templates if t.name == "simpletask.split.md"), None)
+        assert split_template is not None
+
+        content = split_template.read_text()
+
+        # CLI commands that should be present
+        cli_commands = [
+            "simpletask show",
+            "simpletask task remove",
+            "simpletask task add",
+        ]
+
+        for cmd in cli_commands:
+            assert cmd in content, f"Missing CLI fallback command: {cmd}"
+
+    def test_opencode_split_template_size_under_500_lines(self):
+        """OpenCode split template should be under 500 lines for token efficiency."""
+        templates = get_bundled_templates()
+        split_template = next((t for t in templates if t.name == "simpletask.split.md"), None)
+        assert split_template is not None
+
+        content = split_template.read_text()
+        line_count = len(content.splitlines())
+
+        assert (
+            line_count < 500
+        ), f"Split template is {line_count} lines, should be <500 for token efficiency"
+
+    def test_qwen_split_template_has_toml_structure(self):
+        """Qwen split template should have valid TOML structure."""
+        templates = get_bundled_qwen_templates()
+        split_template = next((t for t in templates if t.name == "simpletask.split.toml"), None)
+        assert split_template is not None, "simpletask.split.toml not found"
+
+        content = split_template.read_text()
+
+        # TOML structure markers
+        assert 'description = "' in content, "Missing TOML description field"
+        assert 'prompt = """' in content, "Missing TOML prompt field"
+
+    def test_qwen_split_template_has_prompt_field(self):
+        """Qwen split template prompt field should contain essential content."""
+        templates = get_bundled_qwen_templates()
+        split_template = next((t for t in templates if t.name == "simpletask.split.toml"), None)
+        assert split_template is not None
+
+        content = split_template.read_text()
+
+        # Essential content within prompt field
+        essential_in_prompt = [
+            "Step 1: Load Task File",
+            "Step 2: Identify Tasks to Split",
+            "simpletask_get",
+            "simpletask_task",
+        ]
+
+        for item in essential_in_prompt:
+            assert item in content, f"Missing essential content in prompt: {item}"
+
+    def test_qwen_split_template_size_under_500_lines(self):
+        """Qwen split template should be under 500 lines for token efficiency."""
+        templates = get_bundled_qwen_templates()
+        split_template = next((t for t in templates if t.name == "simpletask.split.toml"), None)
+        assert split_template is not None
+
+        content = split_template.read_text()
+        line_count = len(content.splitlines())
+
+        assert (
+            line_count < 500
+        ), f"Qwen split template is {line_count} lines, should be <500 for token efficiency"
+
+    def test_gemini_split_template_matches_qwen_exactly(self):
+        """Gemini split template should be byte-identical to Qwen."""
+        qwen_templates = get_bundled_qwen_templates()
+        qwen_split = next((t for t in qwen_templates if t.name == "simpletask.split.toml"), None)
+        assert qwen_split is not None
+
+        gemini_dir = get_gemini_templates_dir()
+        gemini_split = gemini_dir / "simpletask.split.toml"
+        assert gemini_split.exists(), "Gemini simpletask.split.toml not found"
+
+        qwen_content = qwen_split.read_text()
+        gemini_content = gemini_split.read_text()
+
+        assert (
+            qwen_content == gemini_content
+        ), "simpletask.split.toml differs between Qwen and Gemini. These must be byte-identical."

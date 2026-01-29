@@ -2,7 +2,7 @@
 
 import typer
 
-from ..core.models import QualityRequirements, Design
+from ..core.models import Design, QualityRequirements
 from ..core.project import ensure_project, get_task_file_path
 from ..core.yaml_parser import InvalidTaskFileError, parse_task_file
 from ..utils.console import console, error
@@ -177,9 +177,7 @@ def show(
                     else (
                         "yellow"
                         if task.status.value == "in_progress"
-                        else "red"
-                        if task.status.value == "blocked"
-                        else "white"
+                        else "red" if task.status.value == "blocked" else "white"
                     )
                 )
                 console.print(

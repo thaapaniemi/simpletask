@@ -7,9 +7,7 @@ from pathlib import Path
 
 import yaml
 
-from ..utils.console import warning
 from .git import current_branch, is_git_repo
-from .yaml_parser import parse_task_file
 
 # Constants
 TASK_FILE_EXTENSION = ".yml"
