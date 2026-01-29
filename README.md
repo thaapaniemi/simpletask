@@ -73,6 +73,7 @@ The recommended workflow uses slash commands in supported AI editors. These guid
 | Command | Description |
 |---------|-------------|
 | `/simpletask.plan <feature>` | Create specification and implementation plan from feature description |
+| `/simpletask.split` | Split complex tasks into atomic subtasks for easier AI execution |
 | `/simpletask.implement` | Execute tasks from the plan, updating status as you go |
 | `/simpletask.review` | Review implementation against acceptance criteria |
 
@@ -81,6 +82,10 @@ The recommended workflow uses slash commands in supported AI editors. These guid
 ```
 /simpletask.plan Add user authentication with JWT
   → Creates branch, task file with acceptance criteria and tasks
+
+/simpletask.split
+  → (Optional) Splits complex tasks into atomic subtasks (1-2 steps each)
+  → Reduces cognitive load for AI execution
 
 /simpletask.implement
   → AI executes tasks, marks progress, commits changes
@@ -102,6 +107,7 @@ The recommended workflow uses slash commands in supported AI editors. These guid
 
 The three workflow commands are:
 - `/simpletask.plan` - Create specification and implementation plan
+- `/simpletask.split` - Split complex tasks into atomic subtasks (optional)
 - `/simpletask.implement` - Execute tasks from the plan
 - `/simpletask.review` - Review implementation against acceptance criteria
 

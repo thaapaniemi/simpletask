@@ -39,12 +39,13 @@ class TestGetBundledTemplates:
             assert template.suffix == ".md"
 
     def test_returns_expected_templates(self):
-        """Should return the three bundled templates."""
+        """Should return the four bundled templates."""
         templates = get_bundled_templates()
         template_names = {t.name for t in templates}
 
         expected = {
             "simpletask.plan.md",
+            "simpletask.split.md",
             "simpletask.implement.md",
             "simpletask.review.md",
         }
@@ -94,8 +95,8 @@ class TestInstallTemplates:
         # Should create target directory
         assert target_dir.exists()
 
-        # Should install all three templates
-        assert len(installed) == 3
+        # Should install all four templates
+        assert len(installed) == 4
         assert len(skipped) == 0
         assert len(overwritten) == 0
 
@@ -121,8 +122,8 @@ class TestInstallTemplates:
         # Should not report overwritten files as newly installed
         assert "simpletask.plan.md" not in installed
 
-        # Should install the other two files
-        assert len(installed) == 2
+        # Should install the other three files
+        assert len(installed) == 3
 
         # File should have new content (not "old content")
         assert existing_file.read_text() != "old content"
@@ -147,8 +148,8 @@ class TestInstallTemplates:
         # Should not report as overwritten
         assert len(overwritten) == 0
 
-        # Should install the other two
-        assert len(installed) == 2
+        # Should install the other three
+        assert len(installed) == 3
 
         # Original file should be unchanged
         assert existing_file.read_text() == old_content
@@ -293,12 +294,13 @@ class TestGetBundledQwenTemplates:
             assert template.suffix == ".toml"
 
     def test_returns_expected_templates(self):
-        """Should return the three bundled Qwen templates."""
+        """Should return the four bundled Qwen templates."""
         templates = get_bundled_qwen_templates()
         template_names = {t.name for t in templates}
 
         expected = {
             "simpletask.plan.toml",
+            "simpletask.split.toml",
             "simpletask.implement.toml",
             "simpletask.review.toml",
         }
@@ -348,8 +350,8 @@ class TestInstallQwenTemplates:
         # Should create target directory
         assert target_dir.exists()
 
-        # Should install all three templates
-        assert len(installed) == 3
+        # Should install all four templates
+        assert len(installed) == 4
         assert len(skipped) == 0
         assert len(overwritten) == 0
 
@@ -375,8 +377,8 @@ class TestInstallQwenTemplates:
         # Should not report overwritten files as newly installed
         assert "simpletask.plan.toml" not in installed
 
-        # Should install the other two files
-        assert len(installed) == 2
+        # Should install the other three files
+        assert len(installed) == 3
 
         # File should have new content (not "old content")
         assert existing_file.read_text() != "old content"
@@ -401,8 +403,8 @@ class TestInstallQwenTemplates:
         # Should not report as overwritten
         assert len(overwritten) == 0
 
-        # Should install the other two
-        assert len(installed) == 2
+        # Should install the other three
+        assert len(installed) == 3
 
         # Original file should be unchanged
         assert existing_file.read_text() == old_content
@@ -539,12 +541,13 @@ class TestGetBundledGeminiTemplates:
             assert template.suffix == ".toml"
 
     def test_returns_expected_templates(self):
-        """Should return the three bundled Gemini templates."""
+        """Should return the four bundled Gemini templates."""
         templates = get_bundled_gemini_templates()
         template_names = {t.name for t in templates}
 
         expected = {
             "simpletask.plan.toml",
+            "simpletask.split.toml",
             "simpletask.implement.toml",
             "simpletask.review.toml",
         }
@@ -594,8 +597,8 @@ class TestInstallGeminiTemplates:
         # Should create target directory
         assert target_dir.exists()
 
-        # Should install all three templates
-        assert len(installed) == 3
+        # Should install all four templates
+        assert len(installed) == 4
         assert len(skipped) == 0
         assert len(overwritten) == 0
 
@@ -621,8 +624,8 @@ class TestInstallGeminiTemplates:
         # Should not report overwritten files as newly installed
         assert "simpletask.plan.toml" not in installed
 
-        # Should install the other two files
-        assert len(installed) == 2
+        # Should install the other three files
+        assert len(installed) == 3
 
         # File should have new content (not "old content")
         assert existing_file.read_text() != "old content"
@@ -647,8 +650,8 @@ class TestInstallGeminiTemplates:
         # Should not report as overwritten
         assert len(overwritten) == 0
 
-        # Should install the other two
-        assert len(installed) == 2
+        # Should install the other three
+        assert len(installed) == 3
 
         # Original file should be unchanged
         assert existing_file.read_text() == old_content

@@ -95,8 +95,20 @@ cli/simpletask/           # Main CLI package
 │   └── models.py         # MCP-specific models
 ├── templates/            # AI workflow templates
 │   ├── opencode/         # OpenCode slash commands (.md)
+│   │   ├── simpletask.plan.md
+│   │   ├── simpletask.split.md      # NEW: Task splitting command
+│   │   ├── simpletask.implement.md
+│   │   └── simpletask.review.md
 │   ├── qwen/             # Qwen slash commands (.toml)
+│   │   ├── simpletask.plan.toml
+│   │   ├── simpletask.split.toml    # NEW: Task splitting command
+│   │   ├── simpletask.implement.toml
+│   │   └── simpletask.review.toml
 │   └── gemini/           # Gemini CLI slash commands (.toml)
+│       ├── simpletask.plan.toml
+│       ├── simpletask.split.toml    # NEW: Task splitting command
+│       ├── simpletask.implement.toml
+│       └── simpletask.review.toml
 └── schema/
     └── task_schema.json  # JSON schema for validation
 
@@ -128,6 +140,102 @@ The `normalize_branch_name()` function in `cli/simpletask/core/project.py` conve
 - Double dots (`..`) → Double hyphens (`--`) for security
 
 **Important:** Always use `simpletask` CLI commands instead of manually constructing `.tasks/` paths in bash. The CLI handles normalization automatically.
+
+## AI Workflow Templates (Slash Commands)
+
+simpletask provides AI-assisted workflow templates (slash commands) for OpenCode, Qwen CLI, and Gemini CLI. These templates guide AI models through structured development workflows.
+
+### Available Slash Commands
+
+| Command | Purpose | When to Use |
+|---------|---------|-------------|
+| `/simpletask.plan` | Create task specification from feature description | Start of a new feature branch |
+| `/simpletask.split` | Split complex tasks into atomic subtasks | After planning, before implementation |
+| `/simpletask.implement` | Execute tasks step-by-step with best practices | Implementation phase |
+| `/simpletask.review` | Review completed tasks and generate summary | After all tasks completed |
+
+### `/simpletask.split` - Task Splitting
+
+**Purpose:** Ensures AI models have minimal cognitive load by splitting complex tasks into ultra-atomic units (1-2 steps, 5-10 minutes each).
+
+**Splitting Criteria:**
+
+A task is split if it has ANY of:
+- **>2 steps** in the `steps` array
+- **>1 file** in the `files` array
+- **>3 conditions** in `done_when` array
+- **>100 characters** in goal description
+
+**Output:**
+- Removes complex tasks
+- Adds atomic subtasks (1-2 steps each)
+- Renumbers all task IDs sequentially (T001, T002, T003...)
+- Updates all prerequisite references
+
+**Example Workflow:**
+
+```bash
+# 1. Plan feature
+/simpletask.plan "Add user authentication with JWT"
+
+# 2. Split complex tasks into atomic units
+/simpletask.split
+
+# 3. Implement atomic tasks
+/simpletask.implement
+
+# 4. Review completed work
+/simpletask.review
+```
+
+**Splitting Patterns:**
+
+The split command recognizes and handles these patterns:
+
+1. **Model/Class Creation** - Split into: file creation → fields → methods → constraints
+2. **API Endpoint** - Split into: file → skeleton → validation → logic → token generation → error handling
+3. **Multi-File Feature** - Split by file: one subtask per file operation
+4. **Testing** - Split by test case: one subtask per test
+5. **Configuration + Implementation** - Split into: config → setup → implementation → integration
+
+**Target Metrics:**
+- 1-2 steps per subtask
+- 5-10 minutes completion time
+- No ambiguity or decisions left to implementer
+
+### Template Installation
+
+Install templates for your AI editor:
+
+```bash
+# Install for all editors (OpenCode, Qwen, Gemini)
+simpletask ai install
+
+# Install for specific editor only
+simpletask ai install --opencode
+simpletask ai install --qwen
+simpletask ai install --gemini
+
+# Install to local directory (.opencode/commands in project)
+simpletask ai install --local
+
+# List installed templates
+simpletask ai list
+```
+
+### Template Files
+
+**OpenCode** (Markdown with YAML frontmatter):
+- `cli/simpletask/templates/opencode/*.md`
+- Installed to: `~/.config/opencode/commands/` or `.opencode/commands/`
+
+**Qwen CLI** (TOML format):
+- `cli/simpletask/templates/qwen/*.toml`
+- Installed to: `~/.config/qwen/commands/` or `.qwen/commands/`
+
+**Gemini CLI** (TOML format, identical to Qwen):
+- `cli/simpletask/templates/gemini/*.toml`
+- Installed to: `~/.gemini/commands/` or `.gemini/commands/`
 
 ## Commands
 

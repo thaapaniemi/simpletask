@@ -1,0 +1,1094 @@
+description = "Split complex tasks into atomic subtasks to reduce cognitive load for AI execution"
+
+prompt = """
+User input: {{args}}
+
+**Purpose:** This tool ensures AI models/LLMs have minimal context to think about per task, guaranteeing each subtask is handled correctly with best practices. By splitting complex tasks into ultra-atomic units (1-2 steps, 5-10 minutes), we eliminate ambiguity and decision-making during implementation.
+
+**CRITICAL: This is a TASK REFINEMENT phase. You will automatically split ALL complex tasks, remove originals, add subtasks, renumber IDs, and update the task file. No preview, no confirmation - execute immediately.**
+
+**Step 1: Load Task File**
+
+1. Get current git branch name:
+   ```bash
+   git branch --show-current
+   ```
+
+2. Load task file using MCP tools (with CLI fallback):
+   
+   **Preferred: Use MCP tool** (if simpletask MCP server is available)
+   ```
+   Use simpletask_get() MCP tool to retrieve task data:
+   - Call simpletask_get(branch=None) to use current git branch
+   - Returns SimpleTaskGetResponse with spec, file_path, and summary
+   - If error occurs, task file does not exist
+   ```
+   
+   **Fallback: Use CLI** (if MCP tools not available)
+   ```bash
+   simpletask show
+   ```
+   
+   If task file not found:
+   - Report: "No task file found for current branch. Run /simpletask.plan first."
+   - STOP - cannot proceed without task file
+
+**Note:** Branch names with slashes (e.g., `feature/user-auth`) are automatically normalized to filenames with hyphens (e.g., `.tasks/feature-user-auth.yml`). The MCP tools and CLI commands handle normalization automatically.
+
+**Step 2: Identify Tasks to Split**
+
+Analyze all tasks in `spec.tasks` array to determine which need splitting.
+
+**A task MUST be split if it meets ANY of these criteria:**
+
+1. **Step count:** Has >2 steps in the `steps` array
+2. **File actions:** Has >1 file in the `files` array
+3. **Done conditions:** Has >3 conditions in `done_when` array
+4. **Goal complexity:** Goal description is >100 characters
+
+**SKIP splitting (task is already atomic) if:**
+
+1. **Single atomic step:** Has exactly 1 step AND step description is <50 characters
+2. **Already atomic:** Task name contains keywords indicating atomic work:
+   - "Add import"
+   - "Update version"
+   - "Fix typo"
+   - "Remove unused"
+   - "Rename variable"
+3. **Bug fix context:** Task name starts with "Fix:" (bug fixes often need full context to avoid breaking changes)
+
+**Process:**
+
+**Preferred: Use MCP tool** (if simpletask MCP server is available)
+```
+From simpletask_get() response:
+- Iterate through spec.tasks array
+- For each task, evaluate against split criteria
+- Store tasks that need splitting in complex_tasks list
+- Store tasks to keep as-is in atomic_tasks list
+```
+
+**Fallback: Use CLI** (if MCP tools not available)
+```bash
+# List all tasks to analyze
+simpletask task list
+# Manually evaluate each task against criteria
+```
+
+**Step 3: Analyze Each Complex Task**
+
+For EACH task in complex_tasks, perform detailed analysis to determine optimal splitting strategy.
+
+**3.1: Understand Task Structure**
+
+Extract from the task:
+- `name`: Current task name
+- `goal`: What the task accomplishes
+- `steps`: Array of implementation steps
+- `files`: Array of file actions (create/modify/delete)
+- `done_when`: Array of completion conditions
+- `code_examples`: Code patterns to follow
+- `prerequisites`: Tasks that must complete first
+
+**3.2: Identify Logical Breakpoints**
+
+Analyze the task to find natural splitting points:
+
+**Pattern Recognition:**
+
+1. **File-based split** - Multiple files involved:
+   - Each file operation becomes a separate subtask
+   - Order: create → modify → delete
+
+2. **Method/Function-based split** - Multiple methods to implement:
+   - Each method becomes a separate subtask
+   - Order by dependencies (base method → derived methods)
+
+3. **Layer-based split** - Multiple layers touched:
+   - Model/Schema definition
+   - Business logic implementation
+   - API endpoint creation
+   - Validation logic
+   - Test implementation
+
+4. **Test-based split** - Multiple test cases:
+   - Each test case or test group becomes a subtask
+   - Order: happy path → error cases → edge cases
+
+5. **Configuration-based split** - Setup + implementation:
+   - Configuration/setup
+   - Core implementation
+   - Integration/wiring
+
+**3.3: Use Explore Agent for Intelligent Splitting**
+
+For complex tasks where the splitting strategy is not obvious, use the Task tool with explore agent:
+
+```
+Task(
+  subagent_type="explore",
+  description="Analyze task structure for splitting",
+  prompt="Analyze the following task to determine optimal splitting strategy:
+
+Task: [task.name]
+Goal: [task.goal]
+Steps: [task.steps]
+Files: [task.files]
+
+Identify:
+- Natural logical breakpoints
+- File dependencies and ordering
+- Method/function boundaries
+- Test groupings
+- Configuration vs implementation steps
+
+Recommend: Optimal way to split this into 1-2 step subtasks (5-10 min each)
+Thoroughness: quick"
+)
+```
+
+The explore agent will provide insights on:
+- How existing similar code is structured
+- Natural boundaries in the codebase
+- Optimal splitting points
+
+**Step 4: Generate Subtask Breakdown**
+
+For EACH complex task, generate a list of atomic subtasks following these patterns.
+
+**Subtask Generation Rules:**
+
+1. **Each subtask MUST have:**
+   - 1-2 steps maximum (preferably 1 step)
+   - Single clear objective
+   - Completable in 5-10 minutes
+   - No ambiguity - any LLM can execute without clarification
+
+2. **Subtask naming convention:**
+   - Action-oriented verb + specific target
+   - Max 60 characters
+   - Examples:
+     - ✅ "Create User model file with base structure"
+     - ✅ "Add email field to User model"
+     - ✅ "Implement hash_password method"
+     - ❌ "Work on User model" (too vague)
+     - ❌ "Create User model and add all fields and methods" (too broad)
+
+3. **Subtask goal convention:**
+   - One clear sentence (30-80 characters)
+   - Specific outcome described
+   - Examples:
+     - ✅ "Create src/models/user.py with SQLAlchemy imports and User class skeleton"
+     - ✅ "Add id, email, password_hash, created_at columns to User model"
+     - ❌ "Set up user model" (too vague)
+
+4. **Subtask steps:**
+   - 1-2 concrete actions
+   - Include specific file paths, function names, variable names
+   - No decisions left to implementer
+   - Examples:
+     - ✅ "Create file src/models/user.py with imports: from sqlalchemy import Column, String, DateTime; from .base import Base"
+     - ✅ "Define User class inheriting from Base with __tablename__ = 'users'"
+     - ❌ "Create user model file" (lacks detail)
+
+**Common Splitting Patterns:**
+
+### Pattern 1: Model/Class Creation
+
+**Before:**
+```yaml
+- id: T001
+  name: Create User model
+  goal: Define User database model with authentication fields
+  steps:
+    - Create src/models/user.py
+    - Define User class with id, email, password_hash, created_at
+    - Add unique constraint on email
+    - Add password hashing methods
+```
+
+**After (split into 5 atomic subtasks):**
+```yaml
+- id: T001
+  name: Create User model file with base structure
+  goal: Create src/models/user.py with SQLAlchemy imports and User class skeleton
+  steps:
+    - Create file src/models/user.py with imports and User class inheriting from Base
+  done_when:
+    - File src/models/user.py exists and can be imported without errors
+  
+- id: T002
+  name: Add User model fields
+  goal: Add id, email, password_hash, created_at columns to User model
+  steps:
+    - Define Column fields: id (Integer, primary_key), email (String), password_hash (String), created_at (DateTime)
+  done_when:
+    - User model has all four fields defined
+  prerequisites:
+    - T001
+  
+- id: T003
+  name: Add email unique constraint
+  goal: Ensure email uniqueness at database level
+  steps:
+    - Add unique=True parameter to email Column definition
+  done_when:
+    - Email field has unique constraint in model definition
+  prerequisites:
+    - T002
+  
+- id: T004
+  name: Implement hash_password method
+  goal: Add password hashing using bcrypt
+  steps:
+    - Add static method hash_password(password: str) -> str to User class using bcrypt.hashpw
+  done_when:
+    - Method exists and can hash a test password
+  prerequisites:
+    - T002
+  
+- id: T005
+  name: Implement verify_password method
+  goal: Add password verification method
+  steps:
+    - Add method verify_password(self, password: str) -> bool using bcrypt.checkpw
+  done_when:
+    - Method exists and can verify hashed passwords
+  prerequisites:
+    - T004
+```
+
+### Pattern 2: API Endpoint Implementation
+
+**Before:**
+```yaml
+- id: T002
+  name: Implement /login endpoint
+  goal: Create login endpoint with validation and JWT
+  steps:
+    - Create src/api/auth.py
+    - Add POST /login endpoint skeleton
+    - Add request validation
+    - Add password verification
+    - Add JWT token generation
+    - Add error handling
+```
+
+**After (split into 6 atomic subtasks):**
+```yaml
+- id: T006
+  name: Create auth routes file
+  goal: Create src/api/auth.py with router setup
+  steps:
+    - Create file src/api/auth.py with FastAPI router initialization
+  
+- id: T007
+  name: Add /login endpoint skeleton
+  goal: Define POST /login route with empty handler
+  steps:
+    - Add @router.post("/login") endpoint returning placeholder response
+  prerequisites:
+    - T006
+  
+- id: T008
+  name: Add login request validation
+  goal: Validate email and password in request body
+  steps:
+    - Create LoginRequest Pydantic model with email and password fields
+    - Update /login endpoint to accept LoginRequest body
+  prerequisites:
+    - T007
+  
+- id: T009
+  name: Implement password verification logic
+  goal: Check user exists and password matches
+  steps:
+    - Query User by email, return 401 if not found
+    - Call user.verify_password(password), return 401 if fails
+  prerequisites:
+    - T008
+  
+- id: T010
+  name: Add JWT token generation
+  goal: Generate and return JWT token on successful login
+  steps:
+    - Create JWT token with user_id claim using pyjwt
+    - Return token in response body
+  prerequisites:
+    - T009
+  
+- id: T011
+  name: Add login error handling
+  goal: Handle exceptions and return appropriate error responses
+  steps:
+    - Wrap login logic in try/except for database and JWT errors
+    - Return 500 with error message on exceptions
+  prerequisites:
+    - T010
+```
+
+### Pattern 3: Multi-File Feature
+
+**Before:**
+```yaml
+- id: T003
+  name: Add authentication middleware
+  goal: Protect API routes with JWT validation
+  steps:
+    - Create middleware in src/middleware/auth.py
+    - Implement token extraction from headers
+    - Implement token validation logic
+    - Update main.py to register middleware
+    - Add middleware tests
+```
+
+**After (split into 5 atomic subtasks):**
+```yaml
+- id: T012
+  name: Create auth middleware file
+  goal: Create src/middleware/auth.py with middleware skeleton
+  steps:
+    - Create file with async middleware function accepting request and call_next
+  
+- id: T013
+  name: Implement token extraction
+  goal: Extract JWT token from Authorization header
+  steps:
+    - Add logic to get "Authorization" header and extract Bearer token
+    - Return 401 if header missing or format invalid
+  prerequisites:
+    - T012
+  
+- id: T014
+  name: Implement token validation
+  goal: Validate JWT token and extract user_id
+  steps:
+    - Decode JWT using pyjwt, catch exceptions for invalid/expired tokens
+    - Store user_id in request.state.user_id for downstream handlers
+  prerequisites:
+    - T013
+  
+- id: T015
+  name: Register middleware in main.py
+  goal: Wire up auth middleware to FastAPI app
+  steps:
+    - Import auth_middleware in main.py
+    - Add app.middleware("http")(auth_middleware) call
+  prerequisites:
+    - T014
+  
+- id: T016
+  name: Add middleware unit tests
+  goal: Test token extraction and validation logic
+  steps:
+    - Create tests/test_auth_middleware.py with tests for valid token, missing token, invalid token
+  prerequisites:
+    - T015
+```
+
+### Pattern 4: Testing Task
+
+**Before:**
+```yaml
+- id: T004
+  name: Add authentication tests
+  goal: Test all auth endpoints and flows
+  steps:
+    - Test user registration success
+    - Test user registration validation
+    - Test login success
+    - Test login failure
+    - Test protected route access
+```
+
+**After (split into 5 atomic subtasks):**
+```yaml
+- id: T017
+  name: Test user registration success
+  goal: Verify /register creates user and returns token
+  steps:
+    - Write test that POSTs valid email/password to /register
+    - Assert 200 response and JWT token in body
+  
+- id: T018
+  name: Test registration validation
+  goal: Verify /register rejects invalid inputs
+  steps:
+    - Write test for invalid email format (returns 422)
+    - Write test for missing password (returns 422)
+  prerequisites:
+    - T017
+  
+- id: T019
+  name: Test login success
+  goal: Verify /login returns token for valid credentials
+  steps:
+    - Write test that POSTs correct email/password to /login
+    - Assert 200 response and JWT token matches user
+  prerequisites:
+    - T017
+  
+- id: T020
+  name: Test login failure
+  goal: Verify /login rejects invalid credentials
+  steps:
+    - Write test for wrong password (returns 401)
+    - Write test for non-existent user (returns 401)
+  prerequisites:
+    - T019
+  
+- id: T021
+  name: Test protected route access
+  goal: Verify middleware blocks requests without valid token
+  steps:
+    - Write test accessing protected route without token (returns 401)
+    - Write test with valid token (returns 200)
+  prerequisites:
+    - T020
+```
+
+### Pattern 5: Configuration + Implementation
+
+**Before:**
+```yaml
+- id: T005
+  name: Set up database connection
+  goal: Configure PostgreSQL connection and create tables
+  steps:
+    - Add database URL to config
+    - Create database connection pool
+    - Define database models
+    - Create migration script
+    - Run migrations
+```
+
+**After (split into 5 atomic subtasks):**
+```yaml
+- id: T022
+  name: Add database URL to configuration
+  goal: Store PostgreSQL connection string in config
+  steps:
+    - Add DATABASE_URL to config/settings.py with default value
+  
+- id: T023
+  name: Create database connection pool
+  goal: Initialize SQLAlchemy engine and session maker
+  steps:
+    - Create src/db/connection.py with engine and SessionLocal setup
+  prerequisites:
+    - T022
+  
+- id: T024
+  name: Define database base model
+  goal: Create declarative base for all models
+  steps:
+    - Create src/db/base.py with Base = declarative_base()
+  prerequisites:
+    - T023
+  
+- id: T025
+  name: Create initial migration script
+  goal: Generate Alembic migration for initial schema
+  steps:
+    - Run alembic revision --autogenerate -m "Initial schema"
+  prerequisites:
+    - T024
+  
+- id: T026
+  name: Run database migrations
+  goal: Apply migrations to create tables
+  steps:
+    - Run alembic upgrade head to create all tables
+  prerequisites:
+    - T025
+```
+
+**Step 4.1: Distribute Task Attributes**
+
+For each generated subtask, properly distribute attributes from the original task:
+
+**Prerequisites:**
+- **First subtask:** Inherits ALL prerequisites from original task
+- **Subsequent subtasks:** Depend on previous subtask in the chain
+- **Exception:** Parallel subtasks (e.g., multiple independent tests) can share same prerequisite
+
+**File Actions:**
+- Distribute `files` array entries to relevant subtasks
+- Each subtask should typically modify only 1 file
+- If subtask creates file: `action: create`
+- If subtask modifies file: `action: modify`
+
+**Done When Conditions:**
+- Distribute `done_when` conditions to relevant subtasks
+- Each subtask should have 1-2 specific done_when conditions
+- Ensure conditions are verifiable (command output, file existence, test passes)
+
+**Code Examples:**
+- Analyze which subtask each `code_examples` entry applies to
+- Attach code example to the most relevant subtask
+- If code example shows overall pattern, attach to first subtask
+- If code example applies to multiple subtasks, duplicate it
+
+**Example of attribute distribution:**
+
+**Original task:**
+```yaml
+- id: T001
+  name: Create User model
+  prerequisites: [T000]  # Some earlier task
+  files:
+    - path: src/models/user.py
+      action: create
+  done_when:
+    - File exists at src/models/user.py
+    - User model can be imported
+    - Password hashing works correctly
+  code_examples:
+    - language: python
+      description: SQLAlchemy model pattern
+      code: |
+        from sqlalchemy import Column, Integer, String
+        class User(Base):
+            id = Column(Integer, primary_key=True)
+```
+
+**After splitting - attribute distribution:**
+```yaml
+- id: T001
+  name: Create User model file with base structure
+  prerequisites: [T000]  # Inherited from original
+  files:
+    - path: src/models/user.py
+      action: create
+  done_when:
+    - File exists at src/models/user.py
+    - User model can be imported
+  code_examples:
+    - language: python
+      description: SQLAlchemy model pattern
+      code: |
+        from sqlalchemy import Column, Integer, String
+        class User(Base):
+            id = Column(Integer, primary_key=True)
+
+- id: T002
+  name: Add User model fields
+  prerequisites: [T001]  # Depends on previous subtask
+  files:
+    - path: src/models/user.py
+      action: modify
+  done_when:
+    - User model has all required fields defined
+
+- id: T003
+  name: Add password hashing methods
+  prerequisites: [T002]
+  files:
+    - path: src/models/user.py
+      action: modify
+  done_when:
+    - Password hashing works correctly
+```
+
+**Step 5: Remove Original Complex Tasks**
+
+For EACH task in complex_tasks, remove it from the task file.
+
+**Preferred: Use MCP tool** (if simpletask MCP server is available)
+```
+For each task in complex_tasks:
+  Use simpletask_task() MCP tool:
+  - Call simpletask_task(action="remove", task_id=task.id)
+  - Returns SimpleTaskWriteResponse confirming removal
+```
+
+**Fallback: Use CLI** (if MCP tools not available)
+```bash
+# For each complex task
+simpletask task remove T001
+simpletask task remove T003
+simpletask task remove T005
+# ... etc
+```
+
+**Step 6: Add All Generated Subtasks**
+
+For EACH subtask generated in Step 4, add it to the task file.
+
+**Preferred: Use MCP tool** (if simpletask MCP server is available)
+```
+For each subtask in generated_subtasks:
+  Use simpletask_task() MCP tool:
+  - Call simpletask_task(
+      action="add",
+      name=subtask.name,
+      goal=subtask.goal,
+      steps=subtask.steps  # Pass as list of strings
+    )
+  - Returns SimpleTaskWriteResponse with new task ID
+  - Store returned task ID for prerequisite mapping
+```
+
+**Important:** The MCP `task()` tool only accepts name, goal, and steps. Other fields (done_when, files, code_examples, prerequisites) must be added by editing the YAML file directly.
+
+After adding all subtasks via MCP, edit `.tasks/[branch].yml` directly to add:
+- `done_when` conditions
+- `files` array
+- `code_examples` array
+- `prerequisites` array
+
+**Fallback: Use CLI** (if MCP tools not available)
+```bash
+# For each subtask
+simpletask task add "Create User model file with base structure" \\
+  -g "Create src/models/user.py with SQLAlchemy imports and User class skeleton"
+
+simpletask task add "Add User model fields" \\
+  -g "Add id, email, password_hash, created_at columns to User model"
+
+# ... etc
+
+# Then edit .tasks/[branch].yml directly to add done_when, files, code_examples, prerequisites
+```
+
+**Step 7: Renumber Task IDs Sequentially**
+
+**CRITICAL:** After removing originals and adding subtasks, task IDs are likely non-sequential (e.g., T001, T002, T015, T016, T017). This step renumbers ALL tasks to be sequential: T001, T002, T003, T004...
+
+**7.1: Load Updated Task File**
+
+**Preferred: Use MCP tool**
+```
+Use simpletask_get() MCP tool:
+- Call simpletask_get(branch=None)
+- Returns spec with all current tasks
+```
+
+**Fallback: Use CLI**
+```bash
+simpletask show
+```
+
+**7.2: Create ID Mapping**
+
+Build a mapping of old task IDs to new sequential IDs:
+
+```
+old_to_new_id = {}
+tasks = spec.tasks  # All tasks in current order
+
+for index, task in enumerate(tasks):
+    new_id = f"T{(index + 1):03d}"  # T001, T002, T003...
+    old_to_new_id[task.id] = new_id
+```
+
+Examples:
+- T001 → T001 (unchanged)
+- T002 → T002 (unchanged)
+- T015 → T003 (renumbered)
+- T016 → T004 (renumbered)
+- T017 → T005 (renumbered)
+
+**7.3: Update Task IDs and Prerequisites**
+
+Edit `.tasks/[branch].yml` directly:
+
+1. For each task:
+   - Update `id` field using old_to_new_id mapping
+   
+2. For each task with `prerequisites`:
+   - Update each prerequisite ID using old_to_new_id mapping
+   - Example: `prerequisites: [T015, T016]` → `prerequisites: [T003, T004]`
+
+**7.4: Verify Renumbering**
+
+After renumbering, verify:
+- All task IDs are sequential: T001, T002, T003, T004, T005...
+- No gaps in numbering
+- All prerequisite references use new IDs
+- No prerequisite references point to non-existent tasks
+
+**Step 8: Validate and Report**
+
+**8.1: Validate Task File Schema**
+
+**Preferred: Use MCP tool** (if simpletask MCP server is available)
+```
+Use simpletask_get() MCP tool with validation:
+- Call simpletask_get(branch=None, validate=True)
+- Check validation.valid in response
+- If validation.valid is False, check validation.errors for details
+- Fix any validation errors before proceeding
+```
+
+**Fallback: Use CLI** (if MCP tools not available)
+```bash
+simpletask schema validate
+```
+
+If validation fails:
+- Review validation.errors
+- Fix issues in task file
+- Re-validate until validation.valid is True
+
+**8.2: Generate Split Summary**
+
+Calculate and display:
+- Original task count (before split)
+- Number of complex tasks identified
+- Number of atomic tasks kept as-is
+- New task count (after split)
+- Number of subtasks generated
+- Details of each split (which task became which subtasks)
+
+**8.3: Display Comprehensive Report**
+
+```
+╭─────────────────────────────────────────────────────────────╮
+│ Task Splitting Complete                                     │
+╰─────────────────────────────────────────────────────────────╯
+
+ORIGINAL STATE
+  Total Tasks: X
+  Complex Tasks (>2 steps): Y
+  Atomic Tasks (kept as-is): Z
+
+SPLITTING RESULTS
+  Tasks Removed: Y
+  Subtasks Generated: N
+  New Total Tasks: M
+
+SPLIT DETAILS
+  ✓ T001 "Create User model" (4 steps)
+    → T001 "Create User model file with base structure" (1 step)
+    → T002 "Add User model fields" (1 step)
+    → T003 "Add email unique constraint" (1 step)
+    → T004 "Implement hash_password method" (1 step)
+  
+  ✓ T003 "Implement /login endpoint" (6 steps)
+    → T005 "Create auth routes file" (1 step)
+    → T006 "Add /login endpoint skeleton" (1 step)
+    → T007 "Add login request validation" (1 step)
+    → T008 "Implement password verification logic" (1 step)
+    → T009 "Add JWT token generation" (1 step)
+    → T010 "Add login error handling" (1 step)
+  
+  ✓ T005 "Add authentication tests" (4 steps)
+    → T011 "Test user registration success" (1 step)
+    → T012 "Test registration validation" (1 step)
+    → T013 "Test login success" (1 step)
+    → T014 "Test login failure" (1 step)
+
+COGNITIVE LOAD REDUCTION
+  Average steps per task:
+    Before: 4.2 steps
+    After: 1.3 steps
+  
+  Estimated completion time per task:
+    Before: 15-30 minutes
+    After: 5-10 minutes
+
+VALIDATION
+  Schema: ✓ Valid
+  Task IDs: ✓ Sequential (T001-T014)
+  Prerequisites: ✓ All valid references
+
+───────────────────────────────────────────────────────────────
+READY FOR IMPLEMENTATION
+
+Each task is now atomic with minimal context needed.
+Any AI model can execute these tasks without ambiguity.
+
+Next steps:
+  - Review split tasks: simpletask show
+  - Start implementation: /simpletask.implement
+  - Check task list: simpletask task list
+───────────────────────────────────────────────────────────────
+```
+
+---
+
+## Splitting Strategy Guidelines
+
+### When to Split Aggressively
+
+**Always split if the task involves:**
+
+1. **Multiple files** - Each file operation should be separate
+2. **Multiple methods/functions** - Each method should be separate
+3. **Create + Configure** - Split setup from implementation
+4. **Implementation + Testing** - Split code from tests
+5. **Multiple test cases** - Each test case separate
+
+### When to Keep Tasks Together
+
+**Do NOT split if:**
+
+1. **Single atomic operation** - One file, one function, one purpose
+2. **Tightly coupled steps** - Steps cannot be verified independently
+3. **Context-dependent** - Bug fixes where full context prevents regressions
+
+### Subtask Size Guidelines
+
+**Target metrics for each subtask:**
+
+- **1-2 steps** maximum
+- **5-10 minutes** to complete
+- **1 file** modified (preferably)
+- **1-2 done_when** conditions
+- **No decisions** left to implementer
+
+**If a subtask takes >10 minutes or has >2 steps, it should be split further.**
+
+### Prerequisite Chain Design
+
+**Linear chains** (sequential dependencies):
+```yaml
+T001 → T002 → T003 → T004
+```
+Each task depends on the one before it.
+
+**Parallel branches** (independent work):
+```yaml
+     → T002
+T001 → T003 → T005
+     → T004
+```
+T002, T003, T004 can run in parallel after T001.
+
+**Converging dependencies** (join point):
+```yaml
+T001 → T003
+T002 → T003
+```
+T003 requires both T001 and T002 complete.
+
+---
+
+## CLI Command Reference
+
+### View Task Information
+
+**Preferred: Use MCP tools** (if simpletask MCP server is available)
+```
+Use simpletask_get() MCP tool to retrieve complete task data:
+- Returns SimpleTaskGetResponse with spec and summary
+- spec.tasks: array of all tasks with full details
+- summary: pre-computed status counts
+
+Filter and query the response data:
+- Filter spec.tasks by status field: "not_started", "in_progress", "completed", "blocked"
+- Count tasks: len(spec.tasks)
+- Get task by ID: next((t for t in spec.tasks if t.id == "T001"), None)
+```
+
+**Fallback: Use CLI** (if MCP tools not available)
+```bash
+# Show full task details
+simpletask show
+
+# List all tasks
+simpletask task list
+
+# List tasks by status
+simpletask task list --status not_started
+simpletask task list --status completed
+```
+
+### Remove Tasks
+
+**Preferred: Use MCP tools** (if simpletask MCP server is available)
+```
+Use simpletask_task() MCP tool:
+
+# Remove a task
+simpletask_task(action="remove", task_id="T001")
+
+# Returns SimpleTaskWriteResponse with confirmation
+```
+
+**Fallback: Use CLI** (if MCP tools not available)
+```bash
+# Remove a task
+simpletask task remove T001
+```
+
+### Add Tasks
+
+**Preferred: Use MCP tools** (if simpletask MCP server is available)
+```
+Use simpletask_task() MCP tool:
+
+# Add a task (basic fields only)
+simpletask_task(
+  action="add",
+  name="Task name",
+  goal="Task goal description",
+  steps=["Step 1", "Step 2"]
+)
+
+# Returns SimpleTaskWriteResponse with new task ID
+
+# Then edit .tasks/[branch].yml directly to add:
+# - done_when
+# - files
+# - code_examples
+# - prerequisites
+```
+
+**Fallback: Use CLI** (if MCP tools not available)
+```bash
+# Add a task
+simpletask task add "Task name" -g "Task goal description"
+
+# Then edit .tasks/[branch].yml directly to add full details
+```
+
+### Validation
+
+**Preferred: Use MCP tools** (if simpletask MCP server is available)
+```
+Use simpletask_get() MCP tool with validation:
+
+# Validate task file
+simpletask_get(validate=True)
+# Check validation.valid and validation.errors in response
+```
+
+**Fallback: Use CLI** (if MCP tools not available)
+```bash
+# Validate task file
+simpletask schema validate
+```
+
+---
+
+## Edge Cases & Troubleshooting
+
+### No Complex Tasks Found
+
+**Scenario:** All tasks already have ≤2 steps
+
+**Handling:**
+```
+Report:
+"No complex tasks found. All tasks are already atomic.
+
+Task Analysis:
+- Total tasks: X
+- Tasks with 1 step: Y
+- Tasks with 2 steps: Z
+- No splitting needed.
+
+Ready for implementation: /simpletask.implement"
+```
+
+### Task Already Very Atomic
+
+**Scenario:** Task has 1 simple step like "Add import statement to file.py"
+
+**Handling:**
+- Skip it - do not split
+- Keep in atomic_tasks list
+- Preserve exactly as-is in final task list
+
+### Task with Multiple Prerequisites
+
+**Scenario:** Original task has `prerequisites: [T001, T002, T005]`
+
+**Handling:**
+- First subtask inherits ALL prerequisites: `prerequisites: [T001, T002, T005]`
+- Subsequent subtasks depend on previous subtask only
+- Example:
+  ```yaml
+  # Original: prerequisites: [T001, T002]
+  
+  # After split:
+  - id: T010  # First subtask
+    prerequisites: [T001, T002]  # Inherits all
+  
+  - id: T011  # Second subtask
+    prerequisites: [T010]  # Only depends on previous
+  ```
+
+### Code Example Applies to Multiple Subtasks
+
+**Scenario:** Code example shows pattern used in 3 different subtasks
+
+**Handling:**
+- Duplicate the code example to all 3 relevant subtasks
+- Each subtask should be self-contained with all context needed
+- Redundancy is acceptable to reduce cognitive load
+
+### Split Creates >10 Subtasks
+
+**Scenario:** Original task is extremely complex and splits into 12+ subtasks
+
+**Handling:**
+- Proceed with split but add warning
+- Report: "⚠ Task 'X' split into 12 subtasks - consider grouping related subtasks"
+- Still complete the split - more atomic is better than less
+
+### Prerequisite Chain Becomes Very Long
+
+**Scenario:** After split, have T001 → T002 → T003 → ... → T015 (linear chain)
+
+**Handling:**
+- This is expected and correct
+- Long chains are fine - they represent natural ordering
+- Do NOT try to parallelize if steps must be sequential
+
+### Task Has No Files Array
+
+**Scenario:** Task doesn't specify which files to modify
+
+**Handling:**
+- Split by logical steps only
+- Don't add `files` array if original didn't have it
+- Focus on step-based splitting
+
+### Task Has No Done When Conditions
+
+**Scenario:** Original task missing `done_when` array
+
+**Handling:**
+- Generate basic done_when from steps
+- Example:
+  ```yaml
+  steps:
+    - Create file src/models/user.py
+  done_when:
+    - File src/models/user.py exists  # Generated from step
+  ```
+
+---
+
+## Important Reminders
+
+**WHY we split tasks:**
+- Reduce cognitive load for AI models
+- Eliminate ambiguity and decision-making during execution
+- Ensure ANY LLM can execute tasks correctly
+- Make each task verifiable independently
+- Enable better parallelization where possible
+
+**WHAT makes a good subtask:**
+- 1-2 steps only
+- 5-10 minute completion time
+- Single clear objective
+- No ambiguity or decisions
+- Self-contained with all context needed
+
+**WHAT to avoid:**
+- Subtasks that require multiple decisions
+- Subtasks that modify multiple unrelated files
+- Subtasks with vague goals like "Set up feature"
+- Subtasks that depend on unclear state
+
+**After splitting:**
+- All task IDs are sequential (T001, T002, T003...)
+- All prerequisites use new IDs
+- All subtasks have ≤2 steps
+- Task file validates successfully
+- Ready for /simpletask.implement
+"""
