@@ -129,61 +129,67 @@ For EACH complex task, generate atomic subtasks using these patterns:
 
 ---
 
-## Step 4: Remove Original Complex Tasks
+## Step 4: Apply Changes Atomically with Batch Operations
+
+**CRITICAL:** Use batch operations to remove complex tasks and add subtasks atomically. All operations succeed or all fail - no partial states.
 
 **Using MCP tools** (preferred):
-```
-For each task in complex_tasks:
-  simpletask_task(action="remove", task_id=task.id)
-```
+```python
+# Build operations list
+operations = []
 
-**Using CLI** (fallback):
-```bash
-simpletask task remove T001
-simpletask task remove T003
-# ... for each complex task
-```
+# Add remove operations for complex tasks
+for task in complex_tasks:
+    operations.append({"op": "remove", "task_id": task.id})
 
----
+# Add create operations for subtasks
+for subtask in generated_subtasks:
+    operations.append({
+        "op": "add",
+        "name": subtask.name,
+        "goal": subtask.goal,
+        "steps": subtask.steps
+    })
 
-## Step 5: Add Generated Subtasks
-
-**Using MCP tools** (preferred):
-```
-For each subtask:
-  simpletask_task(
-    action="add",
-    name=subtask.name,
-    goal=subtask.goal,
-    steps=subtask.steps
-  )
-  # Store returned task ID
+# Execute atomically
+result = simpletask_task(action="batch", operations=operations)
+# Returns: SimpleTaskBatchResponse with new_item_ids list
 ```
 
-**IMPORTANT:** MCP tool only accepts name, goal, steps. After adding all subtasks, edit `.tasks/[branch].yml` directly to add:
+**IMPORTANT:** MCP batch operation only accepts name, goal, steps. After batch completes, edit `.tasks/[branch].yml` directly to add:
 - `done_when` conditions
 - `files` array
 - `code_examples` array
 - `prerequisites` array
 
-**Using CLI** (fallback):
+**Using CLI** (fallback - NOT atomic):
 ```bash
-simpletask task add "Task name" -g "Task goal"
+# Remove complex tasks
+simpletask task remove T001
+simpletask task remove T003
+
+# Add subtasks
+simpletask task add "Subtask name" -g "Subtask goal"
 # Then edit .tasks/[branch].yml to add full details
 ```
 
+**Why batch operations?**
+- Atomic: All changes apply or none do
+- No inconsistent intermediate states if interrupted
+- Single write operation for better performance
+
 ---
 
-## Step 6: Renumber Task IDs Sequentially
+## Step 5: Renumber Task IDs Sequentially
 
 **CRITICAL:** Renumber ALL tasks to sequential IDs (T001, T002, T003...) and update prerequisites.
 
-**6.1: Load updated task file**
+**5.1: Load updated task file**
 ```
 simpletask_get(branch=None)
 ```
 
-**6.2: Create ID mapping**
+**5.2: Create ID mapping**
 ```python
 old_to_new_id = {}
 for index, task in enumerate(spec.tasks):
@@ -191,7 +197,7 @@ for index, task in enumerate(spec.tasks):
     old_to_new_id[task.id] = new_id
 ```
 
-**6.3: Update IDs and prerequisites**
+**5.3: Update IDs and prerequisites**
 
 Edit `.tasks/[branch].yml` directly:
 1. Update each task's `id` field using mapping
@@ -199,14 +205,14 @@ Edit `.tasks/[branch].yml` directly:
 
 Example: `prerequisites: [T015, T016]` → `prerequisites: [T003, T004]`
 
-**6.4: Verify**
+**5.4: Verify**
 - All IDs sequential with no gaps
 - All prerequisite references valid
 - No references to non-existent tasks
 
 ---
 
-## Step 7: Validate and Report
+## Step 6: Validate and Report
 
 **Validate schema:**
 ```
@@ -335,6 +341,19 @@ simpletask_task(
 
 # Remove task
 simpletask_task(action="remove", task_id="T001")
+
+# Batch operations (ATOMIC - all succeed or all fail)
+simpletask_task(
+  action="batch",
+  operations=[
+    {"op": "remove", "task_id": "T001"},
+    {"op": "remove", "task_id": "T002"},
+    {"op": "add", "name": "New Task 1", "goal": "First subtask", "steps": ["Step 1"]},
+    {"op": "add", "name": "New Task 2", "goal": "Second subtask", "steps": ["Step 1"]},
+    {"op": "update", "task_id": "T003", "status": "completed"},
+  ]
+)
+# Returns: SimpleTaskBatchResponse with new_item_ids list
 ```
 
 **List all tasks:**

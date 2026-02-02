@@ -170,10 +170,147 @@ def remove_implementation_task(
 
     # Clean up prerequisite references to the removed task
     for task in spec.tasks:
-        if task.prerequisites and removed_id in task.prerequisites:
-            task.prerequisites.remove(removed_id)
+        if task.prerequisites:
+            task.prerequisites = [p for p in task.prerequisites if p != removed_id]
             if not task.prerequisites:  # Clean up empty list
                 task.prerequisites = None
 
     # Write back (auto-updates timestamp)
     write_task_file(file_path, spec)
+
+
+def batch_tasks(file_path: Path, operations: list[dict | object]) -> list[str]:
+    """Perform multiple task operations atomically.
+
+    All operations are performed in memory before writing. If any operation
+    fails, none of the changes are written to disk.
+
+    Args:
+        file_path: Path to task YAML file
+        operations: List of BatchTaskOperation dicts or objects
+
+    Returns:
+        List of newly created task IDs (from add operations)
+
+    Raises:
+        ValueError: If any operation fails validation
+        FileNotFoundError: If task file doesn't exist
+        InvalidTaskFileError: If task file cannot be repaired
+    """
+    # Parse existing file (with automatic repair if needed)
+    try:
+        spec = parse_task_file(file_path)
+    except InvalidTaskFileError:
+        # Attempt automatic repair for common issues
+        spec = repair_task_file(file_path)
+
+    # Ensure tasks list exists
+    if spec.tasks is None:
+        spec.tasks = []
+
+    # Convert all operations to dicts once upfront for efficiency
+    ops_as_dicts = [op if isinstance(op, dict) else op.model_dump() for op in operations]
+
+    # Validate all operations upfront (fail fast before making any changes)
+    existing_task_ids = {t.id for t in spec.tasks}
+    remove_ids = {
+        op_dict.get("task_id") for op_dict in ops_as_dicts if op_dict.get("op") == "remove"
+    }
+
+    for i, op_dict in enumerate(ops_as_dicts):
+        op_type = op_dict.get("op")
+        task_id = op_dict.get("task_id")
+
+        # Validate remove/update operations have existing task_id
+        if op_type in ("remove", "update"):
+            if not task_id:
+                raise ValueError(f"Operation {i}: task_id required for {op_type}")
+            if task_id not in existing_task_ids:
+                raise ValueError(
+                    f"Operation {i}: task {task_id} not found. "
+                    f"Available: {sorted(existing_task_ids)}"
+                )
+
+        # Critical: Detect remove+update conflicts
+        if op_type == "update":
+            if task_id in remove_ids:
+                raise ValueError(
+                    f"Operation {i}: Cannot update task {task_id} - "
+                    f"it is being removed in the same batch"
+                )
+
+        # Validate add operations have name
+        if op_type == "add":
+            if not op_dict.get("name"):
+                raise ValueError(f"Operation {i}: name required for add operation")
+
+        # Validate status values for update operations
+        if op_type == "update" and op_dict.get("status") is not None:
+            try:
+                TaskStatus(op_dict["status"])
+            except ValueError:
+                valid = [s.value for s in TaskStatus]
+                raise ValueError(
+                    f"Operation {i}: Invalid status '{op_dict['status']}'. Valid values: {valid}"
+                ) from None
+
+    # Process remove operations (single-pass optimization)
+    if remove_ids:
+        spec.tasks = [t for t in spec.tasks if t.id not in remove_ids]
+
+        # Clean up prerequisite references to removed tasks
+        for task in spec.tasks:
+            if task.prerequisites:
+                task.prerequisites = [p for p in task.prerequisites if p not in remove_ids]
+                if not task.prerequisites:  # Clean up empty list
+                    task.prerequisites = None
+
+    # Process update operations
+    for op_dict in ops_as_dicts:
+        if op_dict.get("op") == "update":
+            task_id = op_dict["task_id"]
+            # Find task
+            task_maybe = next((t for t in spec.tasks if t.id == task_id), None)
+            if not task_maybe:  # Should not happen due to validation
+                continue
+            task = task_maybe
+
+            # Update fields if provided
+            if op_dict.get("name") is not None:
+                task.name = op_dict["name"]
+            if op_dict.get("goal") is not None:
+                task.goal = op_dict["goal"]
+            if op_dict.get("status") is not None:
+                task.status = TaskStatus(op_dict["status"])
+
+    # Process add operations
+    new_task_ids = []
+    for op_dict in ops_as_dicts:
+        if op_dict.get("op") == "add":
+            # Generate new task ID
+            new_id = get_next_task_id(spec.tasks)
+
+            # Default goal to name if not provided
+            goal = op_dict.get("goal") or op_dict["name"]
+
+            # Default steps to placeholder if not provided or empty
+            steps = op_dict.get("steps")
+            if not steps:
+                steps = ["To be defined"]
+
+            # Create new task
+            new_task = Task(
+                id=new_id,
+                name=op_dict["name"],
+                goal=goal,
+                status=TaskStatus.NOT_STARTED,
+                steps=steps,
+            )
+
+            spec.tasks.append(new_task)
+            new_task_ids.append(new_id)
+
+    # Write back atomically (single write after all operations succeed)
+    write_task_file(file_path, spec)
+
+    return new_task_ids

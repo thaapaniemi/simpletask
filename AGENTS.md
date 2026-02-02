@@ -668,7 +668,7 @@ The MCP server exposes 7 tools for task management:
 | `get` | Get complete task specification with status summary | `validate` (bool, optional): Include schema validation (default: false) |
 | `list` | List all task file branch names in the project | None |
 | `new` | Create a new task file | `branch` (str): Branch identifier<br>`title` (str): Task title<br>`prompt` (str): Original user request<br>`criteria` (list[str] \| None, optional): Acceptance criteria |
-| `task` | Manage implementation tasks (add/update/remove/get) | `action` (str): 'add', 'update', 'remove', or 'get'<br>`task_id` (str, optional): Task ID (required for update/remove/get)<br>`name` (str, optional): Task name (required for add)<br>`goal` (str, optional): Task goal/description<br>`status` (str, optional): Status for update ('not_started', 'in_progress', 'completed', 'blocked', 'paused')<br>`steps` (list[str] \| None, optional): Task steps for add action. None or [] adds placeholder ['To be defined'] |
+| `task` | Manage implementation tasks (add/update/remove/get/batch) | `action` (str): 'add', 'update', 'remove', 'get', or 'batch'<br>`task_id` (str, optional): Task ID (required for update/remove/get)<br>`name` (str, optional): Task name (required for add)<br>`goal` (str, optional): Task goal/description<br>`status` (str, optional): Status for update ('not_started', 'in_progress', 'completed', 'blocked', 'paused')<br>`steps` (list[str] \| None, optional): Task steps for add action. None or [] adds placeholder ['To be defined']<br>`operations` (list[dict], optional): List of BatchTaskOperation dicts (required for batch action) |
 | `criteria` | Manage acceptance criteria (add/complete/remove/get) | `action` (str): 'add', 'complete', 'remove', or 'get'<br>`criterion_id` (str, optional): Criterion ID (required for complete/remove/get)<br>`description` (str, optional): Description (required for add)<br>`completed` (bool, optional): Completion status for 'complete' (default: true) |
 | `quality` | Manage quality requirements (check/set/get/preset) | `action` (str): 'check', 'set', 'get', or 'preset'<br>`config_type` (str, optional): 'linting', 'type-checking', 'testing', or 'security' (for set action)<br>`tool` (str, optional): Tool name from ToolName enum (for set action)<br>`args` (list[str], optional): Tool arguments (for set action)<br>`enabled` (bool, optional): Enable/disable check (for set action)<br>`min_coverage` (int, optional): Minimum coverage % (for testing config only)<br>`preset_name` (str, optional): Preset name (for preset action)<br>Check filters: `lint_only`, `test_only`, `type_only`, `security_only` (bool, for check action) |
 | `design` | Manage design section (set/get/remove) | `action` (str): 'set', 'get', or 'remove'<br>`field` (str, optional): Field to modify: 'pattern', 'reference', 'constraint', 'security', 'error-handling' (for set/remove)<br>`value` (str, optional): Value to add (for set action)<br>`reason` (str, optional): Reason for reference (required when field='reference')<br>`index` (int, optional): Index to remove (for remove action on list fields)<br>`all` (bool, optional): Remove all items or entire section (for remove action) |
@@ -783,21 +783,23 @@ result = new(
 
 #### task
 
-Unified tool for managing implementation tasks with four actions.
+Unified tool for managing implementation tasks with five actions.
 
 **Parameters:**
-- `action`: Operation to perform ('add', 'update', 'remove', 'get')
+- `action`: Operation to perform ('add', 'update', 'remove', 'get', 'batch')
 - `task_id` (optional): Task ID (required for update/remove/get, e.g., 'T001')
 - `name` (optional): Task name (required for add)
 - `goal` (optional): Task goal/description
 - `status` (optional): Task status for update only. Valid values: 'not_started', 'in_progress', 'completed', 'blocked', 'paused'. **Note:** 'add' action ignores this parameter - new tasks always start as `not_started`.
 - `steps` (optional): List of detailed task steps for add action. None or [] adds placeholder step ['To be defined']. Only applies when action='add'.
+- `operations` (optional): List of BatchTaskOperation dicts (required for batch action)
 
 **Note:** This tool always uses the current git branch.
 
 **Returns:** 
 - `SimpleTaskWriteResponse` for write operations (add/update/remove)
 - `SimpleTaskItemResponse` for get operations
+- `SimpleTaskBatchResponse` for batch operations
 
 **Response Structures:**
 
@@ -866,6 +868,65 @@ result = task(
     action="get",
     task_id="T001"
 )
+
+# Batch operations (atomic: all succeed or all fail)
+result = task(
+    action="batch",
+    operations=[
+        {"op": "remove", "task_id": "T001"},
+        {"op": "remove", "task_id": "T002"},
+        {"op": "add", "name": "New Task 1", "goal": "First atomic task", "steps": ["Step 1"]},
+        {"op": "add", "name": "New Task 2", "goal": "Second atomic task", "steps": ["Step 1"]},
+        {"op": "update", "task_id": "T003", "status": "completed"},
+    ]
+)
+# Returns SimpleTaskBatchResponse with new_item_ids: ["T003", "T004"] for the two added tasks
+```
+
+**Batch Operation Details:**
+
+The `batch` action provides atomic task operations. All operations in a batch either succeed together or fail together, with no partial updates to the task file.
+
+**BatchTaskOperation Structure:**
+```python
+{
+  "op": str,  # Operation type: "add", "update", or "remove"
+  
+  # For "add" operations:
+  "name": str,  # Task name (required)
+  "goal": str,  # Task goal/description (optional, defaults to name)
+  "steps": list[str] | None,  # Task steps (optional, None/[] adds placeholder)
+  
+  # For "update" operations:
+  "task_id": str,  # Task ID to update (required)
+  "name": str | None,  # New task name (optional)
+  "goal": str | None,  # New task goal (optional)
+  "status": str | None,  # New status: 'not_started', 'in_progress', 'completed', 'blocked', 'paused' (optional)
+  
+  # For "remove" operations:
+  "task_id": str,  # Task ID to remove (required)
+}
+```
+
+**Note:** `prerequisites`, `done_when`, `files`, and `code_examples` fields cannot be set via batch operations. These must be added by directly editing `.tasks/<branch>.yml` after the batch completes.
+
+**Atomicity Guarantee:**
+- All operations are validated before any changes are applied
+- If any operation is invalid, the entire batch fails with detailed error messages
+- Task file is written only once, after all operations succeed
+- Prerequisite references are automatically cleaned up when tasks are removed
+- New task IDs are generated sequentially after all removals complete
+
+**SimpleTaskBatchResponse Structure:**
+```python
+{
+  "success": bool,
+  "action": str,  # "batch_completed"
+  "message": str,  # Summary of operations performed
+  "file_path": str,
+  "summary": StatusSummary,
+  "new_item_ids": list[str]  # IDs of newly added tasks in order
+}
 ```
 
 **Edge Cases:**
@@ -873,6 +934,7 @@ result = task(
 - Task ID not found → raises `ValueError`
 - Invalid status value → raises `ValueError`
 - Status provided with action='add' → status is ignored, task created as `not_started`
+- Batch operation with invalid operations → raises `ValueError` with detailed validation errors
 
 #### criteria
 

@@ -9,6 +9,7 @@ import builtins
 from typing import Literal, cast
 
 from mcp.server.fastmcp import FastMCP
+from pydantic import ValidationError
 
 from ..core.criteria_ops import (
     add_acceptance_criterion,
@@ -35,13 +36,16 @@ from ..core.quality_ops import (
 from ..core.task_file_ops import create_task_file
 from ..core.task_ops import (
     add_implementation_task,
+    batch_tasks,
     remove_implementation_task,
     update_implementation_task,
 )
 from ..core.validation import validate_task_file
 from ..core.yaml_parser import parse_task_file, write_task_file
 from .models import (
+    BatchTaskOperation,
     QualityCheckResult,
+    SimpleTaskBatchResponse,
     SimpleTaskDesignResponse,
     SimpleTaskGetResponse,
     SimpleTaskItemResponse,
@@ -197,17 +201,18 @@ def new(
 
 @mcp.tool()
 def task(
-    action: Literal["add", "update", "remove", "get"],
+    action: Literal["add", "update", "remove", "get", "batch"],
     task_id: str | None = None,
     name: str | None = None,
     goal: str | None = None,
     status: str | None = None,
     steps: _list[str] | None = None,
-) -> SimpleTaskWriteResponse | SimpleTaskItemResponse:
+    operations: _list[dict] | None = None,
+) -> SimpleTaskWriteResponse | SimpleTaskItemResponse | SimpleTaskBatchResponse:
     """Manage implementation tasks.
 
     Args:
-        action: Operation to perform ('add', 'update', 'remove', 'get')
+        action: Operation to perform ('add', 'update', 'remove', 'get', 'batch')
         task_id: Task ID (required for update/remove/get)
         name: Task name (required for add)
         goal: Task goal/description
@@ -215,10 +220,12 @@ def task(
                Note: 'add' action ignores this - new tasks always start as not_started
         steps: List of detailed task steps (optional for add). None or [] adds placeholder step ['To be defined'].
                Only applies to action='add'.
+        operations: List of BatchTaskOperation dicts (required for batch action)
 
     Returns:
         SimpleTaskWriteResponse for write operations (add/update/remove).
         SimpleTaskItemResponse for get operations.
+        SimpleTaskBatchResponse for batch operations.
 
     Raises:
         ValueError: If required parameters missing or invalid values provided.
@@ -298,6 +305,33 @@ def task(
                 file_path=str(file_path),
                 summary=summary,
                 new_item_id=None,
+            )
+
+        case "batch":
+            if not operations:
+                raise ValueError("'operations' is required for action='batch'")
+            # Validate and convert operations to BatchTaskOperation objects
+            try:
+                validated_ops = [BatchTaskOperation(**op) for op in operations]
+            except ValidationError as e:
+                # Convert Pydantic validation errors to user-friendly message
+                errors = []
+                for err in e.errors():
+                    loc = ".".join(str(x) for x in err["loc"])
+                    errors.append(f"{loc}: {err['msg']}")
+                raise ValueError(f"Invalid batch operations: {'; '.join(errors)}") from e
+            # Execute batch operations atomically
+            new_task_ids = batch_tasks(file_path, validated_ops)
+            spec = parse_task_file(file_path)
+            summary = compute_status_summary(spec)
+            return SimpleTaskBatchResponse(
+                success=True,
+                action="batch_tasks_applied",
+                message=f"Applied {len(operations)} batch operations",
+                file_path=str(file_path),
+                summary=summary,
+                new_item_id=None,
+                new_item_ids=new_task_ids,
             )
 
 

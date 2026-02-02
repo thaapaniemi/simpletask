@@ -1,7 +1,10 @@
 """Unit tests for MCP models and helpers."""
 
+import pytest
+from pydantic import ValidationError
 from simpletask.core.models import SimpleTaskSpec
 from simpletask.mcp.models import (
+    BatchTaskOperation,
     SimpleTaskGetResponse,
     ValidationResult,
     compute_status_summary,
@@ -154,3 +157,74 @@ class TestSimpleTaskGetResponse:
         )
 
         assert response.validation is None
+
+
+class TestBatchTaskOperation:
+    """Tests for BatchTaskOperation model validation."""
+
+    def test_add_operation_valid(self):
+        """Test valid add operation with required name field."""
+        op = BatchTaskOperation(
+            op="add",
+            name="New task",
+            goal="Task goal",
+            steps=["Step 1", "Step 2"],
+        )
+        assert op.op == "add"
+        assert op.name == "New task"
+        assert op.goal == "Task goal"
+        assert op.steps == ["Step 1", "Step 2"]
+        assert op.task_id is None
+
+    def test_add_operation_missing_name_raises(self):
+        """Test add operation without name raises ValidationError."""
+        with pytest.raises(ValidationError, match="name is required for add operation"):
+            BatchTaskOperation(
+                op="add",
+                goal="Task goal",
+            )
+
+    def test_remove_operation_valid(self):
+        """Test valid remove operation with required task_id."""
+        op = BatchTaskOperation(
+            op="remove",
+            task_id="T001",
+        )
+        assert op.op == "remove"
+        assert op.task_id == "T001"
+        assert op.name is None
+
+    def test_remove_operation_missing_task_id_raises(self):
+        """Test remove operation without task_id raises ValidationError."""
+        with pytest.raises(ValidationError, match="task_id is required for remove operation"):
+            BatchTaskOperation(op="remove")
+
+    def test_update_operation_valid(self):
+        """Test valid update operation with required task_id."""
+        op = BatchTaskOperation(
+            op="update",
+            task_id="T002",
+            status="completed",
+            name="Updated name",
+        )
+        assert op.op == "update"
+        assert op.task_id == "T002"
+        assert op.status == "completed"
+        assert op.name == "Updated name"
+
+    def test_update_operation_missing_task_id_raises(self):
+        """Test update operation without task_id raises ValidationError."""
+        with pytest.raises(ValidationError, match="task_id is required for update operation"):
+            BatchTaskOperation(
+                op="update",
+                status="completed",
+            )
+
+    def test_extra_fields_forbidden(self):
+        """Test that extra fields are rejected."""
+        with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
+            BatchTaskOperation(
+                op="add",
+                name="Task",
+                invalid_field="value",
+            )

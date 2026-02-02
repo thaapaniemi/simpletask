@@ -4,7 +4,9 @@ This module defines Pydantic models for MCP tool responses,
 including status summaries and validation results.
 """
 
-from pydantic import BaseModel, Field
+from typing import Literal
+
+from pydantic import BaseModel, Field, model_validator
 
 from ..core.models import (
     AcceptanceCriterion,
@@ -16,7 +18,9 @@ from ..core.models import (
 )
 
 __all__ = [
+    "BatchTaskOperation",
     "QualityCheckResult",
+    "SimpleTaskBatchResponse",
     "SimpleTaskDesignResponse",
     "SimpleTaskGetResponse",
     "SimpleTaskItemResponse",
@@ -26,6 +30,34 @@ __all__ = [
     "ValidationResult",
     "compute_status_summary",
 ]
+
+
+class BatchTaskOperation(BaseModel):
+    """A single operation in a batch task modification request.
+
+    Used by simpletask_task tool with action='batch' to perform multiple
+    task operations (add, remove, update) atomically.
+    """
+
+    model_config = {"extra": "forbid"}
+
+    op: Literal["add", "remove", "update"] = Field(
+        ..., description="Operation type: 'add', 'remove', or 'update'"
+    )
+    task_id: str | None = Field(None, description="Task ID (required for remove/update)")
+    name: str | None = Field(None, description="Task name (required for add)")
+    goal: str | None = Field(None, description="Task goal/description")
+    status: str | None = Field(None, description="Task status (for update)")
+    steps: list[str] | None = Field(None, description="Task steps (for add)")
+
+    @model_validator(mode="after")
+    def validate_required_fields(self) -> "BatchTaskOperation":
+        """Validate that required fields are present based on operation type."""
+        if self.op in ("remove", "update") and not self.task_id:
+            raise ValueError(f"task_id is required for {self.op} operation")
+        if self.op == "add" and not self.name:
+            raise ValueError("name is required for add operation")
+        return self
 
 
 class QualityCheckResult(BaseModel):
@@ -98,6 +130,18 @@ class SimpleTaskWriteResponse(BaseModel):
     summary: StatusSummary = Field(..., description="Pre-computed status summary")
     new_item_id: str | None = Field(
         None, description="ID of newly created item (for add operations)"
+    )
+
+
+class SimpleTaskBatchResponse(SimpleTaskWriteResponse):
+    """Response model for batch task operations.
+
+    Extends SimpleTaskWriteResponse with new_item_ids for tracking multiple
+    created items from batch add operations.
+    """
+
+    new_item_ids: list[str] = Field(
+        default_factory=list, description="IDs of newly created items (for batch add operations)"
     )
 
 
