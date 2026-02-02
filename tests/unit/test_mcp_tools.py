@@ -15,34 +15,24 @@ class TestSimpletaskGet:
         """Test getting task for current branch."""
         _project_root, task_file = tmp_project_with_task
 
-        with patch("simpletask.mcp.server.get_task_file_path") as mock_path:
+        with patch("simpletask.mcp.server.get_current_task_file_path") as mock_path:
             mock_path.return_value = task_file
-            response = get(branch=None, validate=False)
+            response = get(validate=False)
 
             assert response.spec is not None
             assert response.spec.branch == "test-feature"
             assert response.file_path == str(task_file)
             assert response.summary is not None
             assert response.validation is None
-
-    def test_get_specific_branch(self, tmp_project_with_task):
-        """Verify branch parameter passed correctly."""
-        _project_root, task_file = tmp_project_with_task
-
-        with patch("simpletask.mcp.server.get_task_file_path") as mock_path:
-            mock_path.return_value = task_file
-            response = get(branch="test-feature", validate=False)
-
-            mock_path.assert_called_once_with("test-feature")
-            assert response.spec.branch == "test-feature"
+            mock_path.assert_called_once()
 
     def test_get_with_validation_valid(self, tmp_project_with_task):
         """Verify validation included when validate=True."""
         _project_root, task_file = tmp_project_with_task
 
-        with patch("simpletask.mcp.server.get_task_file_path") as mock_path:
+        with patch("simpletask.mcp.server.get_current_task_file_path") as mock_path:
             mock_path.return_value = task_file
-            response = get(branch=None, validate=True)
+            response = get(validate=True)
 
             assert response.validation is not None
             assert response.validation.valid is True
@@ -54,24 +44,24 @@ class TestSimpletaskGet:
         task_file = tmp_path / "invalid.yml"
         task_file.write_text("invalid: yaml: content:")
 
-        with patch("simpletask.mcp.server.get_task_file_path") as mock_path:
+        with patch("simpletask.mcp.server.get_current_task_file_path") as mock_path:
             mock_path.return_value = task_file
             with pytest.raises(InvalidTaskFileError):
-                get(branch=None, validate=True)
+                get(validate=True)
 
     def test_get_file_not_found(self, tmp_path):
         """Verify FileNotFoundError raised for non-existent file."""
-        with patch("simpletask.mcp.server.get_task_file_path") as mock_path:
+        with patch("simpletask.mcp.server.get_current_task_file_path") as mock_path:
             mock_path.return_value = tmp_path / "nonexistent.yml"
             with pytest.raises(FileNotFoundError):
-                get(branch="nonexistent-branch")
+                get()
 
     def test_get_invalid_yaml(self, tmp_path):
         """Verify InvalidTaskFileError raised for malformed YAML."""
         task_file = tmp_path / "bad.yml"
         task_file.write_text("{ invalid yaml content")
 
-        with patch("simpletask.mcp.server.get_task_file_path") as mock_path:
+        with patch("simpletask.mcp.server.get_current_task_file_path") as mock_path:
             mock_path.return_value = task_file
             with pytest.raises(InvalidTaskFileError):
                 get()
@@ -121,36 +111,6 @@ class TestSimpletaskList:
 
 class TestSecurityPathTraversal:
     """Security tests for path traversal attacks via branch parameter."""
-
-    def test_path_traversal_dotdot(self, tmp_project):
-        """Verify ../../ sequences cannot escape .tasks directory."""
-        # The normalize_branch_name function should convert .. to --
-        # This test verifies it doesn't allow reading files outside .tasks/
-        with pytest.raises((FileNotFoundError, ValueError)):
-            get(branch="../../etc/passwd")
-
-    def test_path_traversal_encoded(self, tmp_project):
-        """Verify encoded path traversal is normalized safely."""
-        # Branch names with dots get normalized
-        with pytest.raises((FileNotFoundError, ValueError)):
-            get(branch="....//....//etc/passwd")
-
-    def test_branch_with_slashes(self, tmp_project_with_task):
-        """Verify branch names with slashes work correctly."""
-        # feature/auth -> feature-auth.yml
-        _project_root, task_file = tmp_project_with_task
-
-        with patch("simpletask.mcp.server.get_task_file_path") as mock:
-            mock.return_value = task_file
-            result = get(branch="feature/auth")
-            assert result.spec is not None
-
-    def test_branch_with_unicode(self, tmp_project):
-        """Verify branch with unicode chars normalized."""
-        # Unicode characters should be normalized to ASCII
-        # This should not raise an exception, just file not found
-        with pytest.raises(FileNotFoundError):
-            get(branch="feature/café")
 
 
 class TestListBuiltinShadowing:
@@ -236,9 +196,9 @@ class TestMCPServerRegistration:
 
         # Verify all 7 tools are registered with simple names
         expected_tools = {"get", "list", "new", "task", "criteria", "quality", "design"}
-        assert (
-            registered_tools == expected_tools
-        ), f"Expected tools {expected_tools}, but found {registered_tools}"
+        assert registered_tools == expected_tools, (
+            f"Expected tools {expected_tools}, but found {registered_tools}"
+        )
 
         # Verify no tools have the simpletask_ prefix (that's added by MCP client)
         prefixed_tools = {name for name in registered_tools if name.startswith("simpletask_")}

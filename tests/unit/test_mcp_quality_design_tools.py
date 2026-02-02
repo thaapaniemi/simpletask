@@ -87,7 +87,7 @@ class TestQualityToolGet:
     """Tests for quality tool 'get' action."""
 
     @patch("simpletask.mcp.server.parse_task_file")
-    @patch("simpletask.mcp.server.get_task_file_path")
+    @patch("simpletask.mcp.server.get_current_task_file_path")
     def test_get_returns_quality_requirements(
         self, mock_get_path, mock_parse, sample_spec_with_quality
     ):
@@ -110,7 +110,7 @@ class TestQualityToolCheck:
 
     @patch("simpletask.mcp.server.run_quality_checks")
     @patch("simpletask.mcp.server.parse_task_file")
-    @patch("simpletask.mcp.server.get_task_file_path")
+    @patch("simpletask.mcp.server.get_current_task_file_path")
     def test_check_runs_all_enabled_checks(
         self, mock_get_path, mock_parse, mock_run_checks, sample_spec_with_quality
     ):
@@ -144,7 +144,7 @@ class TestQualityToolCheck:
 
     @patch("simpletask.mcp.server.run_quality_checks")
     @patch("simpletask.mcp.server.parse_task_file")
-    @patch("simpletask.mcp.server.get_task_file_path")
+    @patch("simpletask.mcp.server.get_current_task_file_path")
     def test_check_detects_failures(
         self, mock_get_path, mock_parse, mock_run_checks, sample_spec_with_quality
     ):
@@ -183,7 +183,7 @@ class TestQualityToolSet:
 
     @patch("simpletask.mcp.server.write_task_file")
     @patch("simpletask.mcp.server.parse_task_file")
-    @patch("simpletask.mcp.server.get_task_file_path")
+    @patch("simpletask.mcp.server.get_current_task_file_path")
     def test_set_linting_config(
         self, mock_get_path, mock_parse, mock_write, sample_spec_with_quality
     ):
@@ -209,7 +209,7 @@ class TestQualityToolSet:
 
     @patch("simpletask.mcp.server.write_task_file")
     @patch("simpletask.mcp.server.parse_task_file")
-    @patch("simpletask.mcp.server.get_task_file_path")
+    @patch("simpletask.mcp.server.get_current_task_file_path")
     def test_set_testing_with_coverage(
         self, mock_get_path, mock_parse, mock_write, sample_spec_with_quality
     ):
@@ -229,7 +229,7 @@ class TestQualityToolSet:
         assert written_spec.quality_requirements.testing.min_coverage == 90
 
     @patch("simpletask.mcp.server.parse_task_file")
-    @patch("simpletask.mcp.server.get_task_file_path")
+    @patch("simpletask.mcp.server.get_current_task_file_path")
     def test_set_requires_config_type(self, mock_get_path, mock_parse, sample_spec_with_quality):
         """Quality set action requires config_type parameter."""
         mock_get_path.return_value = Path(".tasks/test-feature.yml")
@@ -239,7 +239,7 @@ class TestQualityToolSet:
             quality(action="set", config_type=None)
 
     @patch("simpletask.mcp.server.parse_task_file")
-    @patch("simpletask.mcp.server.get_task_file_path")
+    @patch("simpletask.mcp.server.get_current_task_file_path")
     def test_set_validates_config_type(self, mock_get_path, mock_parse, sample_spec_with_quality):
         """Quality set action validates config_type parameter."""
         mock_get_path.return_value = Path(".tasks/test-feature.yml")
@@ -249,7 +249,7 @@ class TestQualityToolSet:
             quality(action="set", config_type="invalid")
 
     @patch("simpletask.mcp.server.parse_task_file")
-    @patch("simpletask.mcp.server.get_task_file_path")
+    @patch("simpletask.mcp.server.get_current_task_file_path")
     def test_set_validates_tool_name(self, mock_get_path, mock_parse, sample_spec_with_quality):
         """Quality set action validates tool name against ToolName enum."""
         mock_get_path.return_value = Path(".tasks/test-feature.yml")
@@ -259,7 +259,7 @@ class TestQualityToolSet:
             quality(action="set", config_type="linting", tool="invalid-tool")
 
     @patch("simpletask.mcp.server.parse_task_file")
-    @patch("simpletask.mcp.server.get_task_file_path")
+    @patch("simpletask.mcp.server.get_current_task_file_path")
     def test_set_validates_min_coverage_only_for_testing(
         self, mock_get_path, mock_parse, sample_spec_with_quality
     ):
@@ -285,7 +285,7 @@ class TestQualityToolPreset:
 
     @patch("simpletask.mcp.server.write_task_file")
     @patch("simpletask.mcp.server.parse_task_file")
-    @patch("simpletask.mcp.server.get_task_file_path")
+    @patch("simpletask.mcp.server.get_current_task_file_path")
     def test_preset_applies_python_preset(
         self, mock_get_path, mock_parse, mock_write, sample_spec_with_quality
     ):
@@ -309,7 +309,7 @@ class TestQualityToolPreset:
         assert written_spec.quality_requirements.type_checking.tool == ToolName.MYPY
 
     @patch("simpletask.mcp.server.parse_task_file")
-    @patch("simpletask.mcp.server.get_task_file_path")
+    @patch("simpletask.mcp.server.get_current_task_file_path")
     def test_preset_requires_preset_name(self, mock_get_path, mock_parse, sample_spec_with_quality):
         """Quality preset action requires preset_name parameter."""
         mock_get_path.return_value = Path(".tasks/test-feature.yml")
@@ -323,7 +323,7 @@ class TestDesignToolGet:
     """Tests for design tool 'get' action."""
 
     @patch("simpletask.mcp.server.parse_task_file")
-    @patch("simpletask.mcp.server.get_task_file_path")
+    @patch("simpletask.mcp.server.get_current_task_file_path")
     def test_get_returns_design_section(self, mock_get_path, mock_parse, sample_spec_with_design):
         """Design get action returns current design section."""
         mock_get_path.return_value = Path(".tasks/test-feature.yml")
@@ -338,7 +338,7 @@ class TestDesignToolGet:
         assert result.design.error_handling.value == "result_type"
 
     @patch("simpletask.mcp.server.parse_task_file")
-    @patch("simpletask.mcp.server.get_task_file_path")
+    @patch("simpletask.mcp.server.get_current_task_file_path")
     def test_get_returns_none_when_no_design(
         self, mock_get_path, mock_parse, sample_spec_with_quality
     ):
@@ -357,7 +357,7 @@ class TestDesignToolSet:
 
     @patch("simpletask.mcp.server.write_task_file")
     @patch("simpletask.mcp.server.parse_task_file")
-    @patch("simpletask.mcp.server.get_task_file_path")
+    @patch("simpletask.mcp.server.get_current_task_file_path")
     def test_set_patterns(self, mock_get_path, mock_parse, mock_write, sample_spec_with_quality):
         """Design set action adds pattern."""
         mock_get_path.return_value = Path(".tasks/test-feature.yml")
@@ -380,7 +380,7 @@ class TestDesignToolSet:
 
     @patch("simpletask.mcp.server.write_task_file")
     @patch("simpletask.mcp.server.parse_task_file")
-    @patch("simpletask.mcp.server.get_task_file_path")
+    @patch("simpletask.mcp.server.get_current_task_file_path")
     def test_set_references_with_reason(
         self, mock_get_path, mock_parse, mock_write, sample_spec_with_quality
     ):
@@ -403,7 +403,7 @@ class TestDesignToolSet:
         assert written_spec.design.reference_implementations[0].reason == "Similar implementation"
 
     @patch("simpletask.mcp.server.parse_task_file")
-    @patch("simpletask.mcp.server.get_task_file_path")
+    @patch("simpletask.mcp.server.get_current_task_file_path")
     def test_set_references_requires_reason(
         self, mock_get_path, mock_parse, sample_spec_with_quality
     ):
@@ -416,7 +416,7 @@ class TestDesignToolSet:
 
     @patch("simpletask.mcp.server.write_task_file")
     @patch("simpletask.mcp.server.parse_task_file")
-    @patch("simpletask.mcp.server.get_task_file_path")
+    @patch("simpletask.mcp.server.get_current_task_file_path")
     def test_set_error_handling(
         self, mock_get_path, mock_parse, mock_write, sample_spec_with_quality
     ):
@@ -436,7 +436,7 @@ class TestDesignToolSet:
         assert written_spec.design.error_handling.value == "result_type"
 
     @patch("simpletask.mcp.server.parse_task_file")
-    @patch("simpletask.mcp.server.get_task_file_path")
+    @patch("simpletask.mcp.server.get_current_task_file_path")
     def test_set_requires_field(self, mock_get_path, mock_parse, sample_spec_with_quality):
         """Design set action requires field parameter."""
         mock_get_path.return_value = Path(".tasks/test-feature.yml")
@@ -446,7 +446,7 @@ class TestDesignToolSet:
             design(action="set", field=None, value="test")
 
     @patch("simpletask.mcp.server.parse_task_file")
-    @patch("simpletask.mcp.server.get_task_file_path")
+    @patch("simpletask.mcp.server.get_current_task_file_path")
     def test_set_validates_field(self, mock_get_path, mock_parse, sample_spec_with_quality):
         """Design set action validates field parameter."""
         mock_get_path.return_value = Path(".tasks/test-feature.yml")
@@ -461,7 +461,7 @@ class TestDesignToolRemove:
 
     @patch("simpletask.mcp.server.write_task_file")
     @patch("simpletask.mcp.server.parse_task_file")
-    @patch("simpletask.mcp.server.get_task_file_path")
+    @patch("simpletask.mcp.server.get_current_task_file_path")
     def test_remove_all(self, mock_get_path, mock_parse, mock_write, sample_spec_with_design):
         """Design remove action removes entire design section with field='all'."""
         mock_get_path.return_value = Path(".tasks/test-feature.yml")
@@ -477,7 +477,7 @@ class TestDesignToolRemove:
 
     @patch("simpletask.mcp.server.write_task_file")
     @patch("simpletask.mcp.server.parse_task_file")
-    @patch("simpletask.mcp.server.get_task_file_path")
+    @patch("simpletask.mcp.server.get_current_task_file_path")
     def test_remove_patterns_all(
         self, mock_get_path, mock_parse, mock_write, sample_spec_with_design
     ):
@@ -497,7 +497,7 @@ class TestDesignToolRemove:
 
     @patch("simpletask.mcp.server.write_task_file")
     @patch("simpletask.mcp.server.parse_task_file")
-    @patch("simpletask.mcp.server.get_task_file_path")
+    @patch("simpletask.mcp.server.get_current_task_file_path")
     def test_remove_patterns_by_index(
         self, mock_get_path, mock_parse, mock_write, sample_spec_with_design
     ):
@@ -515,7 +515,7 @@ class TestDesignToolRemove:
         assert len(written_spec.design.patterns) == initial_count - 1
 
     @patch("simpletask.mcp.server.parse_task_file")
-    @patch("simpletask.mcp.server.get_task_file_path")
+    @patch("simpletask.mcp.server.get_current_task_file_path")
     def test_remove_patterns_invalid_index(
         self, mock_get_path, mock_parse, sample_spec_with_design
     ):
@@ -527,7 +527,7 @@ class TestDesignToolRemove:
             design(action="remove", field="pattern", index=999)
 
     @patch("simpletask.mcp.server.parse_task_file")
-    @patch("simpletask.mcp.server.get_task_file_path")
+    @patch("simpletask.mcp.server.get_current_task_file_path")
     def test_remove_from_missing_design(self, mock_get_path, mock_parse, sample_spec_with_quality):
         """Design remove action raises error when no design section exists."""
         mock_get_path.return_value = Path(".tasks/test-feature.yml")
@@ -537,7 +537,7 @@ class TestDesignToolRemove:
             design(action="remove", field="patterns")
 
     @patch("simpletask.mcp.server.parse_task_file")
-    @patch("simpletask.mcp.server.get_task_file_path")
+    @patch("simpletask.mcp.server.get_current_task_file_path")
     def test_remove_requires_field(self, mock_get_path, mock_parse, sample_spec_with_design):
         """Design remove action requires field parameter."""
         mock_get_path.return_value = Path(".tasks/test-feature.yml")
@@ -547,7 +547,7 @@ class TestDesignToolRemove:
             design(action="remove", field=None)
 
     @patch("simpletask.mcp.server.parse_task_file")
-    @patch("simpletask.mcp.server.get_task_file_path")
+    @patch("simpletask.mcp.server.get_current_task_file_path")
     def test_remove_validates_field(self, mock_get_path, mock_parse, sample_spec_with_design):
         """Design remove action validates field parameter."""
         mock_get_path.return_value = Path(".tasks/test-feature.yml")

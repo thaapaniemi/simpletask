@@ -7,6 +7,7 @@ from simpletask.core.project import (
     Project,
     ensure_project,
     find_project,
+    get_current_task_file_path,
     get_task_file_path,
 )
 
@@ -385,6 +386,60 @@ class TestGetTaskFilePath:
 
         with pytest.raises(ValueError, match="Not on a git branch"):
             get_task_file_path()
+
+
+class TestGetCurrentTaskFilePath:
+    """Tests for get_current_task_file_path() function."""
+
+    @patch("simpletask.core.project.current_branch")
+    @patch("simpletask.core.project.ensure_project")
+    def test_get_current_task_file_path_success(
+        self, mock_ensure_project, mock_current_branch, tmp_project
+    ):
+        """Test get_current_task_file_path returns path for current branch."""
+        mock_project = Mock(spec=Project)
+        mock_project.get_task_file.return_value = tmp_project / ".tasks" / "feature.yml"
+        mock_ensure_project.return_value = mock_project
+        mock_current_branch.return_value = "feature"
+
+        result = get_current_task_file_path()
+
+        assert result == tmp_project / ".tasks" / "feature.yml"
+        mock_ensure_project.assert_called_once()
+        mock_current_branch.assert_called_once()
+        mock_project.get_task_file.assert_called_once_with("feature")
+
+    @patch("simpletask.core.project.current_branch")
+    @patch("simpletask.core.project.ensure_project")
+    def test_get_current_task_file_path_detached_head(
+        self, mock_ensure_project, mock_current_branch
+    ):
+        """Test get_current_task_file_path raises on detached HEAD."""
+        mock_ensure_project.return_value = Mock(spec=Project)
+        mock_current_branch.return_value = None
+
+        with pytest.raises(
+            ValueError,
+            match=r"Not on a git branch \(detached HEAD\)\. Switch to a branch first",
+        ):
+            get_current_task_file_path()
+
+    @patch("simpletask.core.project.current_branch")
+    @patch("simpletask.core.project.ensure_project")
+    def test_get_current_task_file_path_normalizes_branch(
+        self, mock_ensure_project, mock_current_branch, tmp_project
+    ):
+        """Test get_current_task_file_path normalizes branch name."""
+        mock_project = Mock(spec=Project)
+        mock_project.get_task_file.return_value = tmp_project / ".tasks" / "feature-auth.yml"
+        mock_ensure_project.return_value = mock_project
+        mock_current_branch.return_value = "feature/auth"
+
+        result = get_current_task_file_path()
+
+        # Verify normalization happened (feature/auth -> feature-auth.yml)
+        assert result == tmp_project / ".tasks" / "feature-auth.yml"
+        mock_project.get_task_file.assert_called_once_with("feature/auth")
 
 
 class TestProjectListTasksByMtime:

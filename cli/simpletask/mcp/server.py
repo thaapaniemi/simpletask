@@ -26,7 +26,7 @@ from ..core.models import (
     TaskStatus,
     ToolName,
 )
-from ..core.project import ensure_project, get_task_file_path
+from ..core.project import ensure_project, get_current_task_file_path
 from ..core.quality_ops import (
     apply_quality_preset,
     run_quality_checks,
@@ -95,7 +95,6 @@ __all__ = [
 
 @mcp.tool()
 def get(
-    branch: str | None = None,
     validate: bool = False,
 ) -> SimpleTaskGetResponse:
     """Get complete task specification with status summary.
@@ -104,8 +103,6 @@ def get(
     pre-computed status counts. Optionally validates against JSON schema.
 
     Args:
-        branch: Branch name, or None to use current git branch. The branch name
-                will be normalized to a safe filename (e.g., 'feature/auth' -> 'feature-auth.yml').
         validate: Whether to include schema validation result (default: False).
                   Opt-in to reduce overhead for simple queries.
 
@@ -118,7 +115,7 @@ def get(
         InvalidTaskFileError: If YAML file is malformed or invalid.
     """
     # Get file path (normalizes branch name and validates git repo)
-    file_path = get_task_file_path(branch)
+    file_path = get_current_task_file_path()
 
     # Parse task file
     spec = parse_task_file(file_path)
@@ -201,7 +198,6 @@ def new(
 @mcp.tool()
 def task(
     action: Literal["add", "update", "remove", "get"],
-    branch: str | None = None,
     task_id: str | None = None,
     name: str | None = None,
     goal: str | None = None,
@@ -212,7 +208,6 @@ def task(
 
     Args:
         action: Operation to perform ('add', 'update', 'remove', 'get')
-        branch: Branch name, or None for current git branch
         task_id: Task ID (required for update/remove/get)
         name: Task name (required for add)
         goal: Task goal/description
@@ -228,7 +223,7 @@ def task(
     Raises:
         ValueError: If required parameters missing or invalid values provided.
     """
-    file_path = get_task_file_path(branch)
+    file_path = get_current_task_file_path()
 
     match action:
         case "get":
@@ -309,7 +304,6 @@ def task(
 @mcp.tool()
 def criteria(
     action: Literal["add", "complete", "remove", "get"],
-    branch: str | None = None,
     criterion_id: str | None = None,
     description: str | None = None,
     completed: bool = True,
@@ -318,7 +312,6 @@ def criteria(
 
     Args:
         action: Operation to perform ('add', 'complete', 'remove', 'get')
-        branch: Branch name, or None for current git branch
         criterion_id: Criterion ID (required for complete/remove/get)
         description: Criterion description (required for add)
         completed: Completion status for 'complete' action (default: True)
@@ -331,7 +324,7 @@ def criteria(
         ValueError: If required parameters missing or criterion not found.
         Note: Removing the last criterion fails due to min_length=1 schema constraint.
     """
-    file_path = get_task_file_path(branch)
+    file_path = get_current_task_file_path()
 
     match action:
         case "get":
@@ -405,7 +398,6 @@ def criteria(
 @mcp.tool()
 def quality(
     action: Literal["check", "set", "get", "preset"],
-    branch: str | None = None,
     config_type: str | None = None,
     tool: str | None = None,
     args: str | None = None,
@@ -418,7 +410,6 @@ def quality(
 
     Args:
         action: Operation to perform ('check', 'set', 'get', 'preset')
-        branch: Branch name, or None for current git branch
         config_type: Config type for 'set' action ('linting', 'type-checking', 'testing', 'security')
         tool: Tool name for 'set' action (e.g., 'ruff', 'mypy', 'pytest')
         args: Comma-separated tool arguments for 'set' action (e.g., 'check,.,--fix')
@@ -434,7 +425,7 @@ def quality(
     Raises:
         ValueError: If required parameters missing or invalid values provided.
     """
-    file_path = get_task_file_path(branch)
+    file_path = get_current_task_file_path()
     spec = parse_task_file(file_path)
 
     # Parse args if provided
@@ -551,7 +542,6 @@ def quality(
 @mcp.tool()
 def design(
     action: Literal["set", "get", "remove"],
-    branch: str | None = None,
     field: str | None = None,
     value: str | None = None,
     reason: str | None = None,
@@ -563,7 +553,6 @@ def design(
 
     Args:
         action: Operation to perform ('set', 'get', 'remove')
-        branch: Branch name, or None for current git branch
         field: Field to set/remove ('pattern', 'reference', 'constraint', 'security', 'error-handling')
         value: Value to set (enum value for pattern/error-handling, free text for others)
         reason: Reason for reference (required when field='reference')
@@ -578,7 +567,7 @@ def design(
     Raises:
         ValueError: If required parameters missing or invalid values provided.
     """
-    file_path = get_task_file_path(branch)
+    file_path = get_current_task_file_path()
     spec = parse_task_file(file_path)
 
     match action:

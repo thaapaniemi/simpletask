@@ -60,7 +60,6 @@ class TestTaskCRUDCycle:
         # ADD: Add first task
         result = task(
             action="add",
-            branch="feature/crud-test",
             name="First task",
         )
         assert result.summary.tasks_total == 1
@@ -68,7 +67,6 @@ class TestTaskCRUDCycle:
         # Get task details using action='get'
         task_result = task(
             action="get",
-            branch="feature/crud-test",
             task_id="T001",
         )
         task_t001 = task_result.task
@@ -78,7 +76,6 @@ class TestTaskCRUDCycle:
         # ADD: Add second task with goal
         result = task(
             action="add",
-            branch="feature/crud-test",
             name="Second task",
             goal="Complete this task",
         )
@@ -88,7 +85,6 @@ class TestTaskCRUDCycle:
         # UPDATE: Mark first task as in_progress
         result = task(
             action="update",
-            branch="feature/crud-test",
             task_id="T001",
             status="in_progress",
         )
@@ -97,7 +93,6 @@ class TestTaskCRUDCycle:
         # Get task details using action='get'
         task_result = task(
             action="get",
-            branch="feature/crud-test",
             task_id="T001",
         )
         assert task_result.task.status == TaskStatus.IN_PROGRESS
@@ -105,7 +100,6 @@ class TestTaskCRUDCycle:
         # UPDATE: Mark first task as completed
         result = task(
             action="update",
-            branch="feature/crud-test",
             task_id="T001",
             status="completed",
         )
@@ -115,7 +109,6 @@ class TestTaskCRUDCycle:
         # Get task details using action='get'
         task_result = task(
             action="get",
-            branch="feature/crud-test",
             task_id="T001",
         )
         assert task_result.task.status == TaskStatus.COMPLETED
@@ -123,14 +116,12 @@ class TestTaskCRUDCycle:
         # UPDATE: Change name of second task
         result = task(
             action="update",
-            branch="feature/crud-test",
             task_id="T002",
             name="Updated second task name",
         )
         # Get task details using action='get'
         task_result = task(
             action="get",
-            branch="feature/crud-test",
             task_id="T002",
         )
         task_t002 = task_result.task
@@ -140,19 +131,18 @@ class TestTaskCRUDCycle:
         # REMOVE: Remove completed task
         result = task(
             action="remove",
-            branch="feature/crud-test",
             task_id="T001",
         )
         assert result.summary.tasks_total == 1
         assert result.summary.tasks_completed == 0
         assert result.summary.tasks_not_started == 1
         # Verify using get to check task list
-        get_result = get(branch="feature/crud-test")
+        get_result = get()
         assert len(get_result.spec.tasks) == 1
         assert get_result.spec.tasks[0].id == "T002"
 
         # VERIFY: Final state via get
-        result = get(branch="feature/crud-test")
+        result = get()
         assert result.summary.tasks_total == 1
         assert len(result.spec.tasks) == 1
         assert result.spec.tasks[0].id == "T002"
@@ -176,7 +166,6 @@ class TestCriteriaCRUDCycle:
         # Get criterion details using action='get'
         criterion_result = criteria(
             action="get",
-            branch="feature/crud-test",
             criterion_id="AC1",
         )
         ac1 = criterion_result.criterion
@@ -187,7 +176,6 @@ class TestCriteriaCRUDCycle:
         # ADD: Add second criterion
         result = criteria(
             action="add",
-            branch="feature/crud-test",
             description="Second criterion",
         )
         assert result.summary.criteria_total == 2
@@ -195,7 +183,6 @@ class TestCriteriaCRUDCycle:
         # Get criterion details using action='get'
         criterion_result = criteria(
             action="get",
-            branch="feature/crud-test",
             criterion_id="AC2",
         )
         ac2 = criterion_result.criterion
@@ -205,14 +192,12 @@ class TestCriteriaCRUDCycle:
         # ADD: Add third criterion
         result = criteria(
             action="add",
-            branch="feature/crud-test",
             description="Third criterion",
         )
         assert result.summary.criteria_total == 3
         # Get criterion details using action='get'
         criterion_result = criteria(
             action="get",
-            branch="feature/crud-test",
             criterion_id="AC3",
         )
         assert criterion_result.criterion.description == "Third criterion"
@@ -220,7 +205,6 @@ class TestCriteriaCRUDCycle:
         # COMPLETE: Mark first criterion as completed
         result = criteria(
             action="complete",
-            branch="feature/crud-test",
             criterion_id="AC1",
             completed=True,
         )
@@ -228,7 +212,6 @@ class TestCriteriaCRUDCycle:
         # Get criterion details using action='get'
         criterion_result = criteria(
             action="get",
-            branch="feature/crud-test",
             criterion_id="AC1",
         )
         assert criterion_result.criterion.completed is True
@@ -236,7 +219,6 @@ class TestCriteriaCRUDCycle:
         # COMPLETE: Mark second criterion as completed
         result = criteria(
             action="complete",
-            branch="feature/crud-test",
             criterion_id="AC2",
             completed=True,
         )
@@ -244,7 +226,6 @@ class TestCriteriaCRUDCycle:
         # Get criterion details using action='get'
         criterion_result = criteria(
             action="get",
-            branch="feature/crud-test",
             criterion_id="AC2",
         )
         assert criterion_result.criterion.completed is True
@@ -252,7 +233,6 @@ class TestCriteriaCRUDCycle:
         # COMPLETE: Mark first criterion as incomplete again
         result = criteria(
             action="complete",
-            branch="feature/crud-test",
             criterion_id="AC1",
             completed=False,
         )
@@ -260,7 +240,6 @@ class TestCriteriaCRUDCycle:
         # Get criterion details using action='get'
         criterion_result = criteria(
             action="get",
-            branch="feature/crud-test",
             criterion_id="AC1",
         )
         assert criterion_result.criterion.completed is False
@@ -268,13 +247,12 @@ class TestCriteriaCRUDCycle:
         # REMOVE: Remove uncompleted first criterion
         result = criteria(
             action="remove",
-            branch="feature/crud-test",
             criterion_id="AC1",
         )
         assert result.summary.criteria_total == 2
         assert result.summary.criteria_completed == 1
         # Verify using get to check criteria list
-        get_result = get(branch="feature/crud-test")
+        get_result = get()
         assert len(get_result.spec.acceptance_criteria) == 2
         # AC2 and AC3 should remain, IDs unchanged
         assert get_result.spec.acceptance_criteria[0].id == "AC2"
@@ -283,18 +261,17 @@ class TestCriteriaCRUDCycle:
         # REMOVE: Remove completed second criterion (now first in list)
         result = criteria(
             action="remove",
-            branch="feature/crud-test",
             criterion_id="AC2",
         )
         assert result.summary.criteria_total == 1
         assert result.summary.criteria_completed == 0
         # Verify using get to check criteria list
-        get_result = get(branch="feature/crud-test")
+        get_result = get()
         assert len(get_result.spec.acceptance_criteria) == 1
         assert get_result.spec.acceptance_criteria[0].id == "AC3"
 
         # VERIFY: Last state before attempted invalid operation
-        result = get(branch="feature/crud-test")
+        result = get()
         assert result.summary.criteria_total == 1
         assert len(result.spec.acceptance_criteria) == 1
         assert result.spec.acceptance_criteria[0].id == "AC3"
@@ -305,7 +282,6 @@ class TestCriteriaCRUDCycle:
         with pytest.raises(InvalidTaskFileError):
             criteria(
                 action="remove",
-                branch="feature/crud-test",
                 criterion_id="AC3",
             )
 
@@ -328,17 +304,14 @@ class TestMixedCRUDOperations:
         # Add tasks
         task(
             action="add",
-            branch="feature/crud-test",
             name="Task 1",
         )
         task(
             action="add",
-            branch="feature/crud-test",
             name="Task 2",
         )
         result = task(
             action="add",
-            branch="feature/crud-test",
             name="Task 3",
         )
         assert result.summary.tasks_total == 3
@@ -347,19 +320,16 @@ class TestMixedCRUDOperations:
         # Update task statuses to different states
         task(
             action="update",
-            branch="feature/crud-test",
             task_id="T001",
             status="in_progress",
         )
         task(
             action="update",
-            branch="feature/crud-test",
             task_id="T002",
             status="completed",
         )
         result = task(
             action="update",
-            branch="feature/crud-test",
             task_id="T003",
             status="blocked",
         )
@@ -371,20 +341,18 @@ class TestMixedCRUDOperations:
         # Complete some criteria
         criteria(
             action="complete",
-            branch="feature/crud-test",
             criterion_id="AC1",
             completed=True,
         )
         result = criteria(
             action="complete",
-            branch="feature/crud-test",
             criterion_id="AC3",
             completed=True,
         )
         assert result.summary.criteria_completed == 2
 
         # VERIFY: Final comprehensive state
-        result = get(branch="feature/crud-test")
+        result = get()
         assert result.summary.criteria_total == 3
         assert result.summary.criteria_completed == 2
         assert result.summary.tasks_total == 3

@@ -626,6 +626,37 @@ uv tool dir simpletask
 
 **Note:** For Qwen CLI and Gemini CLI configuration, see [docs/MCP.md](docs/MCP.md).
 
+### Breaking Changes in v0.18.0
+
+#### MCP Tools No Longer Accept `branch` Parameter
+
+**Affected tools:** `get`, `task`, `criteria`, `quality`, `design`
+
+**What changed:** These MCP tools no longer accept a `branch` parameter. They always auto-detect the current git branch.
+
+**Why:** MCP clients sometimes incorrectly passed the string `"None"` instead of `null`, causing errors. Removing the parameter entirely fixes this at the API level.
+
+**Migration:**
+
+Before (v0.17.x):
+```python
+simpletask_get(branch=None)  # or branch="feature/xyz"
+simpletask_task(action="add", branch=None, name="Task")
+simpletask_criteria(action="add", branch=None, description="Criterion")
+```
+
+After (v0.18.0):
+```python
+simpletask_get()  # Always uses current git branch
+simpletask_task(action="add", name="Task")
+simpletask_criteria(action="add", description="Criterion")
+```
+
+**Note:** CLI commands still support the `--branch` flag for flexibility:
+```bash
+simpletask task list --branch feature/other-branch
+```
+
 ### Available Tools
 
 The MCP server exposes 7 tools for task management:
@@ -634,13 +665,13 @@ The MCP server exposes 7 tools for task management:
 
 | Tool | Description | Parameters |
 |------|-------------|------------|
-| `get` | Get complete task specification with status summary | `branch` (str, optional): Branch name or None for current<br>`validate` (bool, optional): Include schema validation (default: false) |
+| `get` | Get complete task specification with status summary | `validate` (bool, optional): Include schema validation (default: false) |
 | `list` | List all task file branch names in the project | None |
 | `new` | Create a new task file | `branch` (str): Branch identifier<br>`title` (str): Task title<br>`prompt` (str): Original user request<br>`criteria` (list[str] \| None, optional): Acceptance criteria |
-| `task` | Manage implementation tasks (add/update/remove/get) | `action` (str): 'add', 'update', 'remove', or 'get'<br>`branch` (str, optional): Branch name or None for current<br>`task_id` (str, optional): Task ID (required for update/remove/get)<br>`name` (str, optional): Task name (required for add)<br>`goal` (str, optional): Task goal/description<br>`status` (str, optional): Status for update ('not_started', 'in_progress', 'completed', 'blocked', 'paused')<br>`steps` (list[str] \| None, optional): Task steps for add action. None or [] adds placeholder ['To be defined'] |
-| `criteria` | Manage acceptance criteria (add/complete/remove/get) | `action` (str): 'add', 'complete', 'remove', or 'get'<br>`branch` (str, optional): Branch name or None for current<br>`criterion_id` (str, optional): Criterion ID (required for complete/remove/get)<br>`description` (str, optional): Description (required for add)<br>`completed` (bool, optional): Completion status for 'complete' (default: true) |
-| `quality` | Manage quality requirements (check/set/get/preset) | `action` (str): 'check', 'set', 'get', or 'preset'<br>`branch` (str, optional): Branch name or None for current<br>`config_type` (str, optional): 'linting', 'type-checking', 'testing', or 'security' (for set action)<br>`tool` (str, optional): Tool name from ToolName enum (for set action)<br>`args` (list[str], optional): Tool arguments (for set action)<br>`enabled` (bool, optional): Enable/disable check (for set action)<br>`min_coverage` (int, optional): Minimum coverage % (for testing config only)<br>`preset_name` (str, optional): Preset name (for preset action)<br>Check filters: `lint_only`, `test_only`, `type_only`, `security_only` (bool, for check action) |
-| `design` | Manage design section (set/get/remove) | `action` (str): 'set', 'get', or 'remove'<br>`branch` (str, optional): Branch name or None for current<br>`field` (str, optional): Field to modify: 'pattern', 'reference', 'constraint', 'security', 'error-handling' (for set/remove)<br>`value` (str, optional): Value to add (for set action)<br>`reason` (str, optional): Reason for reference (required when field='reference')<br>`index` (int, optional): Index to remove (for remove action on list fields)<br>`all` (bool, optional): Remove all items or entire section (for remove action) |
+| `task` | Manage implementation tasks (add/update/remove/get) | `action` (str): 'add', 'update', 'remove', or 'get'<br>`task_id` (str, optional): Task ID (required for update/remove/get)<br>`name` (str, optional): Task name (required for add)<br>`goal` (str, optional): Task goal/description<br>`status` (str, optional): Status for update ('not_started', 'in_progress', 'completed', 'blocked', 'paused')<br>`steps` (list[str] \| None, optional): Task steps for add action. None or [] adds placeholder ['To be defined'] |
+| `criteria` | Manage acceptance criteria (add/complete/remove/get) | `action` (str): 'add', 'complete', 'remove', or 'get'<br>`criterion_id` (str, optional): Criterion ID (required for complete/remove/get)<br>`description` (str, optional): Description (required for add)<br>`completed` (bool, optional): Completion status for 'complete' (default: true) |
+| `quality` | Manage quality requirements (check/set/get/preset) | `action` (str): 'check', 'set', 'get', or 'preset'<br>`config_type` (str, optional): 'linting', 'type-checking', 'testing', or 'security' (for set action)<br>`tool` (str, optional): Tool name from ToolName enum (for set action)<br>`args` (list[str], optional): Tool arguments (for set action)<br>`enabled` (bool, optional): Enable/disable check (for set action)<br>`min_coverage` (int, optional): Minimum coverage % (for testing config only)<br>`preset_name` (str, optional): Preset name (for preset action)<br>Check filters: `lint_only`, `test_only`, `type_only`, `security_only` (bool, for check action) |
+| `design` | Manage design section (set/get/remove) | `action` (str): 'set', 'get', or 'remove'<br>`field` (str, optional): Field to modify: 'pattern', 'reference', 'constraint', 'security', 'error-handling' (for set/remove)<br>`value` (str, optional): Value to add (for set action)<br>`reason` (str, optional): Reason for reference (required when field='reference')<br>`index` (int, optional): Index to remove (for remove action on list fields)<br>`all` (bool, optional): Remove all items or entire section (for remove action) |
 
 ### Tool Details
 
@@ -649,8 +680,9 @@ The MCP server exposes 7 tools for task management:
 Returns enriched task data with pre-computed status counts:
 
 **Parameters:**
-- `branch` (optional): Branch name, or omit to use current git branch. The branch name will be normalized (e.g., `feature/auth` → `feature-auth.yml`).
 - `validate` (optional): Whether to include schema validation result. Default is `false` to reduce overhead.
+
+**Note:** This tool always uses the current git branch. Branch auto-detection prevents MCP clients from incorrectly passing string values like "None".
 
 **Returns:** `SimpleTaskGetResponse` with:
 - `spec`: Full `SimpleTaskSpec` (branch, title, acceptance_criteria, tasks, etc.)
@@ -755,12 +787,13 @@ Unified tool for managing implementation tasks with four actions.
 
 **Parameters:**
 - `action`: Operation to perform ('add', 'update', 'remove', 'get')
-- `branch` (optional): Branch name, or None for current git branch
 - `task_id` (optional): Task ID (required for update/remove/get, e.g., 'T001')
 - `name` (optional): Task name (required for add)
 - `goal` (optional): Task goal/description
 - `status` (optional): Task status for update only. Valid values: 'not_started', 'in_progress', 'completed', 'blocked', 'paused'. **Note:** 'add' action ignores this parameter - new tasks always start as `not_started`.
 - `steps` (optional): List of detailed task steps for add action. None or [] adds placeholder step ['To be defined']. Only applies when action='add'.
+
+**Note:** This tool always uses the current git branch.
 
 **Returns:** 
 - `SimpleTaskWriteResponse` for write operations (add/update/remove)
@@ -795,8 +828,6 @@ Get operations return:
 # Add a new task
 result = task(
     action="add",
-    branch="feature/user-auth",
-    task_id="T001",
     name="Create User model",
     goal="Define database schema for user accounts"
 )
@@ -804,8 +835,6 @@ result = task(
 # Add a new task with specific steps
 result = task(
     action="add",
-    branch="feature/user-auth",
-    task_id="T002",
     name="Implement authentication endpoints",
     goal="Create login and logout API endpoints",
     steps=["Define API routes", "Implement JWT generation", "Add password hashing", "Write tests"]
@@ -814,7 +843,6 @@ result = task(
 # Update task status
 result = task(
     action="update",
-    branch="feature/user-auth",
     task_id="T001",
     status="completed"
 )
@@ -822,7 +850,7 @@ result = task(
 # Update task name/goal
 result = task(
     action="update",
-    task_id="T001",  # Uses current branch
+    task_id="T001",
     name="Updated task name",
     goal="Updated description"
 )
@@ -852,10 +880,11 @@ Unified tool for managing acceptance criteria with four actions.
 
 **Parameters:**
 - `action`: Operation to perform ('add', 'complete', 'remove', 'get')
-- `branch` (optional): Branch name, or None for current git branch
 - `criterion_id` (optional): Criterion ID (required for complete/remove/get, e.g., 'AC1')
 - `description` (optional): Criterion description (required for add)
 - `completed` (optional): Completion status for 'complete' action (default: true). Set to false to mark as incomplete.
+
+**Note:** This tool always uses the current git branch.
 
 **Returns:**
 - `SimpleTaskWriteResponse` for write operations (add/complete/remove)
@@ -890,7 +919,6 @@ Get operations return:
 # Add a new criterion
 result = criteria(
     action="add",
-    branch="feature/user-auth",
     description="Users can reset forgotten passwords"
 )
 
@@ -932,7 +960,6 @@ Unified tool for managing quality requirements with four actions.
 
 **Parameters:**
 - `action`: Operation to perform ('check', 'set', 'get', 'preset')
-- `branch` (optional): Branch name, or None for current git branch
 - `config_type` (optional): Type of quality config to set ('linting', 'type-checking', 'testing', 'security') - required for set action
 - `tool` (optional): Tool name from ToolName enum (required for set action)
 - `args` (optional): List of tool arguments (for set action)
@@ -941,6 +968,8 @@ Unified tool for managing quality requirements with four actions.
 - `timeout` (optional): Timeout in seconds for the check (for set action, default: 300)
 - `preset_name` (optional): Preset name (required for preset action)
 - Check filters (for check action only): `lint_only`, `test_only`, `type_only`, `security_only` (bool)
+
+**Note:** This tool always uses the current git branch.
 
 **Returns:**
 - `SimpleTaskQualityResponse` for check/get operations
@@ -973,7 +1002,7 @@ Check/get operations return:
 
 ```python
 # Get current quality configuration
-result = quality(action="get", branch="feature/user-auth")
+result = quality(action="get")
 
 # Run all enabled quality checks
 result = quality(action="check")
@@ -1019,12 +1048,13 @@ Unified tool for managing the design section with three actions.
 
 **Parameters:**
 - `action`: Operation to perform ('set', 'get', 'remove')
-- `branch` (optional): Branch name, or None for current git branch
 - `field` (optional): Field to modify ('pattern', 'reference', 'constraint', 'security', 'error-handling') - required for set/remove
 - `value` (optional): Value to add (required for set action)
 - `reason` (optional): Reason/explanation (required when field='reference' in set action)
 - `index` (optional): Index to remove from list fields (for remove action)
 - `all` (optional): Remove all items from field or entire design section (for remove action)
+
+**Note:** This tool always uses the current git branch.
 
 **Returns:**
 - `SimpleTaskDesignResponse` for get operations

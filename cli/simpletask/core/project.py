@@ -238,11 +238,34 @@ def get_task_file_path(branch: str | None = None) -> Path:
     return project.get_task_file(branch)
 
 
+def get_current_task_file_path() -> Path:
+    """Get task file path for current git branch (MCP tool use).
+
+    This function always auto-detects the current git branch without
+    accepting a branch parameter. Designed for MCP tools where we want
+    to avoid clients incorrectly passing string values like "None".
+
+    Returns:
+        Path to task file for current branch
+
+    Raises:
+        ValueError: If not in a git repository or detached HEAD
+    """
+    project = ensure_project()
+    branch = current_branch()
+    if branch is None:
+        raise ValueError(
+            "Not on a git branch (detached HEAD). Switch to a branch first: git checkout <branch>"
+        )
+    return project.get_task_file(branch)
+
+
 # Export public API
 __all__ = [
     "Project",
     "ensure_project",
     "find_project",
+    "get_current_task_file_path",
     "get_task_file_path",
     "normalize_branch_name",
 ]
