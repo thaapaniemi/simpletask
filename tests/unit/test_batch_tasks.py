@@ -290,7 +290,7 @@ class TestBatchValidation:
         ]
 
         with pytest.raises(
-            ValueError, match="Cannot update task T001.*being removed in the same batch"
+            ValueError, match=r"Cannot update task T001.*being removed in the same batch"
         ):
             batch_tasks(task_file, operations)
 

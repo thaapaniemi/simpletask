@@ -908,7 +908,14 @@ The `batch` action provides atomic task operations. All operations in a batch ei
 }
 ```
 
-**Note:** `prerequisites`, `done_when`, `files`, and `code_examples` fields cannot be set via batch operations. These must be added by directly editing `.tasks/<branch>.yml` after the batch completes.
+**Note:** All Task model fields are fully supported in batch operations, including:
+- `steps`: Task implementation steps (list[str])
+- `done_when`: Completion verification conditions (list[str])
+- `prerequisites`: Prerequisite task IDs (list[str])
+- `files`: Files to create/modify/delete (list[dict] with `path` and `action` fields)
+- `code_examples`: Code patterns to follow (list[dict] with `language`, `description`, `code` fields)
+
+These fields work in both "add" and "update" batch operations, eliminating the need for manual YAML editing.
 
 **Atomicity Guarantee:**
 - All operations are validated before any changes are applied

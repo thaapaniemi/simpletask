@@ -19,9 +19,11 @@ from ..core.criteria_ops import (
 from ..core.design_ops import remove_design_field
 from ..core.models import (
     ArchitecturalPattern,
+    CodeExample,
     Design,
     DesignReference,
     ErrorHandlingStrategy,
+    FileAction,
     SecurityCategory,
     SecurityRequirement,
     TaskStatus,
@@ -95,6 +97,31 @@ __all__ = [
     "run_server",
     "task",
 ]
+
+
+def _convert_task_field_dicts(
+    files: _list[dict] | None,
+    code_examples: _list[dict] | None,
+) -> tuple[_list[FileAction] | None, _list[CodeExample] | None]:
+    """Convert files and code_examples from dict form to Pydantic models.
+
+    Args:
+        files: List of file action dicts or None
+        code_examples: List of code example dicts or None
+
+    Returns:
+        Tuple of (files_converted, code_examples_converted) where each is
+        either a list of Pydantic models or None.
+    """
+    files_converted = None
+    if files:
+        files_converted = [FileAction(**f) for f in files]
+
+    code_examples_converted = None
+    if code_examples:
+        code_examples_converted = [CodeExample(**c) for c in code_examples]
+
+    return files_converted, code_examples_converted
 
 
 @mcp.tool()
@@ -207,6 +234,10 @@ def task(
     goal: str | None = None,
     status: str | None = None,
     steps: _list[str] | None = None,
+    done_when: _list[str] | None = None,
+    prerequisites: _list[str] | None = None,
+    files: _list[dict] | None = None,
+    code_examples: _list[dict] | None = None,
     operations: _list[dict] | None = None,
 ) -> SimpleTaskWriteResponse | SimpleTaskItemResponse | SimpleTaskBatchResponse:
     """Manage implementation tasks.
@@ -220,6 +251,10 @@ def task(
                Note: 'add' action ignores this - new tasks always start as not_started
         steps: List of detailed task steps (optional for add). None or [] adds placeholder step ['To be defined'].
                Only applies to action='add'.
+        done_when: List of completion verification conditions (optional for add/update)
+        prerequisites: List of prerequisite task IDs (optional for add/update)
+        files: List of FileAction dicts with path and action fields (optional for add/update)
+        code_examples: List of CodeExample dicts with path and description fields (optional for add/update)
         operations: List of BatchTaskOperation dicts (required for batch action)
 
     Returns:
@@ -256,7 +291,22 @@ def task(
             if not name:
                 raise ValueError("'name' is required for action='add'")
             # Note: status param intentionally ignored for add - new tasks start as not_started
-            add_implementation_task(file_path, name, goal, steps=steps)
+
+            # Convert dicts to Pydantic models
+            files_converted, code_examples_converted = _convert_task_field_dicts(
+                files, code_examples
+            )
+
+            add_implementation_task(
+                file_path,
+                name,
+                goal,
+                steps=steps,
+                done_when=done_when,
+                prerequisites=prerequisites,
+                files=files_converted,
+                code_examples=code_examples_converted,
+            )
             spec = parse_task_file(file_path)
             summary = compute_status_summary(spec)
             # Find the newly added task (should be last one)
@@ -280,7 +330,24 @@ def task(
                 except ValueError:
                     valid = [s.value for s in TaskStatus]
                     raise ValueError(f"Invalid status '{status}'. Valid: {valid}") from None
-            update_implementation_task(file_path, task_id, name, goal, task_status)
+
+            # Convert dicts to Pydantic models
+            files_converted, code_examples_converted = _convert_task_field_dicts(
+                files, code_examples
+            )
+
+            update_implementation_task(
+                file_path,
+                task_id,
+                name,
+                goal,
+                task_status,
+                steps,
+                done_when,
+                prerequisites,
+                files_converted,
+                code_examples_converted,
+            )
             spec = parse_task_file(file_path)
             summary = compute_status_summary(spec)
             return SimpleTaskWriteResponse(
@@ -321,7 +388,7 @@ def task(
                     errors.append(f"{loc}: {err['msg']}")
                 raise ValueError(f"Invalid batch operations: {'; '.join(errors)}") from e
             # Execute batch operations atomically
-            new_task_ids = batch_tasks(file_path, validated_ops)
+            new_task_ids = batch_tasks(file_path, validated_ops)  # type: ignore[arg-type]
             spec = parse_task_file(file_path)
             summary = compute_status_summary(spec)
             return SimpleTaskBatchResponse(

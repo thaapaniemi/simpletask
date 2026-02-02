@@ -1,10 +1,14 @@
 """Task operations for CRUD on implementation tasks in task files."""
 
 from pathlib import Path
+from typing import TYPE_CHECKING, Any, Union
 
-from .models import Task, TaskStatus
+from .models import CodeExample, FileAction, Task, TaskStatus
 from .repair import repair_task_file
 from .yaml_parser import InvalidTaskFileError, parse_task_file, write_task_file
+
+if TYPE_CHECKING:
+    from ..mcp.models import BatchTaskOperation
 
 
 def get_next_task_id(tasks: list[Task]) -> str:
@@ -28,6 +32,10 @@ def add_implementation_task(
     goal: str | None = None,
     status: TaskStatus = TaskStatus.NOT_STARTED,
     steps: list[str] | None = None,
+    done_when: list[str] | None = None,
+    prerequisites: list[str] | None = None,
+    files: list[FileAction] | None = None,
+    code_examples: list[CodeExample] | None = None,
 ) -> str:
     """Add a new implementation task to the task file.
 
@@ -37,6 +45,10 @@ def add_implementation_task(
         goal: Optional task goal/description (defaults to name if not provided)
         status: Initial status (default: not_started)
         steps: Optional list of task steps. None or [] adds placeholder step.
+        done_when: Optional list of completion verification conditions
+        prerequisites: Optional list of prerequisite task IDs
+        files: Optional list of FileAction objects specifying files to modify
+        code_examples: Optional list of CodeExample objects with implementation patterns
 
     Returns:
         New task ID
@@ -71,6 +83,10 @@ def add_implementation_task(
         goal=goal,
         status=status,
         steps=steps,
+        done_when=done_when,
+        prerequisites=prerequisites,
+        files=files,
+        code_examples=code_examples,
     )
 
     # Append task
@@ -90,6 +106,11 @@ def update_implementation_task(
     name: str | None = None,
     goal: str | None = None,
     status: TaskStatus | None = None,
+    steps: list[str] | None = None,
+    done_when: list[str] | None = None,
+    prerequisites: list[str] | None = None,
+    files: list[FileAction] | None = None,
+    code_examples: list[CodeExample] | None = None,
 ) -> None:
     """Update an existing implementation task.
 
@@ -99,6 +120,11 @@ def update_implementation_task(
         name: New name (optional)
         goal: New goal (optional)
         status: New status (optional)
+        steps: New steps list (optional, replaces existing)
+        done_when: New completion conditions (optional, replaces existing)
+        prerequisites: New prerequisite list (optional, replaces existing)
+        files: New files list (optional, replaces existing)
+        code_examples: New code examples list (optional, replaces existing)
 
     Raises:
         ValueError: If task not found
@@ -128,6 +154,16 @@ def update_implementation_task(
         task.goal = goal
     if status is not None:
         task.status = status
+    if steps is not None:
+        task.steps = steps
+    if done_when is not None:
+        task.done_when = done_when
+    if prerequisites is not None:
+        task.prerequisites = prerequisites
+    if files is not None:
+        task.files = files
+    if code_examples is not None:
+        task.code_examples = code_examples
 
     # Write back (auto-updates timestamp)
     write_task_file(file_path, spec)
@@ -179,7 +215,9 @@ def remove_implementation_task(
     write_task_file(file_path, spec)
 
 
-def batch_tasks(file_path: Path, operations: list[dict | object]) -> list[str]:
+def batch_tasks(
+    file_path: Path, operations: list[Union[dict[str, Any], "BatchTaskOperation"]]
+) -> list[str]:
     """Perform multiple task operations atomically.
 
     All operations are performed in memory before writing. If any operation
@@ -209,7 +247,10 @@ def batch_tasks(file_path: Path, operations: list[dict | object]) -> list[str]:
         spec.tasks = []
 
     # Convert all operations to dicts once upfront for efficiency
-    ops_as_dicts = [op if isinstance(op, dict) else op.model_dump() for op in operations]
+    ops_as_dicts: list[dict[str, Any]] = [
+        op if isinstance(op, dict) else op.model_dump()  # type: ignore[union-attr]
+        for op in operations
+    ]
 
     # Validate all operations upfront (fail fast before making any changes)
     existing_task_ids = {t.id for t in spec.tasks}
@@ -283,9 +324,25 @@ def batch_tasks(file_path: Path, operations: list[dict | object]) -> list[str]:
             if op_dict.get("status") is not None:
                 task.status = TaskStatus(op_dict["status"])
 
+            # Update new fields if provided
+            if op_dict.get("steps") is not None:
+                task.steps = op_dict["steps"]
+            if op_dict.get("done_when") is not None:
+                task.done_when = op_dict["done_when"]
+            if op_dict.get("prerequisites") is not None:
+                task.prerequisites = op_dict["prerequisites"]
+
+            # Update files field with conversion
+            if op_dict.get("files") is not None:
+                task.files = [FileAction(**f) for f in op_dict["files"]]
+
+            # Update code_examples field with conversion
+            if op_dict.get("code_examples") is not None:
+                task.code_examples = [CodeExample(**c) for c in op_dict["code_examples"]]
+
     # Process add operations
-    new_task_ids = []
-    for op_dict in ops_as_dicts:
+    new_task_ids: list[str] = []
+    for i, op_dict in enumerate(ops_as_dicts):
         if op_dict.get("op") == "add":
             # Generate new task ID
             new_id = get_next_task_id(spec.tasks)
@@ -298,6 +355,31 @@ def batch_tasks(file_path: Path, operations: list[dict | object]) -> list[str]:
             if not steps:
                 steps = ["To be defined"]
 
+            # Extract new fields
+            done_when = op_dict.get("done_when")
+            prerequisites = op_dict.get("prerequisites")
+
+            # Validate prerequisites reference existing or newly-added task IDs
+            if prerequisites:
+                # Build set of all valid task IDs: existing + already added in this batch
+                valid_task_ids = existing_task_ids | (set(new_task_ids) - remove_ids)
+                for prereq_id in prerequisites:
+                    if prereq_id not in valid_task_ids:
+                        raise ValueError(
+                            f"Operation {i}: Invalid prerequisite '{prereq_id}' - "
+                            f"task does not exist. Available: {sorted(valid_task_ids)}"
+                        )
+
+            # Convert files list[dict] to list[FileAction]
+            files = None
+            if op_dict.get("files"):
+                files = [FileAction(**f) for f in op_dict["files"]]
+
+            # Convert code_examples list[dict] to list[CodeExample]
+            code_examples = None
+            if op_dict.get("code_examples"):
+                code_examples = [CodeExample(**c) for c in op_dict["code_examples"]]
+
             # Create new task
             new_task = Task(
                 id=new_id,
@@ -305,6 +387,10 @@ def batch_tasks(file_path: Path, operations: list[dict | object]) -> list[str]:
                 goal=goal,
                 status=TaskStatus.NOT_STARTED,
                 steps=steps,
+                done_when=done_when,
+                prerequisites=prerequisites,
+                files=files,
+                code_examples=code_examples,
             )
 
             spec.tasks.append(new_task)

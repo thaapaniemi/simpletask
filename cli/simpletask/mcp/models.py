@@ -49,6 +49,10 @@ class BatchTaskOperation(BaseModel):
     goal: str | None = Field(None, description="Task goal/description")
     status: str | None = Field(None, description="Task status (for update)")
     steps: list[str] | None = Field(None, description="Task steps (for add)")
+    done_when: list[str] | None = Field(None, description="Completion conditions")
+    prerequisites: list[str] | None = Field(None, description="Task IDs that must complete first")
+    files: list[dict] | None = Field(None, description="Files to create/modify/delete")
+    code_examples: list[dict] | None = Field(None, description="Code patterns to follow")
 
     @model_validator(mode="after")
     def validate_required_fields(self) -> "BatchTaskOperation":

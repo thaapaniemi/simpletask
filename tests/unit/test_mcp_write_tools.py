@@ -537,3 +537,479 @@ class TestTaskStepsParameter:
         assert len(raw_data["tasks"]) == 1
         assert "steps" in raw_data["tasks"][0]
         assert raw_data["tasks"][0]["steps"] == ["First step", "Second step"]
+
+
+class TestTaskNewFields:
+    """Tests for new Task model fields (done_when, prerequisites, files, code_examples)."""
+
+    def test_task_add_with_done_when(self, temp_project):
+        """Test task add with done_when parameter."""
+        import subprocess
+
+        from simpletask.core.project import get_task_file_path
+        from simpletask.core.yaml_parser import parse_task_file
+
+        new(branch="done-when-test", title="Test", prompt="Test", criteria=["AC1"])
+
+        subprocess.run(["git", "checkout", "-b", "done-when-test"], cwd=temp_project, check=True)
+
+        result = task(
+            action="add",
+            name="Test Task",
+            goal="Test goal",
+            done_when=["pytest passes", "No lint errors"],
+        )
+
+        assert result.success is True
+
+        # Verify done_when was saved
+        task_path = get_task_file_path("done-when-test")
+        spec = parse_task_file(task_path)
+        assert spec.tasks is not None
+        task_obj = spec.tasks[0]
+        assert task_obj.done_when == ["pytest passes", "No lint errors"]
+
+    def test_task_add_with_prerequisites(self, temp_project):
+        """Test task add with prerequisites parameter."""
+        import subprocess
+
+        from simpletask.core.project import get_task_file_path
+        from simpletask.core.yaml_parser import parse_task_file
+
+        new(branch="prereq-test", title="Test", prompt="Test", criteria=["AC1"])
+
+        subprocess.run(["git", "checkout", "-b", "prereq-test"], cwd=temp_project, check=True)
+
+        # Add first task
+        task(action="add", name="First Task", goal="First")
+
+        # Add second task with prerequisite
+        result = task(
+            action="add",
+            name="Second Task",
+            goal="Second",
+            prerequisites=["T001"],
+        )
+
+        assert result.success is True
+
+        # Verify prerequisites was saved
+        task_path = get_task_file_path("prereq-test")
+        spec = parse_task_file(task_path)
+        assert spec.tasks is not None
+        assert len(spec.tasks) == 2
+        second_task = spec.tasks[1]
+        assert second_task.prerequisites == ["T001"]
+
+    def test_task_add_with_files(self, temp_project):
+        """Test task add with files parameter."""
+        import subprocess
+
+        from simpletask.core.project import get_task_file_path
+        from simpletask.core.yaml_parser import parse_task_file
+
+        new(branch="files-test", title="Test", prompt="Test", criteria=["AC1"])
+
+        subprocess.run(["git", "checkout", "-b", "files-test"], cwd=temp_project, check=True)
+
+        result = task(
+            action="add",
+            name="Test Task",
+            goal="Test goal",
+            files=[
+                {"path": "src/models.py", "action": "create"},
+                {"path": "src/views.py", "action": "modify"},
+            ],
+        )
+
+        assert result.success is True
+
+        # Verify files was saved
+        task_path = get_task_file_path("files-test")
+        spec = parse_task_file(task_path)
+        assert spec.tasks is not None
+        task_obj = spec.tasks[0]
+        assert task_obj.files is not None
+        assert len(task_obj.files) == 2
+        assert task_obj.files[0].path == "src/models.py"
+        assert task_obj.files[0].action == "create"
+        assert task_obj.files[1].path == "src/views.py"
+        assert task_obj.files[1].action == "modify"
+
+    def test_task_add_with_code_examples(self, temp_project):
+        """Test task add with code_examples parameter."""
+        import subprocess
+
+        from simpletask.core.project import get_task_file_path
+        from simpletask.core.yaml_parser import parse_task_file
+
+        new(branch="code-examples-test", title="Test", prompt="Test", criteria=["AC1"])
+
+        subprocess.run(
+            ["git", "checkout", "-b", "code-examples-test"], cwd=temp_project, check=True
+        )
+
+        result = task(
+            action="add",
+            name="Test Task",
+            goal="Test goal",
+            code_examples=[
+                {
+                    "language": "python",
+                    "description": "Example pattern",
+                    "code": "def example(): pass",
+                },
+            ],
+        )
+
+        assert result.success is True
+
+        # Verify code_examples was saved
+        task_path = get_task_file_path("code-examples-test")
+        spec = parse_task_file(task_path)
+        assert spec.tasks is not None
+        task_obj = spec.tasks[0]
+        assert task_obj.code_examples is not None
+        assert len(task_obj.code_examples) == 1
+        assert task_obj.code_examples[0].language == "python"
+        assert task_obj.code_examples[0].description == "Example pattern"
+        assert task_obj.code_examples[0].code == "def example(): pass"
+
+    def test_task_add_with_all_fields(self, temp_project):
+        """Test task add with all new parameters combined."""
+        import subprocess
+
+        from simpletask.core.project import get_task_file_path
+        from simpletask.core.yaml_parser import parse_task_file
+
+        new(branch="all-fields-test", title="Test", prompt="Test", criteria=["AC1"])
+
+        subprocess.run(["git", "checkout", "-b", "all-fields-test"], cwd=temp_project, check=True)
+
+        # Add first task to use as prerequisite
+        task(action="add", name="First Task", goal="First")
+
+        # Add second task with all fields
+        result = task(
+            action="add",
+            name="Full Task",
+            goal="Task with all fields",
+            steps=["Step 1", "Step 2"],
+            done_when=["All tests pass", "No errors"],
+            prerequisites=["T001"],
+            files=[
+                {"path": "src/module.py", "action": "create"},
+            ],
+            code_examples=[
+                {
+                    "language": "python",
+                    "description": "Pattern to follow",
+                    "code": "class Example: pass",
+                },
+            ],
+        )
+
+        assert result.success is True
+
+        # Verify all fields were saved correctly
+        task_path = get_task_file_path("all-fields-test")
+        spec = parse_task_file(task_path)
+        assert spec.tasks is not None
+        assert len(spec.tasks) == 2
+        full_task = spec.tasks[1]
+
+        assert full_task.name == "Full Task"
+        assert full_task.goal == "Task with all fields"
+        assert full_task.steps == ["Step 1", "Step 2"]
+        assert full_task.done_when == ["All tests pass", "No errors"]
+        assert full_task.prerequisites == ["T001"]
+        assert full_task.files is not None
+        assert len(full_task.files) == 1
+        assert full_task.files[0].path == "src/module.py"
+        assert full_task.files[0].action == "create"
+        assert full_task.code_examples is not None
+        assert len(full_task.code_examples) == 1
+        assert full_task.code_examples[0].language == "python"
+        assert full_task.code_examples[0].code == "class Example: pass"
+
+    def test_task_update_steps(self, temp_project):
+        """Test task update can modify steps."""
+        import subprocess
+
+        from simpletask.core.project import get_task_file_path
+        from simpletask.core.yaml_parser import parse_task_file
+
+        new(branch="update-steps-test", title="Test", prompt="Test", criteria=["AC1"])
+
+        subprocess.run(["git", "checkout", "-b", "update-steps-test"], cwd=temp_project, check=True)
+
+        # Add task with initial steps
+        task(action="add", name="Test Task", steps=["Initial step"])
+
+        # Update steps
+        result = task(
+            action="update",
+            task_id="T001",
+            steps=["Updated step 1", "Updated step 2"],
+        )
+
+        assert result.success is True
+
+        # Verify steps were updated
+        task_path = get_task_file_path("update-steps-test")
+        spec = parse_task_file(task_path)
+        assert spec.tasks is not None
+        task_obj = spec.tasks[0]
+        assert task_obj.steps == ["Updated step 1", "Updated step 2"]
+
+    def test_task_update_done_when_and_files(self, temp_project):
+        """Test task update can modify done_when and files."""
+        import subprocess
+
+        from simpletask.core.project import get_task_file_path
+        from simpletask.core.yaml_parser import parse_task_file
+
+        new(branch="update-fields-test", title="Test", prompt="Test", criteria=["AC1"])
+
+        subprocess.run(
+            ["git", "checkout", "-b", "update-fields-test"], cwd=temp_project, check=True
+        )
+
+        # Add task
+        task(action="add", name="Test Task")
+
+        # Update done_when and files
+        result = task(
+            action="update",
+            task_id="T001",
+            done_when=["Tests pass"],
+            files=[{"path": "src/new.py", "action": "create"}],
+        )
+
+        assert result.success is True
+
+        # Verify fields were updated
+        task_path = get_task_file_path("update-fields-test")
+        spec = parse_task_file(task_path)
+        assert spec.tasks is not None
+        task_obj = spec.tasks[0]
+        assert task_obj.done_when == ["Tests pass"]
+        assert task_obj.files is not None
+        assert len(task_obj.files) == 1
+        assert task_obj.files[0].path == "src/new.py"
+
+    def test_batch_add_with_full_fields(self, temp_project):
+        """Test batch operation with all Task model fields."""
+        import subprocess
+
+        from simpletask.core.project import get_task_file_path
+        from simpletask.core.yaml_parser import parse_task_file
+
+        new(branch="batch-full-test", title="Test", prompt="Test", criteria=["AC1"])
+
+        subprocess.run(["git", "checkout", "-b", "batch-full-test"], cwd=temp_project, check=True)
+
+        # Use batch operation to add task with all fields
+        result = task(
+            action="batch",
+            operations=[
+                {
+                    "op": "add",
+                    "name": "Full Batch Task",
+                    "goal": "Task with all fields in batch",
+                    "steps": ["Batch step 1", "Batch step 2"],
+                    "done_when": ["Batch condition met"],
+                    "prerequisites": [],
+                    "files": [{"path": "src/batch.py", "action": "create"}],
+                    "code_examples": [
+                        {
+                            "language": "python",
+                            "description": "Batch example",
+                            "code": "def batch_example(): pass",
+                        }
+                    ],
+                },
+            ],
+        )
+
+        assert result.success is True
+        assert len(result.new_item_ids) == 1
+
+        # Verify all fields were saved
+        task_path = get_task_file_path("batch-full-test")
+        spec = parse_task_file(task_path)
+        assert spec.tasks is not None
+        assert len(spec.tasks) == 1
+        batch_task = spec.tasks[0]
+
+        assert batch_task.name == "Full Batch Task"
+        assert batch_task.goal == "Task with all fields in batch"
+        assert batch_task.steps == ["Batch step 1", "Batch step 2"]
+        assert batch_task.done_when == ["Batch condition met"]
+        assert batch_task.prerequisites == []
+        assert batch_task.files is not None
+        assert len(batch_task.files) == 1
+        assert batch_task.files[0].path == "src/batch.py"
+        assert batch_task.code_examples is not None
+        assert len(batch_task.code_examples) == 1
+        assert batch_task.code_examples[0].language == "python"
+
+    def test_batch_update_new_fields(self, temp_project):
+        """Test batch update operation modifies done_when, files, and code_examples."""
+        import subprocess
+
+        from simpletask.core.project import get_task_file_path
+        from simpletask.core.yaml_parser import parse_task_file
+
+        new(branch="batch-update-test", title="Test", prompt="Test", criteria=["AC1"])
+
+        subprocess.run(["git", "checkout", "-b", "batch-update-test"], cwd=temp_project, check=True)
+
+        # Add initial task with basic fields
+        task(action="add", name="Initial Task", goal="Initial goal")
+
+        # Use batch operation to update task with new fields
+        result = task(
+            action="batch",
+            operations=[
+                {
+                    "op": "update",
+                    "task_id": "T001",
+                    "done_when": ["Updated condition 1", "Updated condition 2"],
+                    "files": [
+                        {"path": "src/updated.py", "action": "modify"},
+                        {"path": "tests/test_updated.py", "action": "create"},
+                    ],
+                    "code_examples": [
+                        {
+                            "language": "python",
+                            "description": "Updated pattern",
+                            "code": "def updated_example(): return True",
+                        }
+                    ],
+                },
+            ],
+        )
+
+        assert result.success is True
+
+        # Verify all fields were updated correctly
+        task_path = get_task_file_path("batch-update-test")
+        spec = parse_task_file(task_path)
+        assert spec.tasks is not None
+        assert len(spec.tasks) == 1
+        updated_task = spec.tasks[0]
+
+        assert updated_task.name == "Initial Task"
+        assert updated_task.goal == "Initial goal"
+        assert updated_task.done_when == ["Updated condition 1", "Updated condition 2"]
+        assert updated_task.files is not None
+        assert len(updated_task.files) == 2
+        assert updated_task.files[0].path == "src/updated.py"
+        assert updated_task.files[0].action == "modify"
+        assert updated_task.files[1].path == "tests/test_updated.py"
+        assert updated_task.files[1].action == "create"
+        assert updated_task.code_examples is not None
+        assert len(updated_task.code_examples) == 1
+        assert updated_task.code_examples[0].language == "python"
+        assert updated_task.code_examples[0].description == "Updated pattern"
+        assert updated_task.code_examples[0].code == "def updated_example(): return True"
+
+    def test_batch_invalid_prerequisite_atomicity(self, temp_project):
+        """Test batch operations with invalid prerequisites fail atomically without partial changes."""
+        import subprocess
+
+        import pytest
+        from simpletask.core.project import get_task_file_path
+        from simpletask.core.yaml_parser import parse_task_file
+
+        new(branch="batch-atomic-test", title="Test", prompt="Test", criteria=["AC1"])
+
+        subprocess.run(["git", "checkout", "-b", "batch-atomic-test"], cwd=temp_project, check=True)
+
+        # Add initial task
+        task(action="add", name="Initial Task", goal="Initial")
+
+        # Record initial state
+        task_path = get_task_file_path("batch-atomic-test")
+        spec_before = parse_task_file(task_path)
+        assert spec_before.tasks is not None
+        initial_task_count = len(spec_before.tasks)
+        initial_task_name = spec_before.tasks[0].name
+
+        # Try batch with mix of valid and invalid operations
+        # Should fail atomically without applying any changes
+        with pytest.raises(ValueError) as exc_info:
+            task(
+                action="batch",
+                operations=[
+                    {"op": "add", "name": "Valid Add", "goal": "This should not be added"},
+                    {
+                        "op": "add",
+                        "name": "Invalid Prereq",
+                        "prerequisites": ["T999"],  # Non-existent prerequisite
+                    },
+                    {"op": "update", "task_id": "T001", "name": "Updated Name"},
+                ],
+            )
+
+        # Verify error message mentions prerequisite
+        error_msg = str(exc_info.value)
+        assert "T999" in error_msg
+        assert "prerequisite" in error_msg.lower()
+
+        # Verify task spec unchanged (no partial operations applied)
+        spec_after = parse_task_file(task_path)
+        assert spec_after.tasks is not None
+        assert len(spec_after.tasks) == initial_task_count
+        assert spec_after.tasks[0].name == initial_task_name
+        # Verify no new tasks were added
+        assert all(t.name != "Valid Add" for t in spec_after.tasks)
+        assert all(t.name != "Invalid Prereq" for t in spec_after.tasks)
+
+    def test_invalid_prerequisites_error(self, temp_project):
+        """Test that invalid prerequisites raise clear error."""
+        import subprocess
+
+        import pytest
+        from simpletask.core.yaml_parser import InvalidTaskFileError
+
+        new(branch="invalid-prereq-test", title="Test", prompt="Test", criteria=["AC1"])
+
+        subprocess.run(
+            ["git", "checkout", "-b", "invalid-prereq-test"], cwd=temp_project, check=True
+        )
+
+        # Try to add task with non-existent prerequisite - should fail validation
+        with pytest.raises(InvalidTaskFileError) as exc_info:
+            task(
+                action="add",
+                name="Test Task",
+                prerequisites=["T999"],  # Non-existent task
+            )
+
+        error_msg = str(exc_info.value)
+        assert "T999" in error_msg
+        assert "prerequisite" in error_msg.lower()
+
+    def test_invalid_file_action_error(self, temp_project):
+        """Test that invalid file action values raise clear error."""
+        import subprocess
+
+        import pytest
+        from pydantic import ValidationError
+
+        new(branch="invalid-file-test", title="Test", prompt="Test", criteria=["AC1"])
+
+        subprocess.run(["git", "checkout", "-b", "invalid-file-test"], cwd=temp_project, check=True)
+
+        # Try to add task with invalid file action
+        with pytest.raises(ValidationError) as exc_info:
+            task(
+                action="add",
+                name="Test Task",
+                files=[{"path": "src/test.py", "action": "invalid_action"}],
+            )
+
+        error_msg = str(exc_info.value)
+        assert "invalid_action" in error_msg or "action" in error_msg.lower()

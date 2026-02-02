@@ -399,6 +399,11 @@ Manage implementation tasks (add, update, remove).
 | `name` | string | Conditional | - | Task name (required for add) |
 | `goal` | string | No | - | Task goal/description |
 | `status` | string | No | - | Status for update: `not_started`, `in_progress`, `completed`, `blocked`, `paused` |
+| `steps` | list[str] | No | `["To be defined"]` | Task implementation steps (for add/update) |
+| `done_when` | list[str] | No | `null` | Completion verification conditions (for add/update) |
+| `prerequisites` | list[str] | No | `null` | Prerequisite task IDs (for add/update) |
+| `files` | list[dict] | No | `null` | Files to modify, each with `path` and `action` fields (for add/update) |
+| `code_examples` | list[dict] | No | `null` | Code examples with `language`, `description`, and `code` fields (for add/update) |
 
 **Returns:**
 
@@ -407,7 +412,28 @@ A `SimpleTaskGetResponse` object with the updated spec and summary.
 **Example usage:**
 
 ```python
-# Add a new task
+# Add a new task with all fields
+result = simpletask_task(
+    action="add",
+    name="Create User model",
+    goal="Define database schema for user accounts",
+    steps=["Define User class", "Add fields", "Add validation"],
+    done_when=["Model passes tests", "No mypy errors"],
+    prerequisites=["T001"],  # Depends on task T001
+    files=[
+        {"path": "src/models/user.py", "action": "create"},
+        {"path": "tests/test_user.py", "action": "create"},
+    ],
+    code_examples=[
+        {
+            "language": "python",
+            "description": "Follow this Pydantic pattern",
+            "code": "class BaseModel:\n    model_config = {'extra': 'forbid'}",
+        }
+    ],
+)
+
+# Add a simple task (only required fields)
 result = simpletask_task(
     action="add",
     name="Create User model",
@@ -421,12 +447,14 @@ result = simpletask_task(
     status="completed"
 )
 
-# Update task name/goal
+# Update task fields including steps and done_when
 result = simpletask_task(
     action="update",
     task_id="T001",
     name="Updated task name",
-    goal="Updated description"
+    goal="Updated description",
+    steps=["New step 1", "New step 2"],
+    done_when=["Updated condition"],
 )
 
 # Remove task
@@ -434,6 +462,38 @@ result = simpletask_task(
     action="remove",
     task_id="T001"
 )
+```
+
+**Batch operations example:**
+
+```python
+# Batch operation with full task definitions
+result = simpletask_task(
+    action="batch",
+    operations=[
+        {
+            "op": "add",
+            "name": "Setup database",
+            "goal": "Configure database connection",
+            "steps": ["Install dependencies", "Configure settings"],
+            "done_when": ["Connection works"],
+            "files": [{"path": "config/db.py", "action": "create"}],
+        },
+        {
+            "op": "add",
+            "name": "Create models",
+            "goal": "Define data models",
+            "prerequisites": ["T001"],  # Depends on first task
+            "files": [{"path": "models/user.py", "action": "create"}],
+        },
+        {
+            "op": "update",
+            "task_id": "T003",
+            "status": "completed",
+        },
+    ],
+)
+# Returns: {"success": true, "new_item_ids": ["T001", "T002"], ...}
 ```
 
 **AI prompts:**
