@@ -1,7 +1,8 @@
-description = "Create specification and implementation plan from feature description using simpletask."
+---
+description: Create specification and implementation plan from feature description using simpletask.
+---
 
-prompt = """
-User input: {{args}}
+User input: $ARGUMENTS
 
 **CRITICAL: This is a PLANNING phase. DO NOT implement code or execute tasks. Your job is to create/update the task file with acceptance criteria and task breakdown - then STOP.**
 
@@ -114,7 +115,7 @@ Use simpletask CLI to create the task file:
 **Preferred: Use MCP tool** (if simpletask MCP server is available)
 ```
 Use simpletask_new() MCP tool to create task file:
-- Call simpletask_new(branch="[branch-name]", title="[title]", prompt="[original prompt from {{args}}]", criteria=None)
+- Call simpletask_new(branch="[branch-name]", title="[title]", prompt="[original prompt from $ARGUMENTS]", criteria=None)
 - The MCP tool handles branch name normalization automatically
 - Returns SimpleTaskWriteResponse with file_path and summary
 - If criteria=None, creates placeholder criterion automatically
@@ -122,7 +123,7 @@ Use simpletask_new() MCP tool to create task file:
 
 **Fallback: Use CLI** (if MCP tools not available)
 ```bash
-simpletask new [branch-name] "[original prompt from {{args}}]" -y
+simpletask new [branch-name] "[original prompt from $ARGUMENTS]" -y
 ```
 
 This creates a task file with the basic structure.
@@ -572,4 +573,3 @@ The planning phase is complete when:
 2. All acceptance criteria are defined
 3. All implementation tasks are detailed with steps, done_when, and prerequisites
 4. `simpletask schema validate` passes
-"""

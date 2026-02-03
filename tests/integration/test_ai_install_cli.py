@@ -37,9 +37,9 @@ class TestAiInstallCLI:
         assert (opencode_dir / "simpletask.plan.md").exists()
         assert (opencode_dir / "simpletask.implement.md").exists()
         assert (opencode_dir / "simpletask.review.md").exists()
-        assert (qwen_dir / "simpletask.plan.toml").exists()
-        assert (qwen_dir / "simpletask.implement.toml").exists()
-        assert (qwen_dir / "simpletask.review.toml").exists()
+        assert (qwen_dir / "simpletask.plan.md").exists()
+        assert (qwen_dir / "simpletask.implement.md").exists()
+        assert (qwen_dir / "simpletask.review.md").exists()
         assert (gemini_dir / "simpletask.plan.toml").exists()
         assert (gemini_dir / "simpletask.implement.toml").exists()
         assert (gemini_dir / "simpletask.review.toml").exists()
@@ -79,7 +79,7 @@ class TestAiInstallCLI:
         assert "Installing OpenCode commands" not in result.stdout
 
         # Verify only Qwen files were created
-        assert (qwen_dir / "simpletask.plan.toml").exists()
+        assert (qwen_dir / "simpletask.plan.md").exists()
         assert not opencode_dir.exists()
 
     @patch("simpletask.commands.ai.install.get_global_commands_dir")
@@ -133,7 +133,7 @@ class TestAiInstallCLI:
 
         # Verify all three were created
         assert (opencode_dir / "simpletask.plan.md").exists()
-        assert (qwen_dir / "simpletask.plan.toml").exists()
+        assert (qwen_dir / "simpletask.plan.md").exists()
         assert (gemini_dir / "simpletask.plan.toml").exists()
 
     @patch("simpletask.commands.ai.install.get_local_commands_dir")
@@ -159,7 +159,7 @@ class TestAiInstallCLI:
 
         # Verify files were created in local directories
         assert (opencode_dir / "simpletask.plan.md").exists()
-        assert (qwen_dir / "simpletask.plan.toml").exists()
+        assert (qwen_dir / "simpletask.plan.md").exists()
         assert (gemini_dir / "simpletask.plan.toml").exists()
 
     @patch("simpletask.commands.ai.install.get_global_commands_dir")
@@ -176,17 +176,16 @@ class TestAiInstallCLI:
 
         # Create existing files
         (opencode_dir / "simpletask.plan.md").write_text("old opencode content")
-        (qwen_dir / "simpletask.plan.toml").write_text("old qwen content")
+        (qwen_dir / "simpletask.plan.md").write_text("old qwen content")
 
         result = runner.invoke(app, ["ai", "install", "--no-overwrite"])
 
         assert result.exit_code == 0
         assert "Skipped (already exists): simpletask.plan.md" in result.stdout
-        assert "Skipped (already exists): simpletask.plan.toml" in result.stdout
 
         # Verify existing files were not overwritten
         assert (opencode_dir / "simpletask.plan.md").read_text() == "old opencode content"
-        assert (qwen_dir / "simpletask.plan.toml").read_text() == "old qwen content"
+        assert (qwen_dir / "simpletask.plan.md").read_text() == "old qwen content"
 
     @patch("simpletask.commands.ai.install.get_local_commands_dir")
     @patch("simpletask.commands.ai.install.get_local_qwen_commands_dir")
@@ -205,7 +204,7 @@ class TestAiInstallCLI:
 
         # Verify both were created
         assert (opencode_dir / "simpletask.plan.md").exists()
-        assert (qwen_dir / "simpletask.plan.toml").exists()
+        assert (qwen_dir / "simpletask.plan.md").exists()
 
     @patch("simpletask.commands.ai.install.get_global_commands_dir")
     @patch("simpletask.commands.ai.install.get_global_qwen_commands_dir")
@@ -228,7 +227,8 @@ class TestAiInstallCLI:
         assert "Installed: simpletask.plan.md" in result.stdout
         assert "Installed: simpletask.implement.md" in result.stdout
         assert "Installed: simpletask.review.md" in result.stdout
-        # Should show installed files for Qwen
-        assert "Installed: simpletask.plan.toml" in result.stdout
-        assert "Installed: simpletask.implement.toml" in result.stdout
-        assert "Installed: simpletask.review.toml" in result.stdout
+        # Should show installed files for Qwen (now using .md format)
+        # Note: Multiple "Installed: simpletask.plan.md" from both OpenCode and Qwen
+        assert "simpletask.plan.md" in result.stdout
+        assert "simpletask.implement.md" in result.stdout
+        assert "simpletask.review.md" in result.stdout

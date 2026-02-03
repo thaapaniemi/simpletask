@@ -1,7 +1,8 @@
-description = "Comprehensive code review and analysis against plan and specification using simpletask."
+---
+description: Review completed implementation and verify task file completeness.
+---
 
-prompt = """
-User input: {{args}}
+User input: $ARGUMENTS
 
 You are conducting a thorough, technically precise code review. Be brutally honest about issues, inefficiencies, and shortcomings. Your goal is to identify EVERY flaw and provide actionable, specific feedback.
 
@@ -511,4 +512,3 @@ Before marking as "READY TO MERGE":
 5. **Schema valid**: `simpletask schema validate` passes
 
 If ANY of these fail, the review should report "NEEDS CHANGES" or "NOT READY".
-"""

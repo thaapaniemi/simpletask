@@ -287,11 +287,11 @@ class TestGetBundledQwenTemplates:
         for template in templates:
             assert isinstance(template, Path)
 
-    def test_returns_only_toml_files(self):
-        """Should return only .toml files."""
+    def test_returns_only_md_files(self):
+        """Should return only .md files."""
         templates = get_bundled_qwen_templates()
         for template in templates:
-            assert template.suffix == ".toml"
+            assert template.suffix == ".md"
 
     def test_returns_expected_templates(self):
         """Should return the four bundled Qwen templates."""
@@ -299,10 +299,10 @@ class TestGetBundledQwenTemplates:
         template_names = {t.name for t in templates}
 
         expected = {
-            "simpletask.plan.toml",
-            "simpletask.split.toml",
-            "simpletask.implement.toml",
-            "simpletask.review.toml",
+            "simpletask.plan.md",
+            "simpletask.split.md",
+            "simpletask.implement.md",
+            "simpletask.review.md",
         }
 
         assert template_names == expected
@@ -365,17 +365,17 @@ class TestInstallQwenTemplates:
         target_dir.mkdir(parents=True)
 
         # Create existing file
-        existing_file = target_dir / "simpletask.plan.toml"
+        existing_file = target_dir / "simpletask.plan.md"
         existing_file.write_text("old content")
 
         installed, _skipped, overwritten = install_qwen_templates(target_dir, no_overwrite=False)
 
         # Should report one overwrite
-        assert "simpletask.plan.toml" in overwritten
+        assert "simpletask.plan.md" in overwritten
         assert len(overwritten) == 1
 
         # Should not report overwritten files as newly installed
-        assert "simpletask.plan.toml" not in installed
+        assert "simpletask.plan.md" not in installed
 
         # Should install the other three files
         assert len(installed) == 3
@@ -390,14 +390,14 @@ class TestInstallQwenTemplates:
         target_dir.mkdir(parents=True)
 
         # Create existing file
-        existing_file = target_dir / "simpletask.plan.toml"
+        existing_file = target_dir / "simpletask.plan.md"
         old_content = "old content"
         existing_file.write_text(old_content)
 
         installed, skipped, overwritten = install_qwen_templates(target_dir, no_overwrite=True)
 
         # Should report one skip
-        assert "simpletask.plan.toml" in skipped
+        assert "simpletask.plan.md" in skipped
         assert len(skipped) == 1
 
         # Should not report as overwritten
@@ -771,38 +771,42 @@ class TestGetGeminiInstalledStatus:
             assert locations["local"] is True
 
 
-class TestGeminiTemplatesIdenticalToQwen:
-    """Verify Gemini templates remain identical to Qwen (shared format)."""
+class TestGeminiAndQwenTemplateDifferences:
+    """Verify Gemini (TOML) and Qwen (Markdown) templates are no longer identical."""
 
-    def test_gemini_and_qwen_have_same_templates(self):
-        """Gemini and Qwen should have identical template files."""
+    def test_gemini_and_qwen_have_same_count(self):
+        """Gemini and Qwen should have the same number of templates."""
         qwen_templates = get_bundled_qwen_templates()
         gemini_templates = get_bundled_gemini_templates()
 
         # Same number of templates
         assert len(qwen_templates) == len(gemini_templates)
 
-        # Same filenames
-        qwen_names = sorted([t.name for t in qwen_templates])
-        gemini_names = sorted([t.name for t in gemini_templates])
-        assert qwen_names == gemini_names
-
-    def test_gemini_templates_byte_identical_to_qwen(self):
-        """Gemini template contents should be byte-for-byte identical to Qwen."""
+    def test_gemini_uses_toml_qwen_uses_markdown(self):
+        """Gemini should use TOML format while Qwen uses Markdown format."""
         qwen_templates = get_bundled_qwen_templates()
-        gemini_dir = get_gemini_templates_dir()
+        gemini_templates = get_bundled_gemini_templates()
 
-        for qwen_path in qwen_templates:
-            gemini_path = gemini_dir / qwen_path.name
-            assert gemini_path.exists(), f"Gemini template {qwen_path.name} not found"
+        # Qwen uses .md extension
+        for template in qwen_templates:
+            assert template.suffix == ".md", f"Qwen template {template.name} should be .md"
 
-            qwen_content = qwen_path.read_text()
-            gemini_content = gemini_path.read_text()
+        # Gemini uses .toml extension
+        for template in gemini_templates:
+            assert template.suffix == ".toml", f"Gemini template {template.name} should be .toml"
 
-            assert qwen_content == gemini_content, (
-                f"Template {qwen_path.name} differs between Qwen and Gemini. "
-                "These should be identical since Gemini CLI uses the same TOML format."
-            )
+    def test_gemini_and_qwen_have_matching_base_names(self):
+        """Gemini and Qwen should have the same template base names (without extensions)."""
+        qwen_templates = get_bundled_qwen_templates()
+        gemini_templates = get_bundled_gemini_templates()
+
+        # Extract base names (without extensions)
+        qwen_bases = sorted([t.stem for t in qwen_templates])
+        gemini_bases = sorted([t.stem for t in gemini_templates])
+
+        assert (
+            qwen_bases == gemini_bases
+        ), "Qwen and Gemini should have the same template names (ignoring extensions)"
 
 
 class TestSplitTemplateContent:
@@ -899,41 +903,42 @@ class TestSplitTemplateContent:
             line_count < 500
         ), f"Split template is {line_count} lines, should be <500 for token efficiency"
 
-    def test_qwen_split_template_has_toml_structure(self):
-        """Qwen split template should have valid TOML structure."""
+    def test_qwen_split_template_has_markdown_structure(self):
+        """Qwen split template should have valid Markdown with YAML frontmatter structure."""
         templates = get_bundled_qwen_templates()
-        split_template = next((t for t in templates if t.name == "simpletask.split.toml"), None)
-        assert split_template is not None, "simpletask.split.toml not found"
+        split_template = next((t for t in templates if t.name == "simpletask.split.md"), None)
+        assert split_template is not None, "simpletask.split.md not found"
 
         content = split_template.read_text()
 
-        # TOML structure markers
-        assert 'description = "' in content, "Missing TOML description field"
-        assert 'prompt = """' in content, "Missing TOML prompt field"
+        # Markdown with YAML frontmatter structure markers
+        assert content.startswith("---\n"), "Missing YAML frontmatter opening"
+        assert "description:" in content, "Missing YAML description field"
+        assert "\n---\n" in content, "Missing YAML frontmatter closing"
 
-    def test_qwen_split_template_has_prompt_field(self):
-        """Qwen split template prompt field should contain essential content."""
+    def test_qwen_split_template_has_essential_content(self):
+        """Qwen split template should contain essential content."""
         templates = get_bundled_qwen_templates()
-        split_template = next((t for t in templates if t.name == "simpletask.split.toml"), None)
+        split_template = next((t for t in templates if t.name == "simpletask.split.md"), None)
         assert split_template is not None
 
         content = split_template.read_text()
 
-        # Essential content within prompt field
-        essential_in_prompt = [
+        # Essential content
+        essential_content = [
             "Step 1: Load Task File",
             "Step 2: Identify Tasks to Split",
             "simpletask_get",
             "simpletask_task",
         ]
 
-        for item in essential_in_prompt:
-            assert item in content, f"Missing essential content in prompt: {item}"
+        for item in essential_content:
+            assert item in content, f"Missing essential content: {item}"
 
     def test_qwen_split_template_size_under_500_lines(self):
         """Qwen split template should be under 500 lines for token efficiency."""
         templates = get_bundled_qwen_templates()
-        split_template = next((t for t in templates if t.name == "simpletask.split.toml"), None)
+        split_template = next((t for t in templates if t.name == "simpletask.split.md"), None)
         assert split_template is not None
 
         content = split_template.read_text()
@@ -943,19 +948,11 @@ class TestSplitTemplateContent:
             line_count < 500
         ), f"Qwen split template is {line_count} lines, should be <500 for token efficiency"
 
-    def test_gemini_split_template_matches_qwen_exactly(self):
-        """Gemini split template should be byte-identical to Qwen."""
-        qwen_templates = get_bundled_qwen_templates()
-        qwen_split = next((t for t in qwen_templates if t.name == "simpletask.split.toml"), None)
-        assert qwen_split is not None
-
+    def test_gemini_split_template_exists(self):
+        """Gemini split template should exist (uses TOML format, while Qwen uses Markdown)."""
         gemini_dir = get_gemini_templates_dir()
         gemini_split = gemini_dir / "simpletask.split.toml"
         assert gemini_split.exists(), "Gemini simpletask.split.toml not found"
 
-        qwen_content = qwen_split.read_text()
-        gemini_content = gemini_split.read_text()
-
-        assert (
-            qwen_content == gemini_content
-        ), "simpletask.split.toml differs between Qwen and Gemini. These must be byte-identical."
+        # Note: Qwen now uses Markdown (.md) while Gemini uses TOML (.toml)
+        # They are no longer byte-identical but serve the same purpose

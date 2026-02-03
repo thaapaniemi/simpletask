@@ -1,7 +1,8 @@
-description = "Split complex tasks into atomic subtasks to reduce cognitive load for AI execution"
+---
+description: Split complex tasks into atomic subtasks to reduce cognitive load for AI execution
+---
 
-prompt = """
-User input: {{args}}
+User input: $ARGUMENTS
 
 **Purpose:** This tool ensures AI models have minimal context per task by splitting complex tasks into ultra-atomic units (1-2 steps, 5-10 minutes). This eliminates ambiguity and decision-making during implementation.
 
@@ -394,4 +395,3 @@ simpletask_get(branch=None)
 - **No ambiguity**
 
 If a subtask takes >10 minutes or has >2 steps, split it further.
-"""

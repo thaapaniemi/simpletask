@@ -31,7 +31,7 @@ EDITOR_CONFIGS: dict[EditorType, EditorConfig] = {
     "qwen": EditorConfig(
         display_name="Qwen",
         template_subdir="qwen",
-        file_extension=".toml",
+        file_extension=".md",
         global_config_dir=(".qwen", "commands"),
         local_config_dir=(".qwen", "commands"),
     ),

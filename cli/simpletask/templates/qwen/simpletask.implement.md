@@ -1,7 +1,8 @@
-description = "Execute task list to implement feature/fix using simpletask."
+---
+description: Execute task list to implement feature/fix using simpletask.
+---
 
-prompt = """
-User input: {{args}}
+User input: $ARGUMENTS
 
 **CRITICAL: You MUST update task status after completing each task, commit your changes, and mark acceptance criteria as complete. These are MANDATORY steps, not optional.**
 
@@ -66,7 +67,7 @@ User input: {{args}}
    - Prerequisites (tasks that must complete first)
    - Build dependency graph and determine execution order
 
-3. If {{args}} specifies a task ID (e.g., "T003"), start from that task
+3. If $ARGUMENTS specifies a task ID (e.g., "T003"), start from that task
 
 **Step 3: Execute Tasks in Order**
 
@@ -456,7 +457,7 @@ Document the blocker in the task file or commit message.
 
 ### Partial Implementation
 
-If implementing only specific tasks (from {{args}}):
+If implementing only specific tasks (from $ARGUMENTS):
 1. Start from the specified task
 2. Ensure all prerequisites are already complete
 3. Continue with dependent tasks if requested
@@ -686,4 +687,3 @@ After `/simpletask.review`, if you see "ACCEPTANCE CRITERIA INCOMPLETE":
 - Commit after individual tasks (wait until all tasks complete)
 - Leave acceptance criteria unmarked when satisfied
 - Proceed without verifying `done_when` conditions
-"""
