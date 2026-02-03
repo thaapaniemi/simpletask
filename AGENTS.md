@@ -1437,6 +1437,7 @@ The `.tasks/` directory contains task definition files used during development b
 - Changing the task YAML schema structure
 - Modifying CLI command names or arguments (breaking changes)
 - Changing Pydantic model field names (affects serialization)
+- **Merging pull requests or branches to main** - ALWAYS ask for explicit permission before merging
 
 ### Never Do
 
