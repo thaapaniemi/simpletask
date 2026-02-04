@@ -659,9 +659,9 @@ simpletask task list --branch feature/other-branch
 
 ### Available Tools
 
-The MCP server exposes 7 tools for task management:
+The MCP server exposes 8 tools for task management:
 
-**Note:** MCP clients automatically prefix tool names with the server name. When invoked through an MCP client (like OpenCode), these tools become `simpletask_get`, `simpletask_list`, `simpletask_new`, `simpletask_task`, `simpletask_criteria`, `simpletask_quality`, and `simpletask_design`.
+**Note:** MCP clients automatically prefix tool names with the server name. When invoked through an MCP client (like OpenCode), these tools become `simpletask_get`, `simpletask_list`, `simpletask_new`, `simpletask_task`, `simpletask_criteria`, `simpletask_quality`, `simpletask_design`, and `simpletask_note`.
 
 | Tool | Description | Parameters |
 |------|-------------|------------|
@@ -672,6 +672,7 @@ The MCP server exposes 7 tools for task management:
 | `criteria` | Manage acceptance criteria (add/complete/remove/get) | `action` (str): 'add', 'complete', 'remove', or 'get'<br>`criterion_id` (str, optional): Criterion ID (required for complete/remove/get)<br>`description` (str, optional): Description (required for add)<br>`completed` (bool, optional): Completion status for 'complete' (default: true) |
 | `quality` | Manage quality requirements (check/set/get/preset) | `action` (str): 'check', 'set', 'get', or 'preset'<br>`config_type` (str, optional): 'linting', 'type-checking', 'testing', or 'security' (for set action)<br>`tool` (str, optional): Tool name from ToolName enum (for set action)<br>`args` (list[str], optional): Tool arguments (for set action)<br>`enabled` (bool, optional): Enable/disable check (for set action)<br>`min_coverage` (int, optional): Minimum coverage % (for testing config only)<br>`preset_name` (str, optional): Preset name (for preset action)<br>Check filters: `lint_only`, `test_only`, `type_only`, `security_only` (bool, for check action) |
 | `design` | Manage design section (set/get/remove) | `action` (str): 'set', 'get', or 'remove'<br>`field` (str, optional): Field to modify: 'pattern', 'reference', 'constraint', 'security', 'error-handling' (for set/remove)<br>`value` (str, optional): Value to add (for set action)<br>`reason` (str, optional): Reason for reference (required when field='reference')<br>`index` (int, optional): Index to remove (for remove action on list fields)<br>`all` (bool, optional): Remove all items or entire section (for remove action) |
+| `note` | Manage notes for root-level and task-level | `action` (str): 'add', 'remove', or 'list'<br>`content` (str, optional): Note content (required for add)<br>`task_id` (str, optional): Task ID for task-level notes; if omitted, operates on root notes<br>`index` (int, optional): Note index to remove (0-based, required for remove unless all=True)<br>`all` (bool, optional): Remove all notes (for remove action)<br>`root_only` (bool, optional): Only return root notes (for list action) |
 
 ### Tool Details
 
@@ -1209,6 +1210,104 @@ result = design(
 - Reference without reason → raises `ValueError`
 - Invalid index for list field → raises `ValueError`
 - Remove from non-existent design section → raises `ValueError`
+
+#### note
+
+Unified tool for managing freeform notes at root-level (SimpleTaskSpec) or task-level (Task).
+
+**Actions:**
+- `add`: Add a note to root or task level
+- `remove`: Remove note(s) by index or all
+- `list`: List notes with optional filtering
+
+**Parameters:**
+- `action` (required): Operation to perform ('add', 'remove', 'list')
+- `content` (optional): Note text content (required for add action)
+- `task_id` (optional): Task ID to operate on task-level notes; if omitted, operates on root-level notes
+- `index` (optional): Zero-based index for remove action (required unless all=True)
+- `all` (optional): Remove all notes (for remove action, default: false)
+- `root_only` (optional): Only return root-level notes (for list action, default: false)
+
+**Note:** This tool always uses the current git branch.
+
+**Returns:**
+- For `add` and `remove`: `SimpleTaskWriteResponse` with success confirmation
+- For `list`: `SimpleTaskNoteResponse` with:
+  - `action`: str ("notes_listed")
+  - `root_notes`: list[str] | None
+  - `task_notes`: dict[str, list[str]] (sparse dict, only tasks with notes)
+  - `total_count`: int (sum of all notes across root and tasks)
+  - `file_path`: str
+  - `summary`: StatusSummary (includes notes_total count)
+
+**Example Usage:**
+
+```python
+# Add root-level note
+result = note(action="add", content="Remember to update docs after release")
+
+# Add note to specific task
+result = note(action="add", content="This needs refactoring", task_id="T003")
+
+# List all notes
+result = note(action="list")
+# result.root_notes = ["Remember to update docs after release"]
+# result.task_notes = {"T003": ["This needs refactoring"]}
+# result.total_count = 2
+
+# List notes for specific task only
+result = note(action="list", task_id="T003")
+# result.root_notes = None
+# result.task_notes = {"T003": ["This needs refactoring"]}
+# result.total_count = 1
+
+# List only root notes
+result = note(action="list", root_only=True)
+# result.root_notes = ["Remember to update docs after release"]
+# result.task_notes = {}
+# result.total_count = 1
+
+# Remove specific note by index
+result = note(action="remove", index=0)  # Remove first root note
+result = note(action="remove", index=1, task_id="T003")  # Remove second note from T003
+
+# Remove all notes
+result = note(action="remove", all=True)  # Remove all root notes
+result = note(action="remove", all=True, task_id="T003")  # Remove all T003 notes
+```
+
+**CLI Commands:**
+
+```bash
+# Add notes
+simpletask note add "Remember to update docs after release"
+simpletask note add "This needs refactoring" --task T003
+
+# List notes
+simpletask note list                    # List all notes
+simpletask note list --task T003        # List notes for T003 only
+simpletask note list --root-only        # List only root notes
+
+# Remove notes
+simpletask note remove 0                # Remove first root note
+simpletask note remove 1 --task T003    # Remove second note from T003
+simpletask note remove --all            # Remove all root notes
+simpletask note remove --all --task T003  # Remove all T003 notes
+```
+
+**Use Cases:**
+- Track implementation decisions and context during development
+- Add reminders for future refactoring or improvements
+- Document why certain approaches were chosen or rejected
+- Leave breadcrumbs for code review or future developers
+- Capture technical debt or known limitations
+- Record blockers or dependencies discovered during implementation
+
+**Edge Cases:**
+- Missing required params → raises `ValueError`
+- Invalid index (out of range or negative) → raises `ValueError`
+- Task ID not found → raises `ValueError`
+- Remove with neither index nor all=True → raises `ValueError`
 
 ### Error Handling
 

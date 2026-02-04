@@ -29,6 +29,7 @@ from ..core.models import (
     TaskStatus,
     ToolName,
 )
+from ..core.note_ops import add_note, list_notes, remove_note
 from ..core.project import ensure_project, get_current_task_file_path
 from ..core.quality_ops import (
     apply_quality_preset,
@@ -51,6 +52,7 @@ from .models import (
     SimpleTaskDesignResponse,
     SimpleTaskGetResponse,
     SimpleTaskItemResponse,
+    SimpleTaskNoteResponse,
     SimpleTaskQualityResponse,
     SimpleTaskWriteResponse,
     ValidationResult,
@@ -93,6 +95,7 @@ __all__ = [
     "list",
     "mcp",
     "new",
+    "note",
     "quality",
     "run_server",
     "task",
@@ -791,6 +794,100 @@ def design(
             return SimpleTaskWriteResponse(
                 success=True,
                 action="design_remove",
+                message=message,
+                file_path=str(file_path),
+                summary=summary,
+                new_item_id=None,
+            )
+
+
+@mcp.tool()
+def note(
+    action: Literal["add", "remove", "list"],
+    content: str | None = None,
+    task_id: str | None = None,
+    index: int | None = None,
+    all: bool = False,
+    root_only: bool = False,
+) -> SimpleTaskWriteResponse | SimpleTaskNoteResponse:
+    """Manage notes for root-level and task-level.
+
+    Args:
+        action: Operation to perform ('add', 'remove', 'list')
+        content: Note content (required for add)
+        task_id: Optional task ID. If provided, operates on task-level notes; otherwise root-level
+        index: Note index to remove (0-based, required for remove unless all=True)
+        all: Remove all notes (for remove action)
+        root_only: Only return root-level notes (for list action)
+
+    Returns:
+        SimpleTaskWriteResponse for write operations (add/remove).
+        SimpleTaskNoteResponse for list operations.
+
+    Raises:
+        ValueError: If required parameters missing, task not found, or invalid index.
+    """
+    file_path = get_current_task_file_path()
+
+    match action:
+        case "list":
+            spec = parse_task_file(file_path)
+            root_notes, task_notes_dict = list_notes(
+                spec=spec,
+                task_id=task_id,
+                root_only=root_only,
+            )
+
+            # Count total notes
+            total_count = len(root_notes) if root_notes else 0
+            for notes in task_notes_dict.values():
+                total_count += len(notes)
+
+            summary = compute_status_summary(spec)
+            return SimpleTaskNoteResponse(
+                action="note_list",
+                root_notes=root_notes,
+                task_notes=task_notes_dict,
+                total_count=total_count,
+                file_path=str(file_path),
+                summary=summary,
+            )
+
+        case "add":
+            if not content:
+                raise ValueError("'content' is required for action='add'")
+            spec = parse_task_file(file_path)
+            spec = add_note(spec=spec, content=content, task_id=task_id)
+            write_task_file(file_path, spec)
+            summary = compute_status_summary(spec)
+
+            location = f"task {task_id}" if task_id else "root"
+            return SimpleTaskWriteResponse(
+                success=True,
+                action="note_added",
+                message=f"Added note to {location}",
+                file_path=str(file_path),
+                summary=summary,
+                new_item_id=None,
+            )
+
+        case "remove":
+            if not all and index is None:
+                raise ValueError("Either 'index' or 'all=True' is required for action='remove'")
+            spec = parse_task_file(file_path)
+            spec = remove_note(spec=spec, index=index, task_id=task_id, all=all)
+            write_task_file(file_path, spec)
+            summary = compute_status_summary(spec)
+
+            location = f"task {task_id}" if task_id else "root"
+            if all:
+                message = f"Removed all notes from {location}"
+            else:
+                message = f"Removed note {index} from {location}"
+
+            return SimpleTaskWriteResponse(
+                success=True,
+                action="note_removed",
                 message=message,
                 file_path=str(file_path),
                 summary=summary,

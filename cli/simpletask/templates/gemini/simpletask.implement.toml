@@ -120,6 +120,36 @@ Follow the `steps` array exactly:
 3. Follow patterns shown in `code_examples`
 4. Respect `constraints` from the task file
 
+**Document Implementation Decisions (Optional but Recommended):**
+
+As you implement, use notes to capture important context:
+
+**Preferred: Use MCP tool** (if simpletask MCP server is available)
+```
+Use simpletask_note() MCP tool to add notes:
+- Root-level notes for feature-wide decisions:
+  simpletask_note(action="add", content="Using JWT for auth instead of sessions due to API scalability")
+  
+- Task-level notes for specific implementation context:
+  simpletask_note(action="add", content="Had to add extra validation here to handle edge case", task_id="T003")
+```
+
+**Fallback: Use CLI** (if MCP tools not available)
+```bash
+# Add root-level note for feature-wide decisions
+simpletask note add "Using JWT for auth instead of sessions due to API scalability"
+
+# Add task-level note for specific context
+simpletask note add "Had to add extra validation here to handle edge case" --task T003
+```
+
+**When to add notes:**
+- Alternative approaches considered and why they were rejected
+- Workarounds for unexpected issues
+- Technical debt identified during implementation
+- Decisions that deviate from the original plan
+- Context that would help reviewers understand the changes
+
 ### 3.4 Verify Completion
 
 Check ALL conditions in `done_when`:

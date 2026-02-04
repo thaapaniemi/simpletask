@@ -24,6 +24,7 @@ __all__ = [
     "SimpleTaskDesignResponse",
     "SimpleTaskGetResponse",
     "SimpleTaskItemResponse",
+    "SimpleTaskNoteResponse",
     "SimpleTaskQualityResponse",
     "SimpleTaskWriteResponse",
     "StatusSummary",
@@ -92,6 +93,7 @@ class StatusSummary(BaseModel):
     tasks_not_started: int = Field(0, description="Not started tasks")
     tasks_blocked: int = Field(0, description="Blocked tasks")
     tasks_paused: int = Field(0, description="Paused tasks")
+    notes_total: int = Field(0, description="Total notes (root + task-level)")
 
 
 class ValidationResult(BaseModel):
@@ -205,6 +207,25 @@ class SimpleTaskDesignResponse(BaseModel):
     summary: StatusSummary = Field(..., description="Pre-computed status summary")
 
 
+class SimpleTaskNoteResponse(BaseModel):
+    """Response model for simpletask_note tool with action='list'.
+
+    Returns notes from root-level and/or task-level.
+    The task_notes dict is sparse - only tasks with notes are included.
+    """
+
+    model_config = {"extra": "forbid"}
+
+    action: str = Field(..., description="Action performed (e.g., 'note_list')")
+    root_notes: list[str] | None = Field(None, description="Root-level notes")
+    task_notes: dict[str, list[str]] = Field(
+        default_factory=dict, description="Task notes (sparse dict: task_id -> notes)"
+    )
+    total_count: int = Field(..., description="Total number of notes (root + task)")
+    file_path: str = Field(..., description="Path to task file")
+    summary: StatusSummary = Field(..., description="Pre-computed status summary")
+
+
 def compute_status_summary(spec: SimpleTaskSpec) -> StatusSummary:
     """Compute status summary from a task specification.
 
@@ -254,6 +275,15 @@ def compute_status_summary(spec: SimpleTaskSpec) -> StatusSummary:
     else:
         overall_status = TaskStatus.NOT_STARTED
 
+    # Count total notes (root + task-level)
+    notes_total = 0
+    if spec.notes:
+        notes_total += len(spec.notes)
+    if spec.tasks:
+        for task in spec.tasks:
+            if task.notes:
+                notes_total += len(task.notes)
+
     return StatusSummary(
         branch=spec.branch,
         title=spec.title,
@@ -266,4 +296,5 @@ def compute_status_summary(spec: SimpleTaskSpec) -> StatusSummary:
         tasks_not_started=tasks_not_started,
         tasks_blocked=tasks_blocked,
         tasks_paused=tasks_paused,
+        notes_total=notes_total,
     )

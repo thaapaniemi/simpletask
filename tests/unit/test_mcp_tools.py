@@ -194,8 +194,8 @@ class TestMCPServerRegistration:
         tools = await mcp.list_tools()
         registered_tools = {tool.name for tool in tools}
 
-        # Verify all 7 tools are registered with simple names
-        expected_tools = {"get", "list", "new", "task", "criteria", "quality", "design"}
+        # Verify all 8 tools are registered with simple names
+        expected_tools = {"get", "list", "new", "task", "criteria", "quality", "design", "note"}
         assert (
             registered_tools == expected_tools
         ), f"Expected tools {expected_tools}, but found {registered_tools}"

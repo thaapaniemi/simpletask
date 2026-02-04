@@ -348,6 +348,7 @@ class Task(BaseModel):
     code_examples: list[CodeExample] | None = Field(
         None, description="Code examples to guide implementation"
     )
+    notes: list[str] | None = Field(None, description="Freeform notes about this task")
     prerequisites: list[str] | None = Field(
         None, description="Task IDs that must complete before this task"
     )
@@ -373,6 +374,9 @@ class SimpleTaskSpec(BaseModel):
     )
     title: str = Field(..., description="Human-readable task title")
     original_prompt: str = Field(..., description="Verbatim user request that initiated this task")
+    notes: list[str] | None = Field(
+        None, description="Freeform notes about this task specification"
+    )
     created: datetime = Field(..., description="Timestamp when the task was created")
     acceptance_criteria: list[AcceptanceCriterion] = Field(
         ..., min_length=1, description="Criteria that define task completion"

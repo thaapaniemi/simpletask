@@ -87,6 +87,7 @@ def add_implementation_task(
         prerequisites=prerequisites,
         files=files,
         code_examples=code_examples,
+        notes=None,
     )
 
     # Append task
@@ -391,6 +392,7 @@ def batch_tasks(
                 prerequisites=prerequisites,
                 files=files,
                 code_examples=code_examples,
+                notes=None,
             )
 
             spec.tasks.append(new_task)

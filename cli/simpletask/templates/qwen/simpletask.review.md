@@ -150,6 +150,41 @@ Examine the actual implementation changes. Review key modified files for:
 - Poor error messages
 - Missing resource cleanup (memory leaks, unclosed connections)
 
+### Implementation Notes Review (Optional)
+
+Check if notes were added during implementation to understand context:
+
+**Preferred: Use MCP tool** (if simpletask MCP server is available)
+```
+Use simpletask_note() MCP tool to list notes:
+- Call simpletask_note(action="list")
+- Returns root_notes (feature-wide decisions) and task_notes (task-specific context)
+- Review notes for:
+  - Useful context explaining non-obvious decisions
+  - Technical debt that should be tracked
+  - Workarounds that might need better solutions
+  - Security or performance considerations mentioned
+```
+
+**Fallback: Use CLI** (if MCP tools not available)
+```bash
+# List all notes
+simpletask note list
+
+# List notes for specific tasks
+simpletask note list --task T003
+
+# List only root-level notes
+simpletask note list --root-only
+```
+
+**When reviewing notes:**
+- Do notes explain important decisions clearly?
+- Are there workarounds that should be improved?
+- Is technical debt properly documented?
+- Are there security/performance notes that need addressing?
+- Should any notes be converted to code comments or documentation?
+
 **Step 5: Analyze Git Changes**
 
 1. Get branch comparison:

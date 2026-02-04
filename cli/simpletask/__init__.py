@@ -1,12 +1,12 @@
 """simpletask: A Python CLI for managing AI-friendly task definition YAML files."""
 
-__version__ = "0.20.1"
+__version__ = "0.21.1"
 
 import typer
 
 # Import top-level commands
 # Import subcommand groups
-from .commands import ai, criteria, design, new, quality, schema, serve, show, task
+from .commands import ai, criteria, design, new, note, quality, schema, serve, show, task
 from .commands import list as list_cmd
 
 
@@ -52,6 +52,7 @@ app.add_typer(task.app, name="task")
 app.add_typer(criteria.app, name="criteria")
 app.add_typer(quality.app, name="quality")
 app.add_typer(design.app, name="design")
+app.add_typer(note.app, name="note")
 app.add_typer(ai.app, name="ai")
 
 

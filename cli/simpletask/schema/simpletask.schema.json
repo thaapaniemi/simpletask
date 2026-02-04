@@ -26,6 +26,13 @@
       "description": "The verbatim user request that initiated this task. Preserved for context recovery and human verification.",
       "examples": ["Add list and show commands so users can see available tasks and their details"]
     },
+    "notes": {
+      "type": ["array", "null"],
+      "description": "Freeform notes about this task specification",
+      "items": {
+        "type": "string"
+      }
+    },
     "created": {
       "type": "string",
       "format": "date-time",
@@ -130,6 +137,13 @@
           "description": "Code examples to guide implementation",
           "items": {
             "$ref": "#/$defs/CodeExample"
+          }
+        },
+        "notes": {
+          "type": ["array", "null"],
+          "description": "Freeform notes about this task",
+          "items": {
+            "type": "string"
           }
         },
         "prerequisites": {
