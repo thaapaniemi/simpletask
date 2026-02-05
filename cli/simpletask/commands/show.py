@@ -3,7 +3,7 @@ Show command - Display task details."""
 
 import typer
 
-from ..core.models import Design, QualityRequirements
+from ..core.models import Design, QualityRequirements, Task
 from ..core.project import ensure_project, get_task_file_path
 from ..core.yaml_parser import InvalidTaskFileError, parse_task_file
 from ..utils.console import console, error
@@ -100,7 +100,7 @@ def _format_design_summary(design: Design) -> list[str]:
     return lines
 
 
-def _truncate_text(text: str, max_length: int = 80) -> str:
+def _truncate_text(text: str, max_length: int = 160) -> str:
     """Truncate text to max_length with ellipsis if needed.
 
     Args:
@@ -113,6 +113,31 @@ def _truncate_text(text: str, max_length: int = 80) -> str:
     if len(text) <= max_length:
         return text
     return text[: max_length - 3] + "..."
+
+
+def _count_task_notes(tasks: list[Task] | None) -> tuple[int, int]:
+    """Count total task notes and tasks with notes.
+
+    Single-pass iteration for efficiency.
+
+    Args:
+        tasks: List of tasks to count notes from
+
+    Returns:
+        Tuple of (total_notes_count, tasks_with_notes_count)
+    """
+    if not tasks:
+        return 0, 0
+
+    total_notes = 0
+    tasks_with_notes = 0
+
+    for task in tasks:
+        if task.notes:
+            total_notes += len(task.notes)
+            tasks_with_notes += 1
+
+    return total_notes, tasks_with_notes
 
 
 def show(
@@ -128,7 +153,8 @@ def show(
     - Constraints (if defined)
     - Quality requirements summary (if configured)
     - Design summary (if configured)
-    - Original prompt
+    - Original prompt (truncated to 160 chars)
+    - Notes (if present): root notes with bullets, task notes as count summary
 
     Examples:
         simpletask show                    # Uses current git branch
@@ -213,8 +239,35 @@ def show(
 
         # Original Prompt
         console.print("\n[bold yellow]Original Prompt:[/bold yellow]")
-        truncated_prompt = _truncate_text(spec.original_prompt, max_length=80)
+        truncated_prompt = _truncate_text(spec.original_prompt)
         console.print(f'  "{truncated_prompt}"')
+
+        # Notes Section (Option C: Hybrid format)
+        # Display root notes with bullets, task notes as summary
+        # Hidden when no notes exist
+        has_root_notes = bool(spec.notes)
+        task_note_count, task_with_notes_count = _count_task_notes(spec.tasks)
+
+        if has_root_notes or task_note_count > 0:
+            console.print("\n[bold cyan]Notes:[/bold cyan]")
+
+            # Display root notes with bullets
+            if has_root_notes:
+                console.print("  [bold]Root:[/bold]")
+                if spec.notes:  # Type guard for mypy
+                    for note in spec.notes:
+                        truncated_note = _truncate_text(note)
+                        console.print(f"    • {truncated_note}")
+                console.print()
+
+            # Display task notes summary
+            if task_note_count > 0:
+                note_word = "note" if task_note_count == 1 else "notes"
+                task_word = "task" if task_with_notes_count == 1 else "tasks"
+                console.print(
+                    f"  [bold]Tasks:[/bold] {task_note_count} {note_word} across {task_with_notes_count} {task_word}"
+                )
+                console.print("  [dim]→ Details:[/dim] simpletask note list")
 
         console.print()
 
