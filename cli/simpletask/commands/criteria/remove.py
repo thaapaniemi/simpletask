@@ -2,8 +2,9 @@
 
 import typer
 
+from simpletask.core.criteria_ops import remove_acceptance_criterion
+from simpletask.core.project import get_task_file_path
 from simpletask.core.yaml_parser import InvalidTaskFileError
-from simpletask.mcp.server import criteria
 from simpletask.utils.console import confirm, handle_exception, success
 
 
@@ -20,6 +21,12 @@ def remove_command(
         simpletask criteria remove AC3
         simpletask criteria remove AC5 --force
         simpletask criteria remove AC2 --branch feature-123
+
+    Raises:
+        ValueError: If not in a git repository, branch cannot be determined, or criterion ID not found
+        FileNotFoundError: If task file doesn't exist for the specified branch
+        InvalidTaskFileError: If task file is malformed and cannot be parsed
+        typer.Abort: If user cancels the confirmation prompt
     """
     try:
         # Confirm removal unless --force
@@ -27,12 +34,9 @@ def remove_command(
             if not confirm(f"Remove criterion {criterion_id}?"):
                 raise typer.Abort()
 
-        # Call MCP tool directly
-        criteria(
-            action="remove",
-            branch=branch,
-            criterion_id=criterion_id,
-        )
+        # Resolve task file path and remove
+        file_path = get_task_file_path(branch)
+        remove_acceptance_criterion(file_path, criterion_id)
 
         success(f"Removed criterion {criterion_id}")
 

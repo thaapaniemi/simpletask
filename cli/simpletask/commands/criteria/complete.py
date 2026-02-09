@@ -2,8 +2,9 @@
 
 import typer
 
+from simpletask.core.criteria_ops import mark_criterion_complete
+from simpletask.core.project import get_task_file_path
 from simpletask.core.yaml_parser import InvalidTaskFileError
-from simpletask.mcp.server import criteria
 from simpletask.utils.console import handle_exception, success
 
 
@@ -22,15 +23,16 @@ def complete_command(
         simpletask criteria complete AC1
         simpletask criteria complete AC2 --branch feature-123
         simpletask criteria complete AC1 --uncomplete
+
+    Raises:
+        ValueError: If not in a git repository, branch cannot be determined, or criterion ID not found
+        FileNotFoundError: If task file doesn't exist for the specified branch
+        InvalidTaskFileError: If task file is malformed and cannot be parsed
     """
     try:
-        # Call MCP tool directly
-        criteria(
-            action="complete",
-            branch=branch,
-            criterion_id=criterion_id,
-            completed=not uncomplete,
-        )
+        # Resolve task file path and mark complete
+        file_path = get_task_file_path(branch)
+        mark_criterion_complete(file_path, criterion_id, completed=not uncomplete)
 
         if uncomplete:
             success(f"Marked {criterion_id} as not completed")

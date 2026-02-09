@@ -2,8 +2,9 @@
 
 import typer
 
+from simpletask.core.criteria_ops import add_acceptance_criterion
+from simpletask.core.project import get_task_file_path
 from simpletask.core.yaml_parser import InvalidTaskFileError
-from simpletask.mcp.server import criteria
 from simpletask.utils.console import handle_exception, success
 
 
@@ -18,17 +19,17 @@ def add_command(
     Examples:
         simpletask criteria add "Feature works correctly"
         simpletask criteria add "Documentation updated" --branch feature-123
+
+    Raises:
+        ValueError: If not in a git repository or branch cannot be determined
+        FileNotFoundError: If task file doesn't exist for the specified branch
+        InvalidTaskFileError: If task file is malformed and cannot be parsed
     """
     try:
-        # Call MCP tool directly
-        result = criteria(
-            action="add",
-            branch=branch,
-            description=description,
-        )
+        # Resolve task file path
+        file_path = get_task_file_path(branch)
+        new_id = add_acceptance_criterion(file_path, description)
 
-        # Extract criterion ID from result
-        new_id = result.new_item_id or "unknown"
         success(f"Added criterion {new_id}: {description}")
 
     except (ValueError, FileNotFoundError, InvalidTaskFileError) as e:

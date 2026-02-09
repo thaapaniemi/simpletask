@@ -2,8 +2,9 @@
 
 import typer
 
+from simpletask.core.project import get_task_file_path
+from simpletask.core.task_ops import add_implementation_task
 from simpletask.core.yaml_parser import InvalidTaskFileError
-from simpletask.mcp.server import task
 from simpletask.utils.console import handle_exception, success
 
 
@@ -20,18 +21,17 @@ def add_command(
         simpletask task add "Implement authentication"
         simpletask task add "Add tests" --goal "Write unit tests for auth"
         simpletask task add "Update docs" --branch feature-123
+
+    Raises:
+        ValueError: If not in a git repository or branch cannot be determined
+        FileNotFoundError: If task file doesn't exist for the specified branch
+        InvalidTaskFileError: If task file is malformed and cannot be parsed
     """
     try:
-        # Call MCP tool directly
-        result = task(
-            action="add",
-            branch=branch,
-            name=name,
-            goal=goal,
-        )
+        # Resolve task file path
+        file_path = get_task_file_path(branch)
+        new_id = add_implementation_task(file_path, name, goal)
 
-        # Extract task ID from result
-        new_id = result.new_item_id or "unknown"
         success(f"Added task {new_id}: {name}")
 
     except (ValueError, FileNotFoundError, InvalidTaskFileError) as e:
