@@ -659,9 +659,9 @@ simpletask task list --branch feature/other-branch
 
 ### Available Tools
 
-The MCP server exposes 8 tools for task management:
+The MCP server exposes 10 tools for task management:
 
-**Note:** MCP clients automatically prefix tool names with the server name. When invoked through an MCP client (like OpenCode), these tools become `simpletask_get`, `simpletask_list`, `simpletask_new`, `simpletask_task`, `simpletask_criteria`, `simpletask_quality`, `simpletask_design`, and `simpletask_note`.
+**Note:** MCP clients automatically prefix tool names with the server name. When invoked through an MCP client (like OpenCode), these tools become `simpletask_get`, `simpletask_list`, `simpletask_new`, `simpletask_task`, `simpletask_criteria`, `simpletask_quality`, `simpletask_design`, `simpletask_note`, `simpletask_constraint`, and `simpletask_context`.
 
 | Tool | Description | Parameters |
 |------|-------------|------------|
@@ -673,6 +673,8 @@ The MCP server exposes 8 tools for task management:
 | `quality` | Manage quality requirements (check/set/get/preset) | `action` (str): 'check', 'set', 'get', or 'preset'<br>`config_type` (str, optional): 'linting', 'type-checking', 'testing', or 'security' (for set action)<br>`tool` (str, optional): Tool name from ToolName enum (for set action)<br>`args` (list[str], optional): Tool arguments (for set action)<br>`enabled` (bool, optional): Enable/disable check (for set action)<br>`min_coverage` (int, optional): Minimum coverage % (for testing config only)<br>`preset_name` (str, optional): Preset name (for preset action)<br>Check filters: `lint_only`, `test_only`, `type_only`, `security_only` (bool, for check action) |
 | `design` | Manage design section (set/get/remove) | `action` (str): 'set', 'get', or 'remove'<br>`field` (str, optional): Field to modify: 'pattern', 'reference', 'constraint', 'security', 'error-handling' (for set/remove)<br>`value` (str, optional): Value to add (for set action)<br>`reason` (str, optional): Reason for reference (required when field='reference')<br>`index` (int, optional): Index to remove (for remove action on list fields)<br>`all` (bool, optional): Remove all items or entire section (for remove action) |
 | `note` | Manage notes for root-level and task-level | `action` (str): 'add', 'remove', or 'list'<br>`content` (str, optional): Note content (required for add)<br>`task_id` (str, optional): Task ID for task-level notes; if omitted, operates on root notes<br>`index` (int, optional): Note index to remove (0-based, required for remove unless all=True)<br>`all` (bool, optional): Remove all notes (for remove action)<br>`root_only` (bool, optional): Only return root notes (for list action) |
+| `constraint` | Manage implementation constraints (add/remove/list) | `action` (str): 'add', 'remove', or 'list'<br>`value` (str, optional): Constraint text (required for add)<br>`index` (int, optional): Constraint index to remove (0-based, required for remove unless all=True)<br>`all` (bool, optional): Remove all constraints (for remove action) |
+| `context` | Manage context key-value pairs (set/remove/show) | `action` (str): 'set', 'remove', or 'show'<br>`key` (str, optional): Context key (required for set/remove)<br>`value` (str, optional): Context value (required for set)<br>`all` (bool, optional): Remove all context entries (for remove action) |
 
 ### Tool Details
 
@@ -1316,6 +1318,144 @@ simpletask note remove --all --task T003  # Remove all T003 notes
 - Invalid index (out of range or negative) → raises `ValueError`
 - Task ID not found → raises `ValueError`
 - Remove with neither index nor all=True → raises `ValueError`
+
+#### constraint
+
+Unified tool for managing implementation constraints (list of strings).
+
+**Actions:**
+- `add`: Add a constraint to the list
+- `remove`: Remove constraint(s) by index or all
+- `list`: List all constraints
+
+**Parameters:**
+- `action` (required): Operation to perform ('add', 'remove', 'list')
+- `value` (optional): Constraint text (required for add action)
+- `index` (optional): Zero-based index for remove action (required unless all=True)
+- `all` (optional): Remove all constraints (for remove action, default: false)
+
+**Note:** This tool always uses the current git branch.
+
+**Returns:**
+- For `add` and `remove`: `SimpleTaskWriteResponse` with success confirmation
+- For `list`: `SimpleTaskConstraintResponse` with:
+  - `action`: str ("constraint_list")
+  - `constraints`: list[str] | None
+  - `file_path`: str
+  - `summary`: StatusSummary
+
+**Example Usage:**
+
+```python
+# Add constraint
+result = constraint(action="add", value="Use Pydantic models with extra='forbid'")
+
+# List all constraints
+result = constraint(action="list")
+# result.constraints = ["Use Pydantic models with extra='forbid'", "No shell=True in subprocess calls"]
+
+# Remove specific constraint by index
+result = constraint(action="remove", index=0)  # Remove first constraint
+
+# Remove all constraints
+result = constraint(action="remove", all=True)
+```
+
+**CLI Commands:**
+
+```bash
+# Add constraint
+simpletask constraint add "Use Pydantic models with extra='forbid'"
+
+# List constraints
+simpletask constraint list
+
+# Remove constraint
+simpletask constraint remove 0       # Remove first constraint
+simpletask constraint remove --all   # Remove all constraints
+```
+
+**Use Cases:**
+- Document coding standards and conventions
+- Define technical requirements and boundaries
+- Specify frameworks and libraries to use or avoid
+- Enforce architectural decisions (e.g., "No direct database access from views")
+- Track technical debt or temporary limitations
+
+**Edge Cases:**
+- Missing required params → raises `ValueError`
+- Invalid index (out of range or negative) → raises `ValueError`
+- Remove with neither index nor all=True → raises `ValueError`
+
+#### context
+
+Unified tool for managing context key-value pairs (flat dictionary).
+
+**Actions:**
+- `set`: Set a context key-value pair
+- `remove`: Remove context entry by key or all entries
+- `show`: Show all context entries
+
+**Parameters:**
+- `action` (required): Operation to perform ('set', 'remove', 'show')
+- `key` (optional): Context key (required for set/remove actions)
+- `value` (optional): Context value (required for set action)
+- `all` (optional): Remove all context entries (for remove action, default: false)
+
+**Note:** This tool always uses the current git branch.
+
+**Returns:**
+- For `set` and `remove`: `SimpleTaskWriteResponse` with success confirmation
+- For `show`: `SimpleTaskContextResponse` with:
+  - `action`: str ("context_show")
+  - `context`: dict[str, Any] | None
+  - `file_path`: str
+  - `summary`: StatusSummary
+
+**Example Usage:**
+
+```python
+# Set context key-value pairs
+result = context(action="set", key="api_version", value="v2")
+result = context(action="set", key="database", value="PostgreSQL 14")
+
+# Show all context
+result = context(action="show")
+# result.context = {"api_version": "v2", "database": "PostgreSQL 14"}
+
+# Remove specific key
+result = context(action="remove", key="api_version")
+
+# Remove all context entries
+result = context(action="remove", all=True)
+```
+
+**CLI Commands:**
+
+```bash
+# Set context
+simpletask context set api_version v2
+simpletask context set database "PostgreSQL 14"
+
+# Show context
+simpletask context show
+
+# Remove context
+simpletask context remove api_version    # Remove specific key
+simpletask context remove --all          # Remove all entries
+```
+
+**Use Cases:**
+- Store environment-specific configuration (API versions, database engines)
+- Track external dependencies (service URLs, API keys locations)
+- Record project metadata (team name, project phase, deployment target)
+- Document assumptions (expected load, user count, data volume)
+- Keep implementation reminders (feature flags, A/B test status)
+
+**Edge Cases:**
+- Missing required params → raises `ValueError`
+- Key not found in remove action → raises `ValueError`
+- Remove with neither key nor all=True → raises `ValueError`
 
 ### Error Handling
 

@@ -6,7 +6,20 @@ import typer
 
 # Import top-level commands
 # Import subcommand groups
-from .commands import ai, criteria, design, new, note, quality, schema, serve, show, task
+from .commands import (
+    ai,
+    constraint,
+    context,
+    criteria,
+    design,
+    new,
+    note,
+    quality,
+    schema,
+    serve,
+    show,
+    task,
+)
 from .commands import list as list_cmd
 
 
@@ -53,6 +66,8 @@ app.add_typer(criteria.app, name="criteria")
 app.add_typer(quality.app, name="quality")
 app.add_typer(design.app, name="design")
 app.add_typer(note.app, name="note")
+app.add_typer(constraint.app, name="constraint")
+app.add_typer(context.app, name="context")
 app.add_typer(ai.app, name="ai")
 
 

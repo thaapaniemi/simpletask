@@ -11,6 +11,8 @@ from typing import Literal, cast
 from mcp.server.fastmcp import FastMCP
 from pydantic import ValidationError
 
+from ..core.constraint_ops import add_constraint, list_constraints, remove_constraint
+from ..core.context_ops import remove_context, set_context, show_context
 from ..core.criteria_ops import (
     add_acceptance_criterion,
     mark_criterion_complete,
@@ -50,6 +52,8 @@ from .models import (
     BatchTaskOperation,
     QualityCheckResult,
     SimpleTaskBatchResponse,
+    SimpleTaskConstraintResponse,
+    SimpleTaskContextResponse,
     SimpleTaskDesignResponse,
     SimpleTaskGetResponse,
     SimpleTaskItemResponse,
@@ -906,6 +910,156 @@ def note(
             return SimpleTaskWriteResponse(
                 success=True,
                 action="note_removed",
+                message=message,
+                file_path=str(file_path),
+                summary=summary,
+                new_item_id=None,
+            )
+
+
+@mcp.tool()
+def constraint(
+    action: Literal["add", "remove", "list"],
+    value: str | None = None,
+    index: int | None = None,
+    all: bool = False,
+) -> SimpleTaskWriteResponse | SimpleTaskConstraintResponse:
+    """Manage implementation constraints.
+
+    Args:
+        action: Operation to perform ('add', 'remove', 'list')
+        value: Constraint text (required for add)
+        index: Constraint index to remove (0-based, required for remove unless all=True)
+        all: Remove all constraints (for remove action)
+
+    Returns:
+        SimpleTaskWriteResponse for write operations (add/remove).
+        SimpleTaskConstraintResponse for list operations.
+
+    Raises:
+        ValueError: If required parameters missing or invalid index.
+    """
+    file_path = get_current_task_file_path()
+
+    match action:
+        case "list":
+            spec = parse_task_file(file_path)
+            constraints = list_constraints(spec=spec)
+            summary = compute_status_summary(spec)
+
+            return SimpleTaskConstraintResponse(
+                action="constraint_list",
+                constraints=constraints,
+                file_path=str(file_path),
+                summary=summary,
+            )
+
+        case "add":
+            if value is None:
+                raise ValueError("'value' is required for action='add'")
+            spec = parse_task_file(file_path)
+            spec = add_constraint(spec=spec, value=value)
+            write_task_file(file_path, spec)
+            summary = compute_status_summary(spec)
+
+            return SimpleTaskWriteResponse(
+                success=True,
+                action="constraint_added",
+                message="Added constraint",
+                file_path=str(file_path),
+                summary=summary,
+                new_item_id=None,
+            )
+
+        case "remove":
+            if not all and index is None:
+                raise ValueError("Either 'index' or 'all=True' is required for action='remove'")
+            spec = parse_task_file(file_path)
+            spec = remove_constraint(spec=spec, index=index, all=all)
+            write_task_file(file_path, spec)
+            summary = compute_status_summary(spec)
+
+            message = "Removed all constraints" if all else f"Removed constraint {index}"
+
+            return SimpleTaskWriteResponse(
+                success=True,
+                action="constraint_removed",
+                message=message,
+                file_path=str(file_path),
+                summary=summary,
+                new_item_id=None,
+            )
+
+
+@mcp.tool()
+def context(
+    action: Literal["set", "remove", "show"],
+    key: str | None = None,
+    value: str | None = None,
+    all: bool = False,
+) -> SimpleTaskWriteResponse | SimpleTaskContextResponse:
+    """Manage context key-value pairs.
+
+    Args:
+        action: Operation to perform ('set', 'remove', 'show')
+        key: Context key (required for set/remove)
+        value: Context value (required for set)
+        all: Remove all context entries (for remove action)
+
+    Returns:
+        SimpleTaskWriteResponse for write operations (set/remove).
+        SimpleTaskContextResponse for show operations.
+
+    Raises:
+        ValueError: If required parameters missing or invalid key.
+    """
+    file_path = get_current_task_file_path()
+
+    match action:
+        case "show":
+            spec = parse_task_file(file_path)
+            context_data = show_context(spec=spec)
+            summary = compute_status_summary(spec)
+
+            return SimpleTaskContextResponse(
+                action="context_show",
+                context=context_data,
+                file_path=str(file_path),
+                summary=summary,
+            )
+
+        case "set":
+            if not key:
+                raise ValueError("'key' is required for action='set'")
+            if value is None:
+                raise ValueError("'value' is required for action='set'")
+            spec = parse_task_file(file_path)
+            spec = set_context(spec=spec, key=key, value=value)
+            write_task_file(file_path, spec)
+            summary = compute_status_summary(spec)
+
+            return SimpleTaskWriteResponse(
+                success=True,
+                action="context_set",
+                message=f"Set context key '{key}'",
+                file_path=str(file_path),
+                summary=summary,
+                new_item_id=None,
+            )
+
+        case "remove":
+            if not all and not key:
+                raise ValueError("Either 'key' or 'all=True' is required for action='remove'")
+            spec = parse_task_file(file_path)
+            spec = remove_context(spec=spec, key=key, all=all)
+            write_task_file(file_path, spec)
+            summary = compute_status_summary(spec)
+
+            message = "Removed all context entries" if all else f"Removed context key '{key}'"
+
+            return SimpleTaskWriteResponse(
+                success=True,
+                action="context_removed",
                 message=message,
                 file_path=str(file_path),
                 summary=summary,

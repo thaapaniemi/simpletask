@@ -4,7 +4,7 @@ This module defines Pydantic models for MCP tool responses,
 including status summaries and validation results.
 """
 
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -21,6 +21,8 @@ __all__ = [
     "BatchTaskOperation",
     "QualityCheckResult",
     "SimpleTaskBatchResponse",
+    "SimpleTaskConstraintResponse",
+    "SimpleTaskContextResponse",
     "SimpleTaskDesignResponse",
     "SimpleTaskGetResponse",
     "SimpleTaskItemResponse",
@@ -222,6 +224,34 @@ class SimpleTaskNoteResponse(BaseModel):
         default_factory=dict, description="Task notes (sparse dict: task_id -> notes)"
     )
     total_count: int = Field(..., description="Total number of notes (root + task)")
+    file_path: str = Field(..., description="Path to task file")
+    summary: StatusSummary = Field(..., description="Pre-computed status summary")
+
+
+class SimpleTaskConstraintResponse(BaseModel):
+    """Response model for simpletask_constraint tool with action='list'.
+
+    Returns all implementation constraints.
+    """
+
+    model_config = {"extra": "forbid"}
+
+    action: str = Field(..., description="Action performed (e.g., 'constraint_list')")
+    constraints: list[str] | None = Field(None, description="List of constraints")
+    file_path: str = Field(..., description="Path to task file")
+    summary: StatusSummary = Field(..., description="Pre-computed status summary")
+
+
+class SimpleTaskContextResponse(BaseModel):
+    """Response model for simpletask_context tool with action='show'.
+
+    Returns all context key-value pairs.
+    """
+
+    model_config = {"extra": "forbid"}
+
+    action: str = Field(..., description="Action performed (e.g., 'context_show')")
+    context: dict[str, Any] | None = Field(None, description="Context key-value pairs")
     file_path: str = Field(..., description="Path to task file")
     summary: StatusSummary = Field(..., description="Pre-computed status summary")
 

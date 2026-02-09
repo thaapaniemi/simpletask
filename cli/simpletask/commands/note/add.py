@@ -19,7 +19,7 @@ def add_command(
     """
     try:
         # Call MCP tool directly
-        result = note(
+        note(
             action="add",
             content=content,
             task_id=task,

@@ -184,7 +184,8 @@ class TestMCPServerRegistration:
     async def test_mcp_tools_registered_with_correct_names(self):
         """Verify all MCP tools are registered with simple names (no simpletask_ prefix).
 
-        The MCP server should register tools with names: get, list, new, task, criteria.
+        The MCP server should register tools with names: get, list, new, task, criteria,
+        quality, design, note, constraint, context.
         The MCP client (e.g., OpenCode) will automatically prefix them with the server
         name, making them available as: simpletask_get, simpletask_list, etc.
         """
@@ -194,8 +195,19 @@ class TestMCPServerRegistration:
         tools = await mcp.list_tools()
         registered_tools = {tool.name for tool in tools}
 
-        # Verify all 8 tools are registered with simple names
-        expected_tools = {"get", "list", "new", "task", "criteria", "quality", "design", "note"}
+        # Verify all 10 tools are registered with simple names
+        expected_tools = {
+            "get",
+            "list",
+            "new",
+            "task",
+            "criteria",
+            "quality",
+            "design",
+            "note",
+            "constraint",
+            "context",
+        }
         assert (
             registered_tools == expected_tools
         ), f"Expected tools {expected_tools}, but found {registered_tools}"

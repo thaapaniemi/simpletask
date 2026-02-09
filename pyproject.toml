@@ -82,6 +82,7 @@ ignore = [
     "TRY301",  # abstract raise to inner function - not always beneficial
     "C901",    # function too complex - pre-existing
     "RUF001",  # ambiguous unicode character - intentional (info icon)
+    "UP042",   # str+Enum inheritance - pre-existing enums
 ]
 
 [tool.mypy]

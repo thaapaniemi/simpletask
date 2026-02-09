@@ -21,7 +21,7 @@ def remove_command(
     """
     try:
         # Call MCP tool directly
-        result = note(
+        note(
             action="remove",
             index=index,
             task_id=task,
