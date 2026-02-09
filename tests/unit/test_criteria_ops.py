@@ -5,6 +5,7 @@ Tests cover:
 - add_acceptance_criterion() - Criterion addition
 - mark_criterion_complete() - Update completion status
 - remove_acceptance_criterion() - Criterion removal
+- update_acceptance_criterion() - Criterion description update
 """
 
 import pytest
@@ -13,6 +14,7 @@ from simpletask.core.criteria_ops import (
     get_next_criterion_id,
     mark_criterion_complete,
     remove_acceptance_criterion,
+    update_acceptance_criterion,
 )
 from simpletask.core.models import AcceptanceCriterion
 from simpletask.core.yaml_parser import parse_task_file
@@ -126,3 +128,40 @@ class TestRemoveAcceptanceCriterion:
         spec = parse_task_file(tmp_task_file)
         assert len(spec.acceptance_criteria) == 1
         assert spec.acceptance_criteria[0].id == "AC2"
+
+
+class TestUpdateAcceptanceCriterion:
+    """Test update_acceptance_criterion function."""
+
+    def test_update_description(self, tmp_task_file):
+        """Update criterion description successfully."""
+        update_acceptance_criterion(tmp_task_file, "AC1", "Updated description")
+
+        spec = parse_task_file(tmp_task_file)
+        assert spec.acceptance_criteria[0].description == "Updated description"
+
+    def test_update_preserves_completed_status(self, tmp_task_file):
+        """Update preserves the criterion's completed status."""
+        mark_criterion_complete(tmp_task_file, "AC1", completed=True)
+        update_acceptance_criterion(tmp_task_file, "AC1", "New text")
+
+        spec = parse_task_file(tmp_task_file)
+        assert spec.acceptance_criteria[0].description == "New text"
+        assert spec.acceptance_criteria[0].completed is True
+
+    def test_update_non_first_criterion(self, tmp_task_file):
+        """Update non-first criterion (AC2) to verify next() scan works."""
+        original_spec = parse_task_file(tmp_task_file)
+        original_ac1_desc = original_spec.acceptance_criteria[0].description
+
+        update_acceptance_criterion(tmp_task_file, "AC2", "Updated AC2 description")
+
+        spec = parse_task_file(tmp_task_file)
+        assert spec.acceptance_criteria[1].description == "Updated AC2 description"
+        # AC1 should remain unchanged
+        assert spec.acceptance_criteria[0].description == original_ac1_desc
+
+    def test_update_criterion_not_found(self, tmp_task_file):
+        """Raise ValueError when criterion doesn't exist."""
+        with pytest.raises(ValueError, match="Criterion AC999 not found"):
+            update_acceptance_criterion(tmp_task_file, "AC999", "New text")

@@ -669,7 +669,7 @@ The MCP server exposes 8 tools for task management:
 | `list` | List all task file branch names in the project | None |
 | `new` | Create a new task file | `branch` (str): Branch identifier<br>`title` (str): Task title<br>`prompt` (str): Original user request<br>`criteria` (list[str] \| None, optional): Acceptance criteria |
 | `task` | Manage implementation tasks (add/update/remove/get/batch) | `action` (str): 'add', 'update', 'remove', 'get', or 'batch'<br>`task_id` (str, optional): Task ID (required for update/remove/get)<br>`name` (str, optional): Task name (required for add)<br>`goal` (str, optional): Task goal/description<br>`status` (str, optional): Status for update ('not_started', 'in_progress', 'completed', 'blocked', 'paused')<br>`steps` (list[str] \| None, optional): Task steps for add action. None or [] adds placeholder ['To be defined']<br>`operations` (list[dict], optional): List of BatchTaskOperation dicts (required for batch action) |
-| `criteria` | Manage acceptance criteria (add/complete/remove/get) | `action` (str): 'add', 'complete', 'remove', or 'get'<br>`criterion_id` (str, optional): Criterion ID (required for complete/remove/get)<br>`description` (str, optional): Description (required for add)<br>`completed` (bool, optional): Completion status for 'complete' (default: true) |
+| `criteria` | Manage acceptance criteria (add/complete/remove/get/update) | `action` (str): 'add', 'complete', 'remove', 'get', or 'update'<br>`criterion_id` (str, optional): Criterion ID (required for complete/remove/get/update)<br>`description` (str, optional): Description (required for add/update)<br>`completed` (bool, optional): Completion status for 'complete' (default: true) |
 | `quality` | Manage quality requirements (check/set/get/preset) | `action` (str): 'check', 'set', 'get', or 'preset'<br>`config_type` (str, optional): 'linting', 'type-checking', 'testing', or 'security' (for set action)<br>`tool` (str, optional): Tool name from ToolName enum (for set action)<br>`args` (list[str], optional): Tool arguments (for set action)<br>`enabled` (bool, optional): Enable/disable check (for set action)<br>`min_coverage` (int, optional): Minimum coverage % (for testing config only)<br>`preset_name` (str, optional): Preset name (for preset action)<br>Check filters: `lint_only`, `test_only`, `type_only`, `security_only` (bool, for check action) |
 | `design` | Manage design section (set/get/remove) | `action` (str): 'set', 'get', or 'remove'<br>`field` (str, optional): Field to modify: 'pattern', 'reference', 'constraint', 'security', 'error-handling' (for set/remove)<br>`value` (str, optional): Value to add (for set action)<br>`reason` (str, optional): Reason for reference (required when field='reference')<br>`index` (int, optional): Index to remove (for remove action on list fields)<br>`all` (bool, optional): Remove all items or entire section (for remove action) |
 | `note` | Manage notes for root-level and task-level | `action` (str): 'add', 'remove', or 'list'<br>`content` (str, optional): Note content (required for add)<br>`task_id` (str, optional): Task ID for task-level notes; if omitted, operates on root notes<br>`index` (int, optional): Note index to remove (0-based, required for remove unless all=True)<br>`all` (bool, optional): Remove all notes (for remove action)<br>`root_only` (bool, optional): Only return root notes (for list action) |
@@ -946,18 +946,18 @@ These fields work in both "add" and "update" batch operations, eliminating the n
 
 #### criteria
 
-Unified tool for managing acceptance criteria with four actions.
+Unified tool for managing acceptance criteria with five actions.
 
 **Parameters:**
-- `action`: Operation to perform ('add', 'complete', 'remove', 'get')
-- `criterion_id` (optional): Criterion ID (required for complete/remove/get, e.g., 'AC1')
-- `description` (optional): Criterion description (required for add)
+- `action`: Operation to perform ('add', 'complete', 'remove', 'get', 'update')
+- `criterion_id` (optional): Criterion ID (required for complete/remove/get/update, e.g., 'AC1')
+- `description` (optional): Criterion description (required for add/update)
 - `completed` (optional): Completion status for 'complete' action (default: true). Set to false to mark as incomplete.
 
 **Note:** This tool always uses the current git branch.
 
 **Returns:**
-- `SimpleTaskWriteResponse` for write operations (add/complete/remove)
+- `SimpleTaskWriteResponse` for write operations (add/complete/remove/update)
 - `SimpleTaskItemResponse` for get operations
 
 **Response Structures:**
@@ -966,7 +966,7 @@ Write operations return:
 ```python
 {
   "success": bool,
-  "action": str,  # e.g., "criterion_added", "criterion_completed", "criterion_removed"
+  "action": str,  # e.g., "criterion_added", "criterion_completed", "criterion_removed", "criterion_updated"
   "message": str,  # Human-readable confirmation
   "file_path": str,
   "summary": StatusSummary
@@ -1017,12 +1017,20 @@ result = criteria(
     action="get",
     criterion_id="AC2"
 )
+
+# Update criterion description
+result = criteria(
+    action="update",
+    criterion_id="AC1",
+    description="Updated description text"
+)
 ```
 
 **Edge Cases:**
 - Missing required params → raises `ValueError`
 - Criterion ID not found → raises `ValueError`
 - Removing last criterion → raises `InvalidTaskFileError` (schema constraint: min_length=1)
+- Update without criterion_id or description → raises `ValueError`
 
 #### quality
 

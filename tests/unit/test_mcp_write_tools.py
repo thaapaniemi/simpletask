@@ -293,6 +293,43 @@ class TestSimpletaskCriteria:
         with pytest.raises(ValueError, match="not found"):
             criteria(action="get", criterion_id="AC999")
 
+    def test_update_success(self, task_project):
+        """Test updating a criterion's description successfully."""
+        result = criteria(action="update", criterion_id="AC1", description="Updated text")
+        assert isinstance(result, SimpleTaskWriteResponse)
+        assert result.success is True
+        assert result.action == "criterion_updated"
+        assert "AC1" in result.message
+        assert "Updated text" in result.message
+        # Verify description was changed
+        get_result = criteria(action="get", criterion_id="AC1")
+        assert get_result.criterion.description == "Updated text"
+
+    def test_update_missing_criterion_id_raises(self, task_project):
+        """Test that update without criterion_id raises ValueError."""
+        with pytest.raises(ValueError, match="'criterion_id' is required"):
+            criteria(action="update", description="New text")
+
+    def test_update_missing_description_raises(self, task_project):
+        """Test that update without description raises ValueError."""
+        with pytest.raises(ValueError, match="'description' is required"):
+            criteria(action="update", criterion_id="AC1")
+
+    def test_update_criterion_not_found_raises(self, task_project):
+        """Test that updating non-existent criterion raises ValueError."""
+        with pytest.raises(ValueError, match="not found"):
+            criteria(action="update", criterion_id="AC999", description="New text")
+
+    def test_update_preserves_completed(self, task_project):
+        """Test that update preserves the criterion's completed status."""
+        criteria(action="complete", criterion_id="AC1")
+        result = criteria(action="update", criterion_id="AC1", description="Updated text")
+        assert result.success is True
+        # Verify completed status was preserved
+        get_result = criteria(action="get", criterion_id="AC1")
+        assert get_result.criterion.completed is True
+        assert get_result.criterion.description == "Updated text"
+
 
 class TestCriteriaRepair:
     """Tests for automatic repair of broken task files."""

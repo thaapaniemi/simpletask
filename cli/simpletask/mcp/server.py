@@ -15,6 +15,7 @@ from ..core.criteria_ops import (
     add_acceptance_criterion,
     mark_criterion_complete,
     remove_acceptance_criterion,
+    update_acceptance_criterion,
 )
 from ..core.design_ops import remove_design_field
 from ..core.models import (
@@ -407,7 +408,7 @@ def task(
 
 @mcp.tool()
 def criteria(
-    action: Literal["add", "complete", "remove", "get"],
+    action: Literal["add", "complete", "remove", "get", "update"],
     criterion_id: str | None = None,
     description: str | None = None,
     completed: bool = True,
@@ -415,13 +416,13 @@ def criteria(
     """Manage acceptance criteria.
 
     Args:
-        action: Operation to perform ('add', 'complete', 'remove', 'get')
-        criterion_id: Criterion ID (required for complete/remove/get)
-        description: Criterion description (required for add)
+        action: Operation to perform ('add', 'complete', 'remove', 'get', 'update')
+        criterion_id: Criterion ID (required for complete/remove/get/update)
+        description: Criterion description (required for add/update)
         completed: Completion status for 'complete' action (default: True)
 
     Returns:
-        SimpleTaskWriteResponse for write operations (add/complete/remove).
+        SimpleTaskWriteResponse for write operations (add/complete/remove/update).
         SimpleTaskItemResponse for get operations.
 
     Raises:
@@ -493,6 +494,23 @@ def criteria(
                 success=True,
                 action="criterion_removed",
                 message=f"Removed criterion {criterion_id}",
+                file_path=str(file_path),
+                summary=summary,
+                new_item_id=None,
+            )
+
+        case "update":
+            if not criterion_id:
+                raise ValueError("'criterion_id' is required for action='update'")
+            if not description:
+                raise ValueError("'description' is required for action='update'")
+            update_acceptance_criterion(file_path, criterion_id, description)
+            spec = parse_task_file(file_path)
+            summary = compute_status_summary(spec)
+            return SimpleTaskWriteResponse(
+                success=True,
+                action="criterion_updated",
+                message=f"Updated criterion {criterion_id}: {description}",
                 file_path=str(file_path),
                 summary=summary,
                 new_item_id=None,

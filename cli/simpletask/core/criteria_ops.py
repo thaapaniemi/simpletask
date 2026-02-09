@@ -99,6 +99,38 @@ def mark_criterion_complete(
     write_task_file(file_path, spec)
 
 
+def update_acceptance_criterion(
+    file_path: Path,
+    criterion_id: str,
+    description: str,
+) -> None:
+    """Update an existing acceptance criterion's description.
+
+    Args:
+        file_path: Path to task YAML file
+        criterion_id: Criterion ID to update
+        description: New criterion description
+
+    Raises:
+        ValueError: If criterion not found
+        FileNotFoundError: If task file doesn't exist
+    """
+    # Parse existing file
+    spec = parse_task_file(file_path)
+
+    # Find criterion
+    criterion = next((c for c in spec.acceptance_criteria if c.id == criterion_id), None)
+    if not criterion:
+        available = [c.id for c in spec.acceptance_criteria]
+        raise ValueError(f"Criterion {criterion_id} not found. Available: {available}")
+
+    # Update description (preserves completed status)
+    criterion.description = description
+
+    # Write back (auto-updates timestamp)
+    write_task_file(file_path, spec)
+
+
 def remove_acceptance_criterion(
     file_path: Path,
     criterion_id: str,
