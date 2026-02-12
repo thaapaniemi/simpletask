@@ -823,13 +823,13 @@ class TestSplitTemplateContent:
         # Essential sections that must be present
         essential_sections = [
             "## Step 1: Load Task File",
+            "## Step 1.5: Codebase Analysis & Design (Conditional)",
             "## Step 2: Identify Tasks to Split",
             "## Step 3: Analyze and Generate Subtasks",
             "## Step 4: Apply Changes Atomically with Batch Operations",
             "## Step 5: Renumber Task IDs Sequentially",
             "## Step 6: Validate and Report",
             "## Edge Cases",
-            "## MCP Tool Reference",
             "## Important Reminders",
         ]
 
@@ -872,23 +872,22 @@ class TestSplitTemplateContent:
         for tool in mcp_tools:
             assert tool in content, f"Missing MCP tool reference: {tool}"
 
-    def test_opencode_split_template_has_cli_fallback(self):
-        """OpenCode split template should include CLI fallback commands."""
+    def test_opencode_split_template_has_no_cli_fallback(self):
+        """OpenCode split template should not include CLI fallback commands (MCP-first approach)."""
         templates = get_bundled_templates()
         split_template = next((t for t in templates if t.name == "simpletask.split.md"), None)
         assert split_template is not None
 
         content = split_template.read_text()
 
-        # CLI commands that should be present
-        cli_commands = [
-            "simpletask show",
-            "simpletask task remove",
-            "simpletask task add",
+        # CLI fallback patterns that should NOT be present
+        cli_fallback_patterns = [
+            "**Fallback: Use CLI**",
+            "**Preferred: Use MCP tool**",
         ]
 
-        for cmd in cli_commands:
-            assert cmd in content, f"Missing CLI fallback command: {cmd}"
+        for pattern in cli_fallback_patterns:
+            assert pattern not in content, f"Found unexpected CLI fallback pattern: {pattern}"
 
     def test_opencode_split_template_size_under_500_lines(self):
         """OpenCode split template should be under 500 lines for token efficiency."""
@@ -956,3 +955,345 @@ class TestSplitTemplateContent:
 
         # Note: Qwen now uses Markdown (.md) while Gemini uses TOML (.toml)
         # They are no longer byte-identical but serve the same purpose
+
+    def test_gemini_split_template_has_toml_structure(self):
+        """Gemini split template should have valid TOML structure."""
+        templates = get_bundled_gemini_templates()
+        split_template = next((t for t in templates if t.name == "simpletask.split.toml"), None)
+        assert split_template is not None, "simpletask.split.toml not found"
+
+        content = split_template.read_text()
+
+        # TOML structure markers
+        assert "description = " in content, "Missing TOML description field"
+        assert 'prompt = """' in content, "Missing TOML prompt field"
+
+    def test_gemini_split_template_has_essential_content(self):
+        """Gemini split template should contain essential content."""
+        templates = get_bundled_gemini_templates()
+        split_template = next((t for t in templates if t.name == "simpletask.split.toml"), None)
+        assert split_template is not None
+
+        content = split_template.read_text()
+
+        # Essential content
+        essential_content = [
+            "Step 1: Load Task File",
+            "Step 2: Identify Tasks to Split",
+            "simpletask_get",
+            "simpletask_task",
+        ]
+
+        for item in essential_content:
+            assert item in content, f"Missing essential content: {item}"
+
+    def test_gemini_split_template_size_under_500_lines(self):
+        """Gemini split template should be under 500 lines for token efficiency."""
+        templates = get_bundled_gemini_templates()
+        split_template = next((t for t in templates if t.name == "simpletask.split.toml"), None)
+        assert split_template is not None
+
+        content = split_template.read_text()
+        line_count = len(content.splitlines())
+
+        assert (
+            line_count < 500
+        ), f"Gemini split template is {line_count} lines, should be <500 for token efficiency"
+
+
+class TestCrossEditorConsistency:
+    """Verify consistency across OpenCode, Qwen, and Gemini templates."""
+
+    def test_all_editors_have_same_template_names(self):
+        """All editors should have templates with the same base names."""
+        opencode_templates = get_bundled_templates()
+        qwen_templates = get_bundled_qwen_templates()
+        gemini_templates = get_bundled_gemini_templates()
+
+        # Extract base names (stems) without extensions
+        opencode_bases = sorted([t.stem for t in opencode_templates])
+        qwen_bases = sorted([t.stem for t in qwen_templates])
+        gemini_bases = sorted([t.stem for t in gemini_templates])
+
+        assert (
+            opencode_bases == qwen_bases == gemini_bases
+        ), "All editors should have the same template base names"
+
+    def test_all_split_templates_have_splitting_criteria(self):
+        """All split templates should define the same splitting criteria."""
+        opencode_templates = get_bundled_templates()
+        qwen_templates = get_bundled_qwen_templates()
+        gemini_templates = get_bundled_gemini_templates()
+
+        opencode_split = next((t for t in opencode_templates if t.stem == "simpletask.split"), None)
+        qwen_split = next((t for t in qwen_templates if t.stem == "simpletask.split"), None)
+        gemini_split = next((t for t in gemini_templates if t.stem == "simpletask.split"), None)
+
+        assert opencode_split is not None
+        assert qwen_split is not None
+        assert gemini_split is not None
+
+        # Read files once outside the loop for efficiency
+        opencode_content = opencode_split.read_text()
+        qwen_content = qwen_split.read_text()
+        gemini_content = gemini_split.read_text()
+
+        # Splitting criteria markers that should be in all templates
+        splitting_criteria = [
+            ">2 steps",
+            ">1 file",
+            ">3 conditions",
+            ">100 characters",
+        ]
+
+        for criterion in splitting_criteria:
+            assert criterion in opencode_content, f"OpenCode missing: {criterion}"
+            assert criterion in qwen_content, f"Qwen missing: {criterion}"
+            assert criterion in gemini_content, f"Gemini missing: {criterion}"
+
+    def test_all_implement_templates_reference_same_mcp_tools(self):
+        """All implement templates should reference the same core MCP tools."""
+        opencode_templates = get_bundled_templates()
+        qwen_templates = get_bundled_qwen_templates()
+        gemini_templates = get_bundled_gemini_templates()
+
+        opencode_impl = next(
+            (t for t in opencode_templates if t.stem == "simpletask.implement"), None
+        )
+        qwen_impl = next((t for t in qwen_templates if t.stem == "simpletask.implement"), None)
+        gemini_impl = next((t for t in gemini_templates if t.stem == "simpletask.implement"), None)
+
+        assert opencode_impl is not None
+        assert qwen_impl is not None
+        assert gemini_impl is not None
+
+        # Core MCP tools that should be in all implement templates
+        core_mcp_tools = [
+            "simpletask_get",
+            "simpletask_task",
+            "simpletask_criteria",
+            "simpletask_note",
+            "simpletask_quality",
+        ]
+
+        # Read files once before the loop
+        opencode_content = opencode_impl.read_text()
+        qwen_content = qwen_impl.read_text()
+        gemini_content = gemini_impl.read_text()
+
+        for tool in core_mcp_tools:
+            assert tool in opencode_content, f"OpenCode missing MCP tool: {tool}"
+            assert tool in qwen_content, f"Qwen missing MCP tool: {tool}"
+            assert tool in gemini_content, f"Gemini missing MCP tool: {tool}"
+
+    def test_no_branch_parameter_in_any_implement_template(self):
+        """No implement template should reference branch=None (removed in v0.18.0)."""
+        opencode_templates = get_bundled_templates()
+        qwen_templates = get_bundled_qwen_templates()
+        gemini_templates = get_bundled_gemini_templates()
+
+        opencode_impl = next(
+            (t for t in opencode_templates if t.stem == "simpletask.implement"), None
+        )
+        qwen_impl = next((t for t in qwen_templates if t.stem == "simpletask.implement"), None)
+        gemini_impl = next((t for t in gemini_templates if t.stem == "simpletask.implement"), None)
+
+        assert opencode_impl is not None
+        assert qwen_impl is not None
+        assert gemini_impl is not None
+
+        opencode_content = opencode_impl.read_text()
+        qwen_content = qwen_impl.read_text()
+        gemini_content = gemini_impl.read_text()
+
+        # Should not contain branch=None (removed in v0.18.0)
+        assert "branch=None" not in opencode_content, "OpenCode has branch=None"
+        assert "branch=None" not in qwen_content, "Qwen has branch=None"
+        assert "branch=None" not in gemini_content, "Gemini has branch=None"
+
+    def test_all_split_templates_reference_same_mcp_tools(self):
+        """All split templates should reference the same core MCP tools."""
+        opencode_templates = get_bundled_templates()
+        qwen_templates = get_bundled_qwen_templates()
+        gemini_templates = get_bundled_gemini_templates()
+
+        opencode_split = next((t for t in opencode_templates if t.stem == "simpletask.split"), None)
+        qwen_split = next((t for t in qwen_templates if t.stem == "simpletask.split"), None)
+        gemini_split = next((t for t in gemini_templates if t.stem == "simpletask.split"), None)
+
+        assert opencode_split is not None
+        assert qwen_split is not None
+        assert gemini_split is not None
+
+        # Core MCP tools that should be in all split templates
+        core_mcp_tools = [
+            "simpletask_get",
+            "simpletask_task",
+        ]
+
+        opencode_content = opencode_split.read_text()
+        qwen_content = qwen_split.read_text()
+        gemini_content = gemini_split.read_text()
+
+        for tool in core_mcp_tools:
+            assert tool in opencode_content, f"OpenCode missing MCP tool: {tool}"
+            assert tool in qwen_content, f"Qwen missing MCP tool: {tool}"
+            assert tool in gemini_content, f"Gemini missing MCP tool: {tool}"
+
+    def test_all_review_templates_reference_same_mcp_tools(self):
+        """All review templates should reference the same core MCP tools."""
+        opencode_templates = get_bundled_templates()
+        qwen_templates = get_bundled_qwen_templates()
+        gemini_templates = get_bundled_gemini_templates()
+
+        opencode_review = next(
+            (t for t in opencode_templates if t.stem == "simpletask.review"), None
+        )
+        qwen_review = next((t for t in qwen_templates if t.stem == "simpletask.review"), None)
+        gemini_review = next((t for t in gemini_templates if t.stem == "simpletask.review"), None)
+
+        assert opencode_review is not None
+        assert qwen_review is not None
+        assert gemini_review is not None
+
+        # Core MCP tools that should be in all review templates
+        # Note: Review templates use simpletask_get() for read-only access and
+        # simpletask_task() for adding fix tasks to the task file
+        core_mcp_tools = [
+            "simpletask_get",
+            "simpletask_task",
+        ]
+
+        opencode_content = opencode_review.read_text()
+        qwen_content = qwen_review.read_text()
+        gemini_content = gemini_review.read_text()
+
+        for tool in core_mcp_tools:
+            assert tool in opencode_content, f"OpenCode missing MCP tool: {tool}"
+            assert tool in qwen_content, f"Qwen missing MCP tool: {tool}"
+            assert tool in gemini_content, f"Gemini missing MCP tool: {tool}"
+
+    def test_no_branch_parameter_in_any_template(self):
+        """All 12 templates should not contain deprecated branch=None.
+
+        The branch parameter is still valid for simpletask_new() but was removed
+        from other MCP tools (get, task, criteria, quality, design, etc.) which
+        now auto-detect the current git branch.
+        """
+        import re
+
+        opencode_templates = get_bundled_templates()
+        qwen_templates = get_bundled_qwen_templates()
+        gemini_templates = get_bundled_gemini_templates()
+
+        # Pattern to match MCP tool calls with branch parameter (excluding simpletask_new)
+        # Matches: simpletask_get(branch=...), simpletask_task(action="...", branch=...)
+        # But NOT: simpletask_new(branch=...)
+        deprecated_branch_pattern = re.compile(
+            r"simpletask_(?!new\()"  # Negative lookahead: not followed by "new("
+            r"[a-z_]+\([^)]*branch="  # Any simpletask tool with branch= param
+        )
+
+        # Check all 4 OpenCode templates
+        for template in opencode_templates:
+            content = template.read_text()
+            assert "branch=None" not in content, f"{template.name} has branch=None"
+            match = deprecated_branch_pattern.search(content)
+            assert match is None, (
+                f"{template.name} has deprecated branch parameter in non-new tool: "
+                f"{match.group(0) if match else ''}"
+            )
+
+        # Check all 4 Qwen templates
+        for template in qwen_templates:
+            content = template.read_text()
+            assert "branch=None" not in content, f"{template.name} has branch=None"
+            match = deprecated_branch_pattern.search(content)
+            assert match is None, (
+                f"{template.name} has deprecated branch parameter in non-new tool: "
+                f"{match.group(0) if match else ''}"
+            )
+
+        # Check all 4 Gemini templates
+        for template in gemini_templates:
+            content = template.read_text()
+            assert "branch=None" not in content, f"{template.name} has branch=None"
+            match = deprecated_branch_pattern.search(content)
+            assert match is None, (
+                f"{template.name} has deprecated branch parameter in non-new tool: "
+                f"{match.group(0) if match else ''}"
+            )
+
+    def test_all_implement_templates_list_all_statuses(self):
+        """All implement templates should list all 5 valid statuses (in_progress, completed, blocked, paused, not_started) in their reference sections."""
+        opencode_templates = get_bundled_templates()
+        qwen_templates = get_bundled_qwen_templates()
+        gemini_templates = get_bundled_gemini_templates()
+
+        opencode_impl = next(
+            (t for t in opencode_templates if t.stem == "simpletask.implement"), None
+        )
+        qwen_impl = next((t for t in qwen_templates if t.stem == "simpletask.implement"), None)
+        gemini_impl = next((t for t in gemini_templates if t.stem == "simpletask.implement"), None)
+
+        assert opencode_impl is not None
+        assert qwen_impl is not None
+        assert gemini_impl is not None
+
+        # All 5 valid task statuses
+        required_statuses = ["in_progress", "completed", "blocked", "paused", "not_started"]
+
+        opencode_content = opencode_impl.read_text()
+        qwen_content = qwen_impl.read_text()
+        gemini_content = gemini_impl.read_text()
+
+        for status in required_statuses:
+            assert status in opencode_content, f"OpenCode implement missing status: {status}"
+            assert status in qwen_content, f"Qwen implement missing status: {status}"
+            assert status in gemini_content, f"Gemini implement missing status: {status}"
+
+    def test_implement_return_type_descriptions_consistent(self):
+        """All implement templates should use consistent SimpleTaskWriteResponse description text."""
+        opencode_templates = get_bundled_templates()
+        qwen_templates = get_bundled_qwen_templates()
+        gemini_templates = get_bundled_gemini_templates()
+
+        opencode_impl = next(
+            (t for t in opencode_templates if t.stem == "simpletask.implement"), None
+        )
+        qwen_impl = next((t for t in qwen_templates if t.stem == "simpletask.implement"), None)
+        gemini_impl = next((t for t in gemini_templates if t.stem == "simpletask.implement"), None)
+
+        assert opencode_impl is not None
+        assert qwen_impl is not None
+        assert gemini_impl is not None
+
+        opencode_content = opencode_impl.read_text()
+        qwen_content = qwen_impl.read_text()
+        gemini_content = gemini_impl.read_text()
+
+        # All templates should use the same description for SimpleTaskWriteResponse
+        expected_description = "Returns SimpleTaskWriteResponse with success confirmation"
+
+        assert (
+            expected_description in opencode_content
+        ), "OpenCode implement has inconsistent SimpleTaskWriteResponse description"
+        assert (
+            expected_description in qwen_content
+        ), "Qwen implement has inconsistent SimpleTaskWriteResponse description"
+        assert (
+            expected_description in gemini_content
+        ), "Gemini implement has inconsistent SimpleTaskWriteResponse description"
+
+        # Also verify absence of known divergent phrasings
+        divergent_description = "Returns SimpleTaskWriteResponse with updated criteria state"
+
+        assert (
+            divergent_description not in opencode_content
+        ), "OpenCode implement contains divergent description: 'updated criteria state'"
+        assert (
+            divergent_description not in qwen_content
+        ), "Qwen implement contains divergent description: 'updated criteria state'"
+        assert (
+            divergent_description not in gemini_content
+        ), "Gemini implement contains divergent description: 'updated criteria state'"

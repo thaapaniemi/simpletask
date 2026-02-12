@@ -13,32 +13,20 @@ User input: $ARGUMENTS
    git branch --show-current
    ```
 
-2. Load and verify task file exists using MCP tools (with CLI fallback):
+2. Load and verify task file exists using MCP tools:
    
-   **Preferred: Use MCP tool** (if simpletask MCP server is available)
    ```
    Use simpletask_get() MCP tool to retrieve task data:
-   - Call simpletask_get(branch=None) to use current git branch
+   - Call simpletask_get() to use current git branch (auto-detected)
    - Returns SimpleTaskGetResponse with spec, file_path, and summary
    - If error occurs, task file does not exist
    ```
    
-   **Fallback: Use CLI** (if MCP tools not available)
-   ```bash
    simpletask show
-   ```
-   
-   If task file not found:
-   - Ask user: "No task file found for current branch. Run /simpletask.plan first?"
-   - Do NOT proceed without a task file
-
-**Note:** Branch names with slashes (e.g., `feature/user-auth`) are automatically normalized to filenames with hyphens (e.g., `.tasks/feature-user-auth.yml`). The MCP tools and CLI commands handle normalization automatically.
-
 **Step 2: Analyze Current State**
 
-1. Get task and criteria data using MCP tools (with CLI fallback):
+1. Get task and criteria data using MCP tools:
    
-   **Preferred: Use MCP tool** (if simpletask MCP server is available)
    ```
    Use simpletask_get() MCP tool to retrieve complete task data:
    - Returns SimpleTaskGetResponse with spec containing:
@@ -53,43 +41,26 @@ User input: $ARGUMENTS
    - List spec.acceptance_criteria with completed=False to see unmet criteria
    ```
    
-   **Fallback: Use CLI** (if MCP tools not available)
-   ```bash
    # List all tasks and their current status
    simpletask task list
    
    # List acceptance criteria status
    simpletask criteria list
-   ```
-
-2. Identify execution order based on:
-   - Tasks with `status: not_started` or `status: in_progress`
-   - Prerequisites (tasks that must complete first)
-   - Build dependency graph and determine execution order
-
-3. If $ARGUMENTS specifies a task ID (e.g., "T003"), start from that task
-
 **Step 3: Execute Tasks in Order**
 
 For EACH task in the execution order:
 
 ### 3.1 Mark Task as In Progress
 
-**Preferred: Use MCP tool** (if simpletask MCP server is available)
 ```
 Use simpletask_task() MCP tool to update task status:
 - Call simpletask_task(action="update", task_id="[TASK_ID]", status="in_progress")
-- Returns SimpleTaskWriteResponse with updated task state
+- Returns SimpleTaskWriteResponse with success confirmation
 ```
 
-**Fallback: Use CLI** (if MCP tools not available)
-```bash
 simpletask task update [TASK_ID] --status in_progress
-```
-
 ### 3.2 Read Task Details
 
-**Preferred: Use MCP tool** (if simpletask MCP server is available)
 ```
 From the simpletask_get() result obtained earlier, extract task details:
 - Find task in spec.tasks where id matches current task ID
@@ -103,16 +74,6 @@ From the simpletask_get() result obtained earlier, extract task details:
   - prerequisites: Tasks that must be complete first (if defined)
 ```
 
-**Fallback: Use CLI/direct file read** (if MCP tools not available)
-From the task file, extract:
-- `name`: What the task is called
-- `goal`: What this task accomplishes
-- `steps`: Ordered list of implementation steps
-- `done_when`: Verification conditions
-- `files`: Files to create/modify/delete
-- `code_examples`: Patterns to follow
-- `prerequisites`: Tasks that must be complete first
-
 ### 3.3 Implement the Task
 
 Follow the `steps` array exactly:
@@ -125,7 +86,6 @@ Follow the `steps` array exactly:
 
 As you implement, use notes to capture important context:
 
-**Preferred: Use MCP tool** (if simpletask MCP server is available)
 ```
 Use simpletask_note() MCP tool to add notes:
 - Root-level notes for feature-wide decisions:
@@ -135,22 +95,11 @@ Use simpletask_note() MCP tool to add notes:
   simpletask_note(action="add", content="Had to add extra validation here to handle edge case", task_id="T003")
 ```
 
-**Fallback: Use CLI** (if MCP tools not available)
-```bash
 # Add root-level note for feature-wide decisions
 simpletask note add "Using JWT for auth instead of sessions due to API scalability"
 
 # Add task-level note for specific context
 simpletask note add "Had to add extra validation here to handle edge case" --task T003
-```
-
-**When to add notes:**
-- Alternative approaches considered and why they were rejected
-- Workarounds for unexpected issues
-- Technical debt identified during implementation
-- Decisions that deviate from the original plan
-- Context that would help reviewers understand the changes
-
 ### 3.4 Verify Completion
 
 Check ALL conditions in `done_when`:
@@ -176,7 +125,6 @@ ruff check src/
 
 1. Get quality requirements from task file:
    
-   **Preferred: Use MCP tool** (if simpletask MCP server is available)
    ```
    Use simpletask_quality() MCP tool to check requirements:
    - Call simpletask_quality(action="check")
@@ -184,13 +132,7 @@ ruff check src/
    - Example response: {linting: "ruff check .", testing: "pytest --cov=..."}
    ```
    
-   **Fallback: Use CLI** (if MCP tools not available)
-   ```bash
    simpletask quality check
-   ```
-
-2. Run each enabled quality check:
-   ```bash
    # Example: If linting is enabled
    ruff check .
    
@@ -202,40 +144,19 @@ ruff check src/
    
    # Example: If formatting is enabled
    black --check .
-   ```
-
-3. Fix any issues found before proceeding:
-   - Linting errors → Fix code style issues
-   - Test failures → Fix bugs or update tests
-   - Type errors → Add/fix type hints
-   - Format issues → Run formatter (e.g., `black .`)
-
-4. Re-run checks until all pass:
-   ```bash
    # Re-run failed checks after fixes
    ruff check .
    pytest
    mypy cli/simpletask
-   ```
-
-**DO NOT mark the task as completed until ALL quality checks pass.** This prevents accumulating technical debt and catches issues early.
-
 ### 3.5 Mark Task as Completed
 
-**Preferred: Use MCP tool** (if simpletask MCP server is available)
 ```
 Use simpletask_task() MCP tool to update task status:
 - Call simpletask_task(action="update", task_id="[TASK_ID]", status="completed")
-- Returns SimpleTaskWriteResponse with updated task state
+- Returns SimpleTaskWriteResponse with success confirmation
 ```
 
-**Fallback: Use CLI** (if MCP tools not available)
-```bash
 simpletask task update [TASK_ID] --status completed
-```
-
-**Note:** Do NOT commit changes yet. All changes will be committed in a single commit after all tasks are complete.
-
 ### 3.6 Repeat for Next Task
 
 Continue with the next task in the execution order until all tasks are complete.
@@ -244,9 +165,8 @@ Continue with the next task in the execution order until all tasks are complete.
 
 After completing ALL tasks, evaluate which acceptance criteria are now satisfied.
 
-1. Get current criteria status using MCP tools (with CLI fallback):
+1. Get current criteria status using MCP tools:
    
-   **Preferred: Use MCP tool** (if simpletask MCP server is available)
    ```
    Use simpletask_get() MCP tool to retrieve current task data:
    - Check spec.acceptance_criteria array
@@ -254,18 +174,11 @@ After completing ALL tasks, evaluate which acceptance criteria are now satisfied
    - summary.criteria_completed shows count of completed criteria
    ```
    
-   **Fallback: Use CLI** (if MCP tools not available)
-   ```bash
    simpletask criteria list
-   ```
-
-2. For EACH criterion that is now satisfied, mark it complete:
-   
-   **Preferred: Use MCP tool** (if simpletask MCP server is available)
    ```
    Use simpletask_criteria() MCP tool:
    - Call simpletask_criteria(action="complete", criterion_id="[CRITERION_ID]")
-   - Returns SimpleTaskWriteResponse with updated criteria state
+   - Returns SimpleTaskWriteResponse with success confirmation
    
    Example:
    simpletask_criteria(action="complete", criterion_id="AC1")
@@ -273,34 +186,20 @@ After completing ALL tasks, evaluate which acceptance criteria are now satisfied
    simpletask_criteria(action="complete", criterion_id="AC3")
    ```
    
-   **Fallback: Use CLI** (if MCP tools not available)
-   ```bash
    simpletask criteria complete AC1
    simpletask criteria complete AC2
    simpletask criteria complete AC3
-   ```
-
-3. Verify all criteria are marked complete:
-   
-   **Preferred: Use MCP tool** (if simpletask MCP server is available)
    ```
    Use simpletask_get() MCP tool:
    - Check summary.criteria_completed equals summary.criteria_total
    - Or filter spec.acceptance_criteria by completed=False (should be empty)
    ```
    
-   **Fallback: Use CLI** (if MCP tools not available)
-   ```bash
    simpletask criteria list --completed
-   ```
-
-**Note:** Do NOT commit changes yet. Criteria updates will be committed along with implementation.
-
 **Step 5: Final Verification and Commit**
 
 1. Validate the task file schema:
    
-   **Preferred: Use MCP tool** (if simpletask MCP server is available)
    ```
    Use simpletask_get() MCP tool with validation:
    - Call simpletask_get(validate=True)
@@ -308,14 +207,7 @@ After completing ALL tasks, evaluate which acceptance criteria are now satisfied
    - If validation.valid is False, check validation.errors for details
    ```
    
-   **Fallback: Use CLI** (if MCP tools not available)
-   ```bash
    simpletask schema validate
-   ```
-
-2. Show final task state:
-   
-   **Preferred: Use MCP tool** (if simpletask MCP server is available)
    ```
    Use simpletask_get() MCP tool:
    - Display summary.tasks_total, tasks_completed, tasks_in_progress, tasks_not_started
@@ -323,28 +215,14 @@ After completing ALL tasks, evaluate which acceptance criteria are now satisfied
    - Show spec.branch, spec.title, spec.status
    ```
    
-   **Fallback: Use CLI** (if MCP tools not available)
-   ```bash
    simpletask show
-   ```
-
-3. Verify all tasks are completed:
-   
-   **Preferred: Use MCP tool** (if simpletask MCP server is available)
    ```
    From simpletask_get() response:
    - Check that summary.tasks_completed equals summary.tasks_total
    - Or filter spec.tasks by status != "completed" (should be empty)
    ```
    
-   **Fallback: Use CLI** (if MCP tools not available)
-   ```bash
    simpletask task list --status completed
-   ```
-
-4. If any tasks remain incomplete:
-   
-   **Preferred: Use MCP tool** (if simpletask MCP server is available)
    ```
    From simpletask_get() response:
    - Filter spec.tasks where status == "not_started" 
@@ -353,19 +231,10 @@ After completing ALL tasks, evaluate which acceptance criteria are now satisfied
    - Filter spec.tasks where status == "paused"
    ```
    
-   **Fallback: Use CLI** (if MCP tools not available)
-   ```bash
    simpletask task list --status not_started
    simpletask task list --status in_progress
    simpletask task list --status blocked
    simpletask task list --status paused
-   ```
-
-4a. Run Final Quality Check (MANDATORY):
-   
-   **Before committing, run all configured quality checks one final time to ensure nothing was missed.**
-   
-   **Preferred: Use MCP tool** (if simpletask MCP server is available)
    ```
    Use simpletask_quality() MCP tool:
    - Call simpletask_quality(action="check")
@@ -373,8 +242,6 @@ After completing ALL tasks, evaluate which acceptance criteria are now satisfied
    - Verify all checks pass before proceeding
    ```
    
-   **Fallback: Use CLI** (if MCP tools not available)
-   ```bash
    # Check which quality requirements are enabled
    simpletask quality show
    
@@ -384,20 +251,6 @@ After completing ALL tasks, evaluate which acceptance criteria are now satisfied
    pytest --cov=cli/simpletask --cov-report=term-missing
    mypy cli/simpletask
    black --check .
-   ```
-   
-   **If any quality check fails:**
-   - Fix the issues immediately
-   - Re-run the failing checks
-   - Do NOT proceed to commit until ALL checks pass
-   
-   This final gate prevents committing code that fails quality standards.
-
-5. Create a single commit with ALL implementation changes:
-   
-   First, determine what the feature accomplishes by reading the task file goal/title.
-   
-   ```bash
    # Stage implementation changes (exclude .tasks/ as it's gitignored)
    git add -A
    
@@ -407,16 +260,6 @@ After completing ALL tasks, evaluate which acceptance criteria are now satisfied
    # Example: feat: implement JWT-based login flow
    # Example: fix: resolve race condition in task scheduler
    git commit -m "feat: <describe the implemented feature based on branch goal>"
-   ```
-   
-   **Commit message guidelines:**
-   - Use `feat:` for new features
-   - Use `fix:` for bug fixes
-   - Use `refactor:` for code restructuring
-   - Use `test:` for adding tests
-   - Keep description concise but meaningful
-   - Focus on WHAT was implemented, not HOW
-
 **Step 6: Report Progress**
 
 Display summary:
@@ -472,19 +315,15 @@ Execution order for above:
 
 If a task cannot be completed:
 
-**Preferred: Use MCP tool** (if simpletask MCP server is available)
 ```
 Use simpletask_task() MCP tool:
 - Call simpletask_task(action="update", task_id="[TASK_ID]", status="blocked")
+- Or use status="paused" for tasks intentionally deferred
 ```
 
-**Fallback: Use CLI** (if MCP tools not available)
-```bash
 simpletask task update [TASK_ID] --status blocked
-```
-
-Document the blocker in the task file or commit message.
-
+# Or mark as paused if intentionally deferred
+simpletask task update [TASK_ID] --status paused
 ### Partial Implementation
 
 If implementing only specific tasks (from $ARGUMENTS):
@@ -498,7 +337,6 @@ If implementing only specific tasks (from $ARGUMENTS):
 
 ### View Task Information
 
-**Preferred: Use MCP tools** (if simpletask MCP server is available)
 ```
 Use simpletask_get() MCP tool to retrieve complete task data:
 - Returns SimpleTaskGetResponse with spec and summary
@@ -512,8 +350,6 @@ Filter and query the response data:
 - Use summary fields for quick counts
 ```
 
-**Fallback: Use CLI** (if MCP tools not available)
-```bash
 # Show full task details
 simpletask show
 
@@ -531,11 +367,8 @@ simpletask task list --status paused
 simpletask criteria list
 simpletask criteria list --completed
 simpletask criteria list --incomplete
-```
-
 ### Update Task Status
 
-**Preferred: Use MCP tools** (if simpletask MCP server is available)
 ```
 Use simpletask_task() MCP tool:
 
@@ -548,13 +381,14 @@ simpletask_task(action="update", task_id="T001", status="completed")
 # Mark task as blocked
 simpletask_task(action="update", task_id="T001", status="blocked")
 
+# Mark task as paused (intentionally deferred)
+simpletask_task(action="update", task_id="T001", status="paused")
+
 # Update task name or goal
 simpletask_task(action="update", task_id="T001", name="New name")
 simpletask_task(action="update", task_id="T001", goal="Updated goal")
 ```
 
-**Fallback: Use CLI** (if MCP tools not available)
-```bash
 # Mark task as in progress
 simpletask task update T001 --status in_progress
 
@@ -564,14 +398,14 @@ simpletask task update T001 --status completed
 # Mark task as blocked
 simpletask task update T001 --status blocked
 
+# Mark task as paused (intentionally deferred)
+simpletask task update T001 --status paused
+
 # Update task name or goal
 simpletask task update T001 --name "New name"
 simpletask task update T001 --goal "Updated goal"
-```
-
 ### Update Acceptance Criteria
 
-**Preferred: Use MCP tools** (if simpletask MCP server is available)
 ```
 Use simpletask_criteria() MCP tool:
 
@@ -582,18 +416,13 @@ simpletask_criteria(action="complete", criterion_id="AC1")
 simpletask_criteria(action="complete", criterion_id="AC1", completed=False)
 ```
 
-**Fallback: Use CLI** (if MCP tools not available)
-```bash
 # Mark criterion as completed
 simpletask criteria complete AC1
 
 # Mark criterion as not completed (undo)
 simpletask criteria complete AC1 --uncomplete
-```
-
 ### Validation
 
-**Preferred: Use MCP tools** (if simpletask MCP server is available)
 ```
 Use simpletask_get() MCP tool with validation:
 
@@ -602,15 +431,11 @@ simpletask_get(validate=True)
 # Check validation.valid and validation.errors in response
 ```
 
-**Fallback: Use CLI** (if MCP tools not available)
-```bash
 # Validate task file against schema
 simpletask schema validate
 
 # Validate specific file
 simpletask schema validate .tasks/branch-name.yml
-```
-
 ---
 
 ## Example Implementation Session

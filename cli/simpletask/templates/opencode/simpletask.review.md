@@ -13,75 +13,52 @@ You are conducting a thorough, technically precise code review. Be brutally hone
    git branch --show-current
    ```
 
-2. Load and verify task file exists using MCP tools (with CLI fallback):
+2. Load and verify task file exists using MCP tools:
    
-   **Preferred: Use MCP tool** (if simpletask MCP server is available)
    ```
    Use simpletask_get() MCP tool to retrieve task data:
-   - Call simpletask_get(branch=None) to use current git branch
+   - Call simpletask_get() to use current git branch (auto-detected)
    - Returns SimpleTaskGetResponse with spec, file_path, and summary
    - If error occurs, task file does not exist
    ```
    
-   **Fallback: Use CLI** (if MCP tools not available)
-   ```bash
    simpletask show
-   ```
-   
-   If task file not found:
-   - Ask user: "No task file found for current branch. Which branch should I review?"
-   - Do NOT proceed without a task file
-
-**Note:** Branch names with slashes (e.g., `feature/user-auth`) are automatically normalized to filenames with hyphens (e.g., `.tasks/feature-user-auth.yml`). The MCP tools and CLI commands handle normalization automatically.
-
 **Step 2: Analyze Task Completion**
 
-1. Get all task data using MCP tools (with CLI fallback):
+1. Get all task data using MCP tools:
    
-   **Preferred: Use MCP tool** (if simpletask MCP server is available)
    ```
    Use simpletask_get() MCP tool to retrieve complete task data:
    - Returns SimpleTaskGetResponse with:
-     - spec.tasks: array of all tasks with id, name, status, goal, etc.
+     - spec.tasks: array of all tasks with id, name, status, goal, steps, etc.
      - summary.tasks_total, tasks_completed, tasks_in_progress, tasks_not_started, tasks_blocked
    
    From the response:
-   - Count tasks by status: filter spec.tasks by status field
-   - Identify incomplete tasks: filter where status != "completed"
+   - Count tasks by status:
+     - Filter spec.tasks where status == "completed"
+     - Filter spec.tasks where status == "in_progress" (should be 0 after implementation)
+     - Filter spec.tasks where status == "not_started" (incomplete)
+     - Filter spec.tasks where status == "blocked" (need attention)
+     - Filter spec.tasks where status == "paused" (intentionally deferred)
    - Check done_when conditions for tasks claiming completion
    ```
    
-   **Fallback: Use CLI** (if MCP tools not available)
    ```bash
    # List all tasks and their statuses
    simpletask task list
    
    # Count tasks by status
-    simpletask task list --status completed
-    simpletask task list --status in_progress
-    simpletask task list --status not_started
-    simpletask task list --status blocked
-    simpletask task list --status paused
+   simpletask task list --status completed
+   simpletask task list --status in_progress
+   simpletask task list --status not_started
+   simpletask task list --status blocked
+   simpletask task list --status paused
    ```
-
-2. Parse task data to determine:
-   - Total tasks in the task list
-   - Tasks with `status: completed`
-   - Tasks with `status: in_progress` (should be 0 after implementation)
-   - Tasks with `status: not_started` (incomplete)
-   - Tasks with `status: blocked` (need attention)
-   - Tasks with `status: paused` (intentionally deferred)
-
-3. Identify tasks that CLAIM completion but may lack quality:
-   - Check if `done_when` conditions are actually satisfied
-   - Verify files listed in `files` array exist/were modified
-   - Look for incomplete implementations
 
 **Step 3: Check Acceptance Criteria**
 
-1. Get acceptance criteria data using MCP tools (with CLI fallback):
+1. Get acceptance criteria data using MCP tools:
    
-   **Preferred: Use MCP tool** (if simpletask MCP server is available)
    ```
    Use simpletask_get() MCP tool data from Step 1:
    - Check spec.acceptance_criteria: array of criteria with id, description, completed
@@ -92,24 +69,10 @@ You are conducting a thorough, technically precise code review. Be brutally hone
    - Filter spec.acceptance_criteria where completed == False (remain incomplete)
    ```
    
-   **Fallback: Use CLI** (if MCP tools not available)
-   ```bash
    # List acceptance criteria status
    simpletask criteria list
    simpletask criteria list --completed
    simpletask criteria list --incomplete
-   ```
-
-2. For each acceptance criterion:
-   - Check if `completed: true` or `completed: false`
-   - **Verify** that "completed" criteria actually meet requirements (don't trust blindly)
-   - Test the actual implementation against the criterion description
-
-3. Document:
-   - Which criteria are marked complete (`completed: true`)
-   - Which criteria remain incomplete (`completed: false`)
-   - Which "complete" criteria don't actually meet requirements (false positives)
-
 **Step 4: Deep Code Analysis**
 
 Examine the actual implementation changes. Review key modified files for:
@@ -154,7 +117,6 @@ Examine the actual implementation changes. Review key modified files for:
 
 Check if notes were added during implementation to understand context:
 
-**Preferred: Use MCP tool** (if simpletask MCP server is available)
 ```
 Use simpletask_note() MCP tool to list notes:
 - Call simpletask_note(action="list")
@@ -166,8 +128,6 @@ Use simpletask_note() MCP tool to list notes:
   - Security or performance considerations mentioned
 ```
 
-**Fallback: Use CLI** (if MCP tools not available)
-```bash
 # List all notes
 simpletask note list
 
@@ -176,15 +136,6 @@ simpletask note list --task T003
 
 # List only root-level notes
 simpletask note list --root-only
-```
-
-**When reviewing notes:**
-- Do notes explain important decisions clearly?
-- Are there workarounds that should be improved?
-- Is technical debt properly documented?
-- Are there security/performance notes that need addressing?
-- Should any notes be converted to code comments or documentation?
-
 **Step 5: Analyze Git Changes**
 
 1. Get branch comparison:
@@ -294,6 +245,7 @@ TASK COMPLETION
   - In Progress: [count]
   - Not Started: [count]
   - Blocked: [count]
+  - Paused: [count]
   
   Incomplete tasks:
     - T00X: [task name]
@@ -347,9 +299,8 @@ PR READINESS: [READY TO MERGE | NEEDS CHANGES | NOT READY]
 
 If issues are found, automatically add fix tasks to the task file:
 
-1. For each issue found, create a fix task using MCP tools (with CLI fallback):
+1. For each issue found, create a fix task using MCP tools:
    
-   **Preferred: Use MCP tool** (if simpletask MCP server is available)
    ```
    Use simpletask_task() MCP tool to add fix tasks:
    - Call simpletask_task(
@@ -357,22 +308,11 @@ If issues are found, automatically add fix tasks to the task file:
        name="Fix: [issue summary]",
        goal="[detailed goal with file path and remediation]"
      )
-   - Returns SimpleTaskGetResponse with updated task list
+   - Returns SimpleTaskWriteResponse with success confirmation
    - Repeat for each fix needed
    ```
    
-   **Fallback: Use CLI** (if MCP tools not available)
-   ```bash
    simpletask task add "Fix: [issue summary]" -g "[detailed goal with file path and remediation]"
-   ```
-
-2. Group related issues into single tasks when appropriate:
-   - Multiple issues in same file → one task
-   - Related security issues → one task
-   - Similar code quality issues → one task
-
-3. Example fix tasks:
-   
    **Using MCP tools:**
    ```
    simpletask_task(
@@ -409,18 +349,13 @@ If issues are found, automatically add fix tasks to the task file:
 
 5. Validate the updated task file:
    
-   **Preferred: Use MCP tool** (if simpletask MCP server is available)
    ```
    Use simpletask_get() MCP tool with validation:
    - Call simpletask_get(validate=True)
    - Check validation.valid in response
    ```
    
-   **Fallback: Use CLI** (if MCP tools not available)
-   ```bash
    simpletask schema validate
-   ```
-
 ---
 
 ## Review Workflow
@@ -449,7 +384,6 @@ The review command creates a natural feedback loop:
 
 ### View Task Information
 
-**Preferred: Use MCP tools** (if simpletask MCP server is available)
 ```
 Use simpletask_get() MCP tool to retrieve complete task data:
 - Returns SimpleTaskGetResponse with spec and summary
@@ -463,8 +397,6 @@ Filter and query the response data:
 - Use summary fields for quick counts
 ```
 
-**Fallback: Use CLI** (if MCP tools not available)
-```bash
 # Show full task details
 simpletask show
 
@@ -474,16 +406,16 @@ simpletask task list
 # List tasks by status
 simpletask task list --status completed
 simpletask task list --status not_started
+simpletask task list --status in_progress
+simpletask task list --status blocked
+simpletask task list --status paused
 
 # List acceptance criteria
 simpletask criteria list
 simpletask criteria list --completed
 simpletask criteria list --incomplete
-```
-
 ### Add Fix Tasks
 
-**Preferred: Use MCP tools** (if simpletask MCP server is available)
 ```
 Use simpletask_task() MCP tool:
 
@@ -493,28 +425,15 @@ simpletask_task(
   name="Fix: [description]",
   goal="[goal]"
 )
-
-# Add task with specific branch
-simpletask_task(
-  action="add",
-  branch="[branch-name]",
-  name="Fix: [description]",
-  goal="[goal]"
-)
 ```
 
-**Fallback: Use CLI** (if MCP tools not available)
-```bash
 # Add a fix task
 simpletask task add "Fix: [description]" -g "[goal]"
 
 # Add task with specific branch
 simpletask task add "Fix: [description]" -g "[goal]" -b [branch-name]
-```
-
 ### Validation
 
-**Preferred: Use MCP tools** (if simpletask MCP server is available)
 ```
 Use simpletask_get() MCP tool with validation:
 
@@ -523,12 +442,8 @@ simpletask_get(validate=True)
 # Check validation.valid and validation.errors in response
 ```
 
-**Fallback: Use CLI** (if MCP tools not available)
-```bash
 # Validate task file
 simpletask schema validate
-```
-
 ---
 
 ## Important Guidelines
@@ -556,6 +471,10 @@ simpletask schema validate
 ---
 
 ## Quality Gates
+
+<!-- NOTE: OpenCode intentionally provides both MCP and CLI references here for 
+     comprehensive guidance, while Qwen/Gemini templates focus on CLI-only workflow.
+     This asymmetry is by design and should not be "harmonized" away. -->
 
 Before marking as "READY TO MERGE":
 

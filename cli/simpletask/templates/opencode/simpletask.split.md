@@ -12,19 +12,184 @@ User input: $ARGUMENTS
 
 ## Step 1: Load Task File
 
-**Using MCP tools** (preferred):
 ```
-simpletask_get(branch=None)  # Uses current git branch
+simpletask_get()  # Uses current git branch
 Returns: SimpleTaskGetResponse with spec, file_path, summary
 ```
 
-**Using CLI** (fallback):
-```bash
-git branch --show-current  # Get branch name
-simpletask show            # Load task file
+If task file not found: Report "No task file found. Run /simpletask.plan first." and STOP.
+
+---
+
+## Step 1.5: Codebase Analysis & Design (Conditional)
+
+**SKIP this step if:**
+- `simpletask_get()` shows `spec.design` is already populated (has patterns, constraints, or references)
+- `simpletask_get()` shows `spec.quality_requirements` already configured
+
+**If design section is empty or missing, execute this mandatory codebase analysis:**
+
+This phase analyzes the codebase to populate design guidance and quality requirements before splitting tasks.
+
+### 1.5.1: Find Reference Implementations
+
+Use the Task tool with the `explore` agent to find similar existing code:
+
+```
+Task(
+  subagent_type="explore",
+  description="Find reference implementations",
+  prompt="Find files similar to [feature description]. Look for:
+- Similar functionality or patterns
+- Existing implementations we should follow
+- Code that solves related problems
+Thoroughness: [quick/medium/very thorough]"
+)
 ```
 
-If task file not found: Report "No task file found. Run /simpletask.plan first." and STOP.
+Set thoroughness based on task complexity:
+- **"quick"** - Simple tasks with obvious patterns
+- **"medium"** - Most tasks requiring moderate exploration
+- **"very thorough"** - Complex tasks or unfamiliar codebases
+
+Document findings:
+```
+Use simpletask_design() MCP tool to add references:
+- Call simpletask_design(
+    action="set",
+    field="reference",
+    value="[file path]",
+    reason="[why this is relevant]"
+  )
+- Repeat for each reference implementation
+```
+
+### 1.5.2: Document Patterns to Follow
+
+Use the explore agent to identify coding patterns:
+
+```
+Task(
+  subagent_type="explore",
+  description="Identify design patterns",
+  prompt="Analyze [relevant files] to identify:
+- Design patterns used (Repository, Factory, Observer, etc.)
+- Code organization patterns
+- Naming conventions
+- Dependency injection patterns
+Thoroughness: [quick/medium/very thorough]"
+)
+```
+
+Document using simpletask_design():
+```
+Call simpletask_design(
+  action="set",
+  field="pattern",
+  value="[Pattern description]"
+)
+- Repeat for each pattern identified
+```
+
+### 1.5.3: Define Architectural Constraints
+
+Use the explore agent to understand constraints:
+
+```
+Task(
+  subagent_type="explore",
+  description="Identify architectural constraints",
+  prompt="Analyze codebase structure to identify:
+- Layer separation rules (UI/business/data)
+- Circular dependency constraints
+- Module boundaries
+- Technology stack limitations
+Thoroughness: [quick/medium/very thorough]"
+)
+```
+
+Document using simpletask_design():
+```
+Call simpletask_design(
+  action="set",
+  field="constraint",
+  value="[Constraint description]"
+)
+- Repeat for each constraint
+```
+
+### 1.5.4: Identify Security Considerations
+
+Use the explore agent for security analysis:
+
+```
+Task(
+  subagent_type="explore",
+  description="Identify security patterns",
+  prompt="Analyze [relevant files] for security patterns:
+- Input validation approaches
+- Authentication/authorization patterns
+- Data sanitization methods
+- Sensitive data handling
+Thoroughness: [quick/medium/very thorough]"
+)
+```
+
+Document using simpletask_design():
+```
+Call simpletask_design(
+  action="set",
+  field="security",
+  value="[Security consideration]"
+)
+- Repeat for each security consideration
+```
+
+### 1.5.5: Define Error Handling Pattern
+
+Use the explore agent to understand error handling:
+
+```
+Task(
+  subagent_type="explore",
+  description="Identify error handling pattern",
+  prompt="Find how errors are handled in [similar files]:
+- Exception types used
+- Error propagation strategy
+- Logging approach
+- User-facing error messages
+Thoroughness: [quick/medium/very thorough]"
+)
+```
+
+Document using simpletask_design():
+```
+Call simpletask_design(
+  action="set",
+  field="error-handling",
+  value="[Error handling pattern description]"
+)
+```
+
+### 1.5.6: Define Quality Requirements
+
+Based on the codebase tech stack, apply a quality preset:
+
+```
+Use simpletask_quality() MCP tool to apply preset:
+- Call simpletask_quality(
+    action="preset",
+    preset_name="[python|typescript|node|go|rust|java-maven|java-gradle]"
+  )
+- Returns fields that were filled (gaps only)
+```
+
+**Available presets:** python, typescript, node, go, rust, java-maven, java-gradle
+
+**After completing Step 1.5, reload the task file:**
+```
+simpletask_get()  # Refresh to see populated design section
+```
 
 ---
 
@@ -32,7 +197,7 @@ If task file not found: Report "No task file found. Run /simpletask.plan first."
 
 **A task MUST be split if it meets ANY criterion:**
 - **>2 steps** in the steps array
-- **>1 file** in the files array  
+- **>1 file** in the files array
 - **>3 conditions** in done_when array
 - **>100 characters** in goal description
 
@@ -134,7 +299,6 @@ For EACH complex task, generate atomic subtasks using these patterns:
 
 **CRITICAL:** Use batch operations to remove complex tasks and add subtasks atomically. All operations succeed or all fail - no partial states.
 
-**Using MCP tools** (preferred):
 ```python
 # Build operations list
 operations = []
@@ -157,22 +321,12 @@ result = simpletask_task(action="batch", operations=operations)
 # Returns: SimpleTaskBatchResponse with new_item_ids list
 ```
 
-**IMPORTANT:** MCP batch operation only accepts name, goal, steps. After batch completes, edit `.tasks/[branch].yml` directly to add:
-- `done_when` conditions
-- `files` array
-- `code_examples` array
-- `prerequisites` array
-
-**Using CLI** (fallback - NOT atomic):
-```bash
-# Remove complex tasks
-simpletask task remove T001
-simpletask task remove T003
-
-# Add subtasks
-simpletask task add "Subtask name" -g "Subtask goal"
-# Then edit .tasks/[branch].yml to add full details
-```
+**Note:** MCP batch operation supports all Task fields including:
+- `name`, `goal`, `steps` (basic task info)
+- `done_when` (completion verification conditions)
+- `files` (files to create/modify/delete)
+- `code_examples` (code patterns to follow)
+- `prerequisites` (task dependencies)
 
 **Why batch operations?**
 - Atomic: All changes apply or none do
@@ -187,7 +341,7 @@ simpletask task add "Subtask name" -g "Subtask goal"
 
 **5.1: Load updated task file**
 ```
-simpletask_get(branch=None)
+simpletask_get()
 ```
 
 **5.2: Create ID mapping**
@@ -217,7 +371,7 @@ Example: `prerequisites: [T015, T016]` → `prerequisites: [T003, T004]`
 
 **Validate schema:**
 ```
-simpletask_get(branch=None, validate=True)
+simpletask_get(validate=True)
 # Check validation.valid and validation.errors
 ```
 
@@ -305,63 +459,6 @@ Next steps:
 **No files/done_when in original:**
 - Split by steps only
 - Generate basic done_when from steps if needed
-
----
-
-## MCP Tool Reference
-
-**Load task file:**
-```python
-simpletask_get(branch=None, validate=False)
-# Returns: SimpleTaskGetResponse
-# - spec: Full task specification
-# - file_path: Path to YAML file
-# - summary: Status counts
-# - validation: Optional validation result
-```
-
-**Manage tasks:**
-```python
-# Get task
-simpletask_task(action="get", task_id="T001")
-
-# Add task (basic fields only)
-simpletask_task(
-  action="add",
-  name="Task name",
-  goal="Task goal",
-  steps=["Step 1", "Step 2"]
-)
-
-# Update task
-simpletask_task(
-  action="update",
-  task_id="T001",
-  status="in_progress"  # not_started | in_progress | completed | blocked
-)
-
-# Remove task
-simpletask_task(action="remove", task_id="T001")
-
-# Batch operations (ATOMIC - all succeed or all fail)
-simpletask_task(
-  action="batch",
-  operations=[
-    {"op": "remove", "task_id": "T001"},
-    {"op": "remove", "task_id": "T002"},
-    {"op": "add", "name": "New Task 1", "goal": "First subtask", "steps": ["Step 1"]},
-    {"op": "add", "name": "New Task 2", "goal": "Second subtask", "steps": ["Step 1"]},
-    {"op": "update", "task_id": "T003", "status": "completed"},
-  ]
-)
-# Returns: SimpleTaskBatchResponse with new_item_ids list
-```
-
-**List all tasks:**
-```python
-simpletask_get(branch=None)
-# Access spec.tasks array for all tasks
-```
 
 ---
 

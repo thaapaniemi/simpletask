@@ -149,14 +149,14 @@ simpletask provides AI-assisted workflow templates (slash commands) for OpenCode
 
 | Command | Purpose | When to Use |
 |---------|---------|-------------|
-| `/simpletask.plan` | Create task specification from feature description | Start of a new feature branch |
-| `/simpletask.split` | Split complex tasks into atomic subtasks | After planning, before implementation |
+| `/simpletask.plan` | Create lightweight task specification from feature description | Start of a new feature branch |
+| `/simpletask.split` | Analyze codebase, enrich tasks with design guidance, and split complex tasks into atomic subtasks | After planning, before implementation |
 | `/simpletask.implement` | Execute tasks step-by-step with best practices | Implementation phase |
 | `/simpletask.review` | Review completed tasks and generate summary | After all tasks completed |
 
 ### `/simpletask.split` - Task Splitting
 
-**Purpose:** Ensures AI models have minimal cognitive load by splitting complex tasks into ultra-atomic units (1-2 steps, 5-10 minutes each).
+**Purpose:** Analyzes the codebase to populate design guidance (patterns, constraints, security considerations, quality requirements), then ensures AI models have minimal cognitive load by splitting complex tasks into ultra-atomic units (1-2 steps, 5-10 minutes each).
 
 **Splitting Criteria:**
 
@@ -175,10 +175,11 @@ A task is split if it has ANY of:
 **Example Workflow:**
 
 ```bash
-# 1. Plan feature
+# 1. Plan feature (creates lightweight task file with criteria and basic tasks)
 /simpletask.plan "Add user authentication with JWT"
 
-# 2. Split complex tasks into atomic units
+# 2. Analyze codebase and split complex tasks into atomic units
+# This step populates design guidance (patterns, constraints, security) and splits tasks
 /simpletask.split
 
 # 3. Implement atomic tasks
