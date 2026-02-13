@@ -458,11 +458,12 @@ another-preset:
 ```
 
 **Valid tool names** (from ToolName enum):
-- Python: `ruff`, `mypy`, `pytest`, `bandit`
-- TypeScript/Node: `eslint`, `tsc`, `npm`, `prettier`
+- Python: `ruff`, `mypy`, `pytest`, `black`, `pylint`, `bandit`
+- TypeScript/Node: `eslint`, `tsc`, `npm`, `yarn`, `jest`
 - Go: `go`, `golangci-lint`, `gosec`
-- Rust: `cargo`
+- Rust: `cargo`, `clippy`
 - Java: `mvn`, `gradle`
+- Other: `make`
 
 ```bash
 # List all available presets (built-in + custom)
@@ -502,11 +503,12 @@ quality_requirements:
 ```
 
 **ToolName Enum** (whitelisted tools for security):
-- Python: `ruff`, `mypy`, `pytest`, `bandit`
-- TypeScript/Node: `eslint`, `tsc`, `npm`, `prettier`
+- Python: `ruff`, `mypy`, `pytest`, `black`, `pylint`, `bandit`
+- TypeScript/Node: `eslint`, `tsc`, `npm`, `yarn`, `jest`
 - Go: `go`, `golangci-lint`, `gosec`
-- Rust: `cargo`
+- Rust: `cargo`, `clippy`
 - Java: `mvn`, `gradle`
+- Other: `make`
 
 ### Design Commands
 
@@ -794,7 +796,7 @@ Creates a new task file without creating a git branch (atomic MCP operation).
 - `branch`: Branch/task identifier (e.g., 'feature/user-auth')
 - `title`: Human-readable task title
 - `prompt`: Original user prompt/request that led to task creation
-- `criteria` (optional): List of acceptance criteria descriptions. If `None`, adds a single placeholder criterion. If provided, must contain at least one item (empty list raises ValidationError).
+- `criteria` (optional): List of acceptance criteria descriptions. If `None` or empty list `[]`, adds a single placeholder criterion. If provided with items, must contain at least one item.
 
 **Returns:** `SimpleTaskWriteResponse` with minimal confirmation and summary
 
@@ -1286,7 +1288,7 @@ Unified tool for managing freeform notes at root-level (SimpleTaskSpec) or task-
 **Returns:**
 - For `add` and `remove`: `SimpleTaskWriteResponse` with success confirmation
 - For `list`: `SimpleTaskNoteResponse` with:
-  - `action`: str ("notes_listed")
+  - `action`: str ("note_list")
   - `root_notes`: list[str] | None
   - `task_notes`: dict[str, list[str]] (sparse dict, only tasks with notes)
   - `total_count`: int (sum of all notes across root and tasks)

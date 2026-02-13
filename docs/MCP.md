@@ -226,7 +226,7 @@ Refer to your MCP client's documentation for specific configuration file locatio
 
 ## Available Tools
 
-The simpletask MCP server exposes 5 tools for task management.
+The simpletask MCP server exposes 10 tools for task management.
 
 ### get
 
@@ -236,7 +236,6 @@ Get complete task specification with pre-computed status summary.
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `branch` | string | No | current branch | Branch name (e.g., `feature/auth`) or omit for current git branch |
 | `validate` | boolean | No | `false` | Include schema validation result in response |
 
 **Returns:**
@@ -270,7 +269,12 @@ A `SimpleTaskGetResponse` object with:
         steps?: string[]
         prerequisites?: string[]
         code_examples?: object[]
-        files?: string[]
+        files?: [
+          {
+            path: string
+            action: "create" | "modify" | "delete"
+          }
+        ]
       }
     ]
   }
@@ -300,9 +304,6 @@ A `SimpleTaskGetResponse` object with:
 ```python
 # Get current branch's task
 result = simpletask_get()
-
-# Get specific branch's task
-result = simpletask_get(branch="feature/auth")
 
 # Include validation
 result = simpletask_get(validate=True)
@@ -355,7 +356,7 @@ Create a new task file without creating a git branch.
 
 **Returns:**
 
-A `SimpleTaskGetResponse` object with the created spec and summary.
+A `SimpleTaskWriteResponse` object with the created spec and summary.
 
 **Example usage:**
 
@@ -394,7 +395,6 @@ Manage implementation tasks (add, update, remove).
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | `action` | string | Yes | - | Operation: `add`, `update`, or `remove` |
-| `branch` | string | No | current branch | Branch name or omit for current git branch |
 | `task_id` | string | Conditional | - | Task ID (required for update/remove, e.g., `T001`) |
 | `name` | string | Conditional | - | Task name (required for add) |
 | `goal` | string | No | - | Task goal/description |
@@ -511,7 +511,6 @@ Manage acceptance criteria (add, complete, remove).
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | `action` | string | Yes | - | Operation: `add`, `complete`, or `remove` |
-| `branch` | string | No | current branch | Branch name or omit for current git branch |
 | `criterion_id` | string | Conditional | - | Criterion ID (required for complete/remove, e.g., `AC1`) |
 | `description` | string | Conditional | - | Description (required for add) |
 | `completed` | boolean | No | `true` | Completion status for `complete` action |
