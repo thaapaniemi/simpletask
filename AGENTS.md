@@ -715,9 +715,9 @@ The MCP server exposes 10 tools for task management:
 | `get` | Get complete task specification with status summary | `validate` (bool, optional): Include schema validation (default: false) |
 | `list` | List all task file branch names in the project | None |
 | `new` | Create a new task file | `branch` (str): Branch identifier<br>`title` (str): Task title<br>`prompt` (str): Original user request<br>`criteria` (list[str] \| None, optional): Acceptance criteria |
-| `task` | Manage implementation tasks (add/update/remove/get/batch) | `action` (str): 'add', 'update', 'remove', 'get', or 'batch'<br>`task_id` (str, optional): Task ID (required for update/remove/get)<br>`name` (str, optional): Task name (required for add)<br>`goal` (str, optional): Task goal/description<br>`status` (str, optional): Status for update ('not_started', 'in_progress', 'completed', 'blocked', 'paused')<br>`steps` (list[str] \| None, optional): Task steps for add action. None or [] adds placeholder ['To be defined']<br>`operations` (list[dict], optional): List of BatchTaskOperation dicts (required for batch action) |
+| `task` | Manage implementation tasks (add/update/remove/get/batch) | `action` (str): 'add', 'update', 'remove', 'get', or 'batch'<br>`task_id` (str, optional): Task ID (required for update/remove/get)<br>`name` (str, optional): Task name (required for add)<br>`goal` (str, optional): Task goal/description<br>`status` (str, optional): Status for update ('not_started', 'in_progress', 'completed', 'blocked', 'paused')<br>`steps` (list[str] \| None, optional): Task steps for add action. None or [] adds placeholder ['To be defined']<br>`done_when` (list[str] \| None, optional): Completion verification conditions<br>`prerequisites` (list[str] \| None, optional): Prerequisite task IDs<br>`files` (list[dict] \| None, optional): Files to create/modify/delete<br>`code_examples` (list[dict] \| None, optional): Code patterns to follow<br>`operations` (list[dict], optional): List of BatchTaskOperation dicts (required for batch action) |
 | `criteria` | Manage acceptance criteria (add/complete/remove/get/update) | `action` (str): 'add', 'complete', 'remove', 'get', or 'update'<br>`criterion_id` (str, optional): Criterion ID (required for complete/remove/get/update)<br>`description` (str, optional): Description (required for add/update)<br>`completed` (bool, optional): Completion status for 'complete' (default: true) |
-| `quality` | Manage quality requirements (check/set/get/preset) | `action` (str): 'check', 'set', 'get', or 'preset'<br>`config_type` (str, optional): 'linting', 'type-checking', 'testing', or 'security' (for set action)<br>`tool` (str, optional): Tool name from ToolName enum (for set action)<br>`args` (list[str], optional): Tool arguments (for set action)<br>`enabled` (bool, optional): Enable/disable check (for set action)<br>`min_coverage` (int, optional): Minimum coverage % (for testing config only)<br>`preset_name` (str, optional): Preset name (for preset action) |
+| `quality` | Manage quality requirements (check/set/get/preset) | `action` (str): 'check', 'set', 'get', or 'preset'<br>`config_type` (str, optional): 'linting', 'type-checking', 'testing', or 'security' (for set action)<br>`tool` (str, optional): Tool name from ToolName enum (for set action)<br>`args` (str, optional): Comma-separated tool arguments (for set action)<br>`enabled` (bool, optional): Enable/disable check (for set action)<br>`min_coverage` (int, optional): Minimum coverage % (for testing config only)<br>`timeout` (int, optional): Timeout in seconds (default: 300)<br>`preset_name` (str, optional): Preset name (for preset action) |
 | `design` | Manage design section (set/get/remove) | `action` (str): 'set', 'get', or 'remove'<br>`field` (str, optional): Field to modify: 'pattern', 'reference', 'constraint', 'security', 'error-handling' (for set/remove)<br>`value` (str, optional): Value to add (for set action)<br>`reason` (str, optional): Reason for reference (required when field='reference')<br>`index` (int, optional): Index to remove (for remove action on list fields)<br>`all` (bool, optional): Remove all items or entire section (for remove action) |
 | `note` | Manage notes for root-level and task-level | `action` (str): 'add', 'remove', or 'list'<br>`content` (str, optional): Note content (required for add)<br>`task_id` (str, optional): Task ID for task-level notes; if omitted, operates on root notes<br>`index` (int, optional): Note index to remove (0-based, required for remove unless all=True)<br>`all` (bool, optional): Remove all notes (for remove action)<br>`root_only` (bool, optional): Only return root notes (for list action) |
 | `constraint` | Manage implementation constraints (add/remove/list) | `action` (str): 'add', 'remove', or 'list'<br>`value` (str, optional): Constraint text (required for add)<br>`index` (int, optional): Constraint index to remove (0-based, required for remove unless all=True)<br>`all` (bool, optional): Remove all constraints (for remove action) |
@@ -842,6 +842,10 @@ Unified tool for managing implementation tasks with five actions.
 - `goal` (optional): Task goal/description
 - `status` (optional): Task status for update only. Valid values: 'not_started', 'in_progress', 'completed', 'blocked', 'paused'. **Note:** 'add' action ignores this parameter - new tasks always start as `not_started`.
 - `steps` (optional): List of detailed task steps for add action. None or [] adds placeholder step ['To be defined']. Only applies when action='add'.
+- `done_when` (optional): List of completion verification conditions (for add/update)
+- `prerequisites` (optional): List of prerequisite task IDs (for add/update)
+- `files` (optional): List of FileAction dicts with path and action fields (for add/update)
+- `code_examples` (optional): List of CodeExample dicts with path and description fields (for add/update)
 - `operations` (optional): List of BatchTaskOperation dicts (required for batch action)
 
 **Note:** This tool always uses the current git branch.
@@ -978,7 +982,7 @@ These fields work in both "add" and "update" batch operations, eliminating the n
 ```python
 {
   "success": bool,
-  "action": str,  # "batch_completed"
+  "action": str,  # "batch_tasks_applied"
   "message": str,  # Summary of operations performed
   "file_path": str,
   "summary": StatusSummary,
@@ -1089,7 +1093,7 @@ Unified tool for managing quality requirements with four actions.
 - `action`: Operation to perform ('check', 'set', 'get', 'preset')
 - `config_type` (optional): Type of quality config to set ('linting', 'type-checking', 'testing', 'security') - required for set action
 - `tool` (optional): Tool name from ToolName enum (required for set action)
-- `args` (optional): List of tool arguments (for set action)
+- `args` (optional): Comma-separated tool arguments string (e.g., 'check,.,--fix') (for set action)
 - `enabled` (optional): Enable/disable the quality check (for set action)
 - `min_coverage` (optional): Minimum test coverage percentage 0-100 (only for testing config in set action)
 - `timeout` (optional): Timeout in seconds for the check (for set action, default: 300)
@@ -1139,7 +1143,7 @@ result = quality(
     action="set",
     config_type="linting",
     tool="ruff",
-    args=["check", "."],
+    args="check,.",
     enabled=True,
     timeout=300
 )
@@ -1149,7 +1153,7 @@ result = quality(
     action="set",
     config_type="testing",
     tool="pytest",
-    args=["--cov=cli/simpletask", "--cov-report=term-missing"],
+    args="--cov=cli/simpletask,--cov-report=term-missing",
     min_coverage=80,
     timeout=600
 )
@@ -1255,7 +1259,7 @@ result = design(
 # Remove entire design section
 result = design(
     action="remove",
-    all=True
+    field="all"
 )
 ```
 

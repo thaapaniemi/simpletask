@@ -109,7 +109,7 @@ Open OpenCode and ask the AI:
 "Can you list the available simpletask tools?"
 ```
 
-You should see `simpletask_get`, `simpletask_list`, `simpletask_new`, `simpletask_task`, and `simpletask_criteria` in the response (MCP clients automatically prefix tool names with the server name).
+You should see `simpletask_get`, `simpletask_list`, `simpletask_new`, `simpletask_task`, `simpletask_criteria`, `simpletask_quality`, `simpletask_design`, `simpletask_note`, `simpletask_constraint`, and `simpletask_context` in the response (MCP clients automatically prefix tool names with the server name).
 
 ### Qwen-CLI
 
@@ -388,13 +388,13 @@ result = simpletask_new(
 
 ### task
 
-Manage implementation tasks (add, update, remove).
+Manage implementation tasks (add, update, remove, get, batch).
 
 **Parameters:**
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `action` | string | Yes | - | Operation: `add`, `update`, or `remove` |
+| `action` | string | Yes | - | Operation: `add`, `update`, `remove`, `get`, or `batch` |
 | `task_id` | string | Conditional | - | Task ID (required for update/remove, e.g., `T001`) |
 | `name` | string | Conditional | - | Task name (required for add) |
 | `goal` | string | No | - | Task goal/description |
@@ -407,7 +407,9 @@ Manage implementation tasks (add, update, remove).
 
 **Returns:**
 
-A `SimpleTaskGetResponse` object with the updated spec and summary.
+- `SimpleTaskWriteResponse` for write operations (add/update/remove)
+- `SimpleTaskItemResponse` for get operations
+- `SimpleTaskBatchResponse` for batch operations
 
 **Example usage:**
 
@@ -504,20 +506,21 @@ result = simpletask_task(
 
 ### criteria
 
-Manage acceptance criteria (add, complete, remove).
+Manage acceptance criteria (add, complete, remove, get, update).
 
 **Parameters:**
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `action` | string | Yes | - | Operation: `add`, `complete`, or `remove` |
+| `action` | string | Yes | - | Operation: `add`, `complete`, `remove`, `get`, or `update` |
 | `criterion_id` | string | Conditional | - | Criterion ID (required for complete/remove, e.g., `AC1`) |
 | `description` | string | Conditional | - | Description (required for add) |
 | `completed` | boolean | No | `true` | Completion status for `complete` action |
 
 **Returns:**
 
-A `SimpleTaskGetResponse` object with the updated spec and summary.
+- `SimpleTaskWriteResponse` for write operations (add/complete/remove/update)
+- `SimpleTaskItemResponse` for get operations
 
 **Example usage:**
 
