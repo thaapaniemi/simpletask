@@ -386,12 +386,6 @@ simpletask quality show
 # Run all enabled quality checks
 simpletask quality check
 
-# Run specific checks only
-simpletask quality check --lint-only
-simpletask quality check --test-only
-simpletask quality check --type-only
-simpletask quality check --security-only
-
 # Configure individual quality requirements
 simpletask quality set linting --tool ruff --args "check" "."
 simpletask quality set testing --tool pytest --min-coverage 80 --timeout 600
@@ -523,8 +517,8 @@ The `simpletask design` subcommand group manages the design section (patterns, r
 simpletask design show
 
 # Add patterns to follow
-simpletask design set pattern "Repository pattern for data access"
-simpletask design set pattern "Dependency injection for loose coupling"
+simpletask design set pattern repository
+simpletask design set pattern dependency_injection
 
 # Add reference implementations
 simpletask design set reference "cli/simpletask/mcp/server.py" "MCP tool pattern to follow"
@@ -534,11 +528,11 @@ simpletask design set constraint "Use Pydantic models with extra='forbid'"
 simpletask design set constraint "No shell=True in subprocess calls"
 
 # Add security considerations
-simpletask design set security "Validate all user inputs"
-simpletask design set security "Use whitelisting for tool execution"
+simpletask design set security --category input_validation "Validate all user inputs"
+simpletask design set security --category input_validation "Use whitelisting for tool execution"
 
 # Set error handling pattern
-simpletask design set error-handling "Use Pydantic ValidationError for input validation"
+simpletask design set error-handling exceptions
 
 # Remove design elements
 simpletask design remove pattern --index 0  # Remove first pattern
@@ -552,19 +546,21 @@ simpletask design remove --all              # Clear entire design section
 
 ```yaml
 design:
-  patterns_to_follow:
-    - "Repository pattern for data access"
-    - "Dependency injection for loose coupling"
+  patterns:
+    - repository
+    - dependency_injection
   reference_implementations:
     - path: "cli/simpletask/mcp/server.py"
       reason: "MCP tool pattern to follow"
   architectural_constraints:
     - "Use Pydantic models with extra='forbid'"
     - "No shell=True in subprocess calls"
-  security_considerations:
-    - "Validate all user inputs"
-    - "Use whitelisting for tool execution"
-  error_handling_pattern: "Use Pydantic ValidationError for input validation"
+  security:
+    - category: input_validation
+      description: "Validate all user inputs"
+    - category: input_validation
+      description: "Use whitelisting for tool execution"
+  error_handling: exceptions
 ```
 
 ### Testing
@@ -719,7 +715,7 @@ The MCP server exposes 10 tools for task management:
 | `new` | Create a new task file | `branch` (str): Branch identifier<br>`title` (str): Task title<br>`prompt` (str): Original user request<br>`criteria` (list[str] \| None, optional): Acceptance criteria |
 | `task` | Manage implementation tasks (add/update/remove/get/batch) | `action` (str): 'add', 'update', 'remove', 'get', or 'batch'<br>`task_id` (str, optional): Task ID (required for update/remove/get)<br>`name` (str, optional): Task name (required for add)<br>`goal` (str, optional): Task goal/description<br>`status` (str, optional): Status for update ('not_started', 'in_progress', 'completed', 'blocked', 'paused')<br>`steps` (list[str] \| None, optional): Task steps for add action. None or [] adds placeholder ['To be defined']<br>`operations` (list[dict], optional): List of BatchTaskOperation dicts (required for batch action) |
 | `criteria` | Manage acceptance criteria (add/complete/remove/get/update) | `action` (str): 'add', 'complete', 'remove', 'get', or 'update'<br>`criterion_id` (str, optional): Criterion ID (required for complete/remove/get/update)<br>`description` (str, optional): Description (required for add/update)<br>`completed` (bool, optional): Completion status for 'complete' (default: true) |
-| `quality` | Manage quality requirements (check/set/get/preset) | `action` (str): 'check', 'set', 'get', or 'preset'<br>`config_type` (str, optional): 'linting', 'type-checking', 'testing', or 'security' (for set action)<br>`tool` (str, optional): Tool name from ToolName enum (for set action)<br>`args` (list[str], optional): Tool arguments (for set action)<br>`enabled` (bool, optional): Enable/disable check (for set action)<br>`min_coverage` (int, optional): Minimum coverage % (for testing config only)<br>`preset_name` (str, optional): Preset name (for preset action)<br>Check filters: `lint_only`, `test_only`, `type_only`, `security_only` (bool, for check action) |
+| `quality` | Manage quality requirements (check/set/get/preset) | `action` (str): 'check', 'set', 'get', or 'preset'<br>`config_type` (str, optional): 'linting', 'type-checking', 'testing', or 'security' (for set action)<br>`tool` (str, optional): Tool name from ToolName enum (for set action)<br>`args` (list[str], optional): Tool arguments (for set action)<br>`enabled` (bool, optional): Enable/disable check (for set action)<br>`min_coverage` (int, optional): Minimum coverage % (for testing config only)<br>`preset_name` (str, optional): Preset name (for preset action) |
 | `design` | Manage design section (set/get/remove) | `action` (str): 'set', 'get', or 'remove'<br>`field` (str, optional): Field to modify: 'pattern', 'reference', 'constraint', 'security', 'error-handling' (for set/remove)<br>`value` (str, optional): Value to add (for set action)<br>`reason` (str, optional): Reason for reference (required when field='reference')<br>`index` (int, optional): Index to remove (for remove action on list fields)<br>`all` (bool, optional): Remove all items or entire section (for remove action) |
 | `note` | Manage notes for root-level and task-level | `action` (str): 'add', 'remove', or 'list'<br>`content` (str, optional): Note content (required for add)<br>`task_id` (str, optional): Task ID for task-level notes; if omitted, operates on root notes<br>`index` (int, optional): Note index to remove (0-based, required for remove unless all=True)<br>`all` (bool, optional): Remove all notes (for remove action)<br>`root_only` (bool, optional): Only return root notes (for list action) |
 | `constraint` | Manage implementation constraints (add/remove/list) | `action` (str): 'add', 'remove', or 'list'<br>`value` (str, optional): Constraint text (required for add)<br>`index` (int, optional): Constraint index to remove (0-based, required for remove unless all=True)<br>`all` (bool, optional): Remove all constraints (for remove action) |
@@ -1096,7 +1092,6 @@ Unified tool for managing quality requirements with four actions.
 - `min_coverage` (optional): Minimum test coverage percentage 0-100 (only for testing config in set action)
 - `timeout` (optional): Timeout in seconds for the check (for set action, default: 300)
 - `preset_name` (optional): Preset name (required for preset action)
-- Check filters (for check action only): `lint_only`, `test_only`, `type_only`, `security_only` (bool)
 
 **Note:** This tool always uses the current git branch.
 
@@ -1137,9 +1132,6 @@ result = quality(action="get")
 result = quality(action="check")
 # Returns: SimpleTaskQualityResponse with check_results list
 
-# Run only linting checks
-result = quality(action="check", lint_only=True)
-
 # Set linting configuration
 result = quality(
     action="set",
@@ -1178,7 +1170,8 @@ Unified tool for managing the design section with three actions.
 **Parameters:**
 - `action`: Operation to perform ('set', 'get', 'remove')
 - `field` (optional): Field to modify ('pattern', 'reference', 'constraint', 'security', 'error-handling') - required for set/remove
-- `value` (optional): Value to add (required for set action)
+- `value` (optional): Value to add (required for set action). Use ArchitecturalPattern enum values for `pattern` (repository, service_layer, factory, strategy, adapter, observer, command, mvc, clean_architecture, hexagonal, dependency_injection, singleton, builder, decorator) and ErrorHandlingStrategy enum values for `error-handling` (exceptions, result_type, error_codes, callbacks, panic_recover)
+- `category` (optional): Security category required when field='security' (authentication, authorization, cryptography, input_validation, output_encoding, session_management, secure_communication, data_protection, audit_logging)
 - `reason` (optional): Reason/explanation (required when field='reference' in set action)
 - `index` (optional): Index to remove from list fields (for remove action)
 - `all` (optional): Remove all items from field or entire design section (for remove action)
@@ -1210,7 +1203,7 @@ result = design(action="get")
 result = design(
     action="set",
     field="pattern",
-    value="Repository pattern for data access"
+    value="repository"
 )
 
 # Add a reference implementation
@@ -1232,6 +1225,7 @@ result = design(
 result = design(
     action="set",
     field="security",
+    category="input_validation",
     value="Validate all user inputs"
 )
 
@@ -1239,7 +1233,7 @@ result = design(
 result = design(
     action="set",
     field="error-handling",
-    value="Use Pydantic ValidationError for input validation"
+    value="exceptions"
 )
 
 # Remove specific pattern by index
