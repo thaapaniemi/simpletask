@@ -18,6 +18,8 @@ class EditorConfig:
     file_extension: str
     global_config_dir: tuple[str, ...]
     local_config_dir: tuple[str, ...]
+    global_agents_dir: tuple[str, ...] | None = None
+    local_agents_dir: tuple[str, ...] | None = None
 
 
 EDITOR_CONFIGS: dict[EditorType, EditorConfig] = {
@@ -27,6 +29,8 @@ EDITOR_CONFIGS: dict[EditorType, EditorConfig] = {
         file_extension=".md",
         global_config_dir=(".config", "opencode", "commands"),
         local_config_dir=(".opencode", "commands"),
+        global_agents_dir=(".config", "opencode", "agents"),
+        local_agents_dir=(".opencode", "agents"),
     ),
     "qwen": EditorConfig(
         display_name="Qwen",
@@ -111,6 +115,48 @@ def _get_local_commands_dir(editor: EditorType) -> Path:
     return Path.cwd().joinpath(*config.local_config_dir)
 
 
+def _install_files(
+    files: list[Path],
+    target_dir: Path,
+    no_overwrite: bool = False,
+) -> tuple[list[str], list[str], list[str]]:
+    """Install files from a list to target directory.
+
+    This is a shared helper for installing templates and agents.
+
+    Args:
+        files: List of source file Path objects to install
+        target_dir: Directory to install files into
+        no_overwrite: If True, skip existing files instead of overwriting
+
+    Returns:
+        Tuple of (installed, skipped, overwritten) file names.
+    """
+    # Ensure target directory exists
+    target_dir.mkdir(parents=True, exist_ok=True)
+
+    installed = []
+    skipped = []
+    overwritten = []
+
+    for source_path in files:
+        target_path = target_dir / source_path.name
+
+        if target_path.exists():
+            if no_overwrite:
+                skipped.append(source_path.name)
+                continue
+            else:
+                overwritten.append(source_path.name)
+        else:
+            installed.append(source_path.name)
+
+        # Copy the file
+        shutil.copy2(source_path, target_path)
+
+    return installed, skipped, overwritten
+
+
 def _install_templates(
     editor: EditorType,
     target_dir: Path,
@@ -135,29 +181,7 @@ def _install_templates(
     if not templates:
         raise FileNotFoundError(f"No {config.display_name} templates found in package")
 
-    # Ensure target directory exists
-    target_dir.mkdir(parents=True, exist_ok=True)
-
-    installed = []
-    skipped = []
-    overwritten = []
-
-    for template_path in templates:
-        target_path = target_dir / template_path.name
-
-        if target_path.exists():
-            if no_overwrite:
-                skipped.append(template_path.name)
-                continue
-            else:
-                overwritten.append(template_path.name)
-        else:
-            installed.append(template_path.name)
-
-        # Copy the file
-        shutil.copy2(template_path, target_path)
-
-    return installed, skipped, overwritten
+    return _install_files(templates, target_dir, no_overwrite)
 
 
 def _get_installed_status(editor: EditorType) -> dict[str, dict[str, bool]]:
@@ -179,6 +203,123 @@ def _get_installed_status(editor: EditorType) -> dict[str, dict[str, bool]]:
             "local": (local_dir / template_path.name).exists(),
         }
         for template_path in templates
+    }
+
+
+def _get_bundled_agents(editor: EditorType) -> list[Path]:
+    """Get list of agent files bundled with the package for an editor.
+
+    Args:
+        editor: Editor type ("opencode", "qwen", or "gemini")
+
+    Returns:
+        List of Path objects for each agent file. Empty list if editor has
+        no agent support.
+    """
+    config = EDITOR_CONFIGS[editor]
+    if config.global_agents_dir is None:
+        return []
+
+    templates_dir = _get_templates_dir(editor)
+    agents_dir = templates_dir / "agents"
+    if not agents_dir.exists():
+        return []
+
+    return sorted(agents_dir.glob(f"*{config.file_extension}"))
+
+
+def _get_global_agents_dir(editor: EditorType) -> Path:
+    """Get global agents directory for an editor.
+
+    Args:
+        editor: Editor type ("opencode", "qwen", or "gemini")
+
+    Returns:
+        Path to global agents directory.
+
+    Raises:
+        ValueError: If editor does not support agents (agents_dir is None).
+    """
+    config = EDITOR_CONFIGS[editor]
+    if config.global_agents_dir is None:
+        raise ValueError(f"{config.display_name} does not support agents")
+    return Path.home().joinpath(*config.global_agents_dir)
+
+
+def _get_local_agents_dir(editor: EditorType) -> Path:
+    """Get local agents directory for an editor.
+
+    Args:
+        editor: Editor type ("opencode", "qwen", or "gemini")
+
+    Returns:
+        Path to local agents directory in current working directory.
+
+    Raises:
+        ValueError: If editor does not support agents (agents_dir is None).
+    """
+    config = EDITOR_CONFIGS[editor]
+    if config.local_agents_dir is None:
+        raise ValueError(f"{config.display_name} does not support agents")
+    return Path.cwd().joinpath(*config.local_agents_dir)
+
+
+def _install_agents(
+    editor: EditorType,
+    target_dir: Path,
+    no_overwrite: bool = False,
+) -> tuple[list[str], list[str], list[str]]:
+    """Install agents to target directory for an editor.
+
+    Args:
+        editor: Editor type ("opencode", "qwen", or "gemini")
+        target_dir: Directory to install agents into
+        no_overwrite: If True, skip existing files instead of overwriting
+
+    Returns:
+        Tuple of (installed, skipped, overwritten) file names.
+
+    Raises:
+        FileNotFoundError: If no agents are found or editor has no agent
+            support.
+    """
+    config = EDITOR_CONFIGS[editor]
+    agents = _get_bundled_agents(editor)
+
+    if not agents:
+        raise FileNotFoundError(f"No {config.display_name} agents found in package")
+
+    return _install_files(agents, target_dir, no_overwrite)
+
+
+def _get_agents_installed_status(editor: EditorType) -> dict[str, dict[str, bool]]:
+    """Get installation status of each agent for an editor.
+
+    Args:
+        editor: Editor type ("opencode", "qwen", or "gemini")
+
+    Returns:
+        Dict mapping agent name to {"global": bool, "local": bool}
+
+    Note:
+        The early return when no bundled agents are found is safe because
+        _get_bundled_agents() returns an empty list for editors without agent
+        support (Qwen and Gemini), so the early return prevents unnecessary
+        directory access errors for those editors.
+    """
+    agents = _get_bundled_agents(editor)
+    if not agents:
+        return {}
+
+    global_dir = _get_global_agents_dir(editor)
+    local_dir = _get_local_agents_dir(editor)
+
+    return {
+        agent_path.name: {
+            "global": (global_dir / agent_path.name).exists(),
+            "local": (local_dir / agent_path.name).exists(),
+        }
+        for agent_path in agents
     }
 
 
@@ -372,3 +513,58 @@ def get_gemini_installed_status() -> dict[str, dict[str, bool]]:
         Dict mapping template name to {"global": bool, "local": bool}
     """
     return _get_installed_status("gemini")
+
+
+def get_bundled_agents() -> list[Path]:
+    """Get list of OpenCode agent files bundled with the package.
+
+    Returns:
+        List of Path objects for each agent file.
+    """
+    return _get_bundled_agents("opencode")
+
+
+def get_global_agents_dir() -> Path:
+    """Get global OpenCode agents directory.
+
+    Returns:
+        Path to ~/.config/opencode/agents/
+    """
+    return _get_global_agents_dir("opencode")
+
+
+def get_local_agents_dir() -> Path:
+    """Get local OpenCode agents directory.
+
+    Returns:
+        Path to .opencode/agents/ in current directory.
+    """
+    return _get_local_agents_dir("opencode")
+
+
+def install_agents(
+    target_dir: Path,
+    no_overwrite: bool = False,
+) -> tuple[list[str], list[str], list[str]]:
+    """Install OpenCode agents to target directory.
+
+    Args:
+        target_dir: Directory to install agents into
+        no_overwrite: If True, skip existing files instead of overwriting
+
+    Returns:
+        Tuple of (installed, skipped, overwritten) file names.
+
+    Raises:
+        FileNotFoundError: If agents directory doesn't exist
+    """
+    return _install_agents("opencode", target_dir, no_overwrite)
+
+
+def get_agents_installed_status() -> dict[str, dict[str, bool]]:
+    """Get installation status of each OpenCode agent.
+
+    Returns:
+        Dict mapping agent name to {"global": bool, "local": bool}
+    """
+    return _get_agents_installed_status("opencode")

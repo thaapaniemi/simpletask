@@ -2,20 +2,26 @@
 
 from pathlib import Path
 
+import pytest
 from simpletask.core.ai_templates import (
+    get_agents_installed_status,
+    get_bundled_agents,
     get_bundled_gemini_templates,
     get_bundled_qwen_templates,
     get_bundled_templates,
     get_gemini_installed_status,
     get_gemini_templates_dir,
+    get_global_agents_dir,
     get_global_commands_dir,
     get_global_gemini_commands_dir,
     get_global_qwen_commands_dir,
     get_installed_status,
+    get_local_agents_dir,
     get_local_commands_dir,
     get_local_gemini_commands_dir,
     get_local_qwen_commands_dir,
     get_qwen_installed_status,
+    install_agents,
     install_gemini_templates,
     install_qwen_templates,
     install_templates,
@@ -1001,6 +1007,45 @@ class TestSplitTemplateContent:
         ), f"Gemini split template is {line_count} lines, should be <500 for token efficiency"
 
 
+class TestAgentTemplateContent:
+    """Validate agent template content structure and completeness."""
+
+    def test_opencode_agent_has_required_frontmatter(self):
+        """OpenCode agent template should contain required frontmatter keys."""
+        agents = get_bundled_agents()
+        agent_template = next((a for a in agents if a.name == "simpletask-plan.md"), None)
+        assert agent_template is not None, "simpletask-plan.md agent not found"
+
+        content = agent_template.read_text()
+
+        required_frontmatter = [
+            "mode: subagent",
+            "tools:",
+            "permission:",
+        ]
+
+        for item in required_frontmatter:
+            assert item in content, f"Missing agent frontmatter: {item}"
+
+    def test_opencode_agent_references_required_mcp_tools(self):
+        """OpenCode agent template should reference required MCP tools."""
+        agents = get_bundled_agents()
+        agent_template = next((a for a in agents if a.name == "simpletask-plan.md"), None)
+        assert agent_template is not None
+
+        content = agent_template.read_text()
+
+        required_tools = [
+            "simpletask_new",
+            "simpletask_criteria",
+            "simpletask_task",
+            "simpletask_get",
+        ]
+
+        for tool in required_tools:
+            assert tool in content, f"Missing MCP tool reference: {tool}"
+
+
 class TestCrossEditorConsistency:
     """Verify consistency across OpenCode, Qwen, and Gemini templates."""
 
@@ -1297,3 +1342,300 @@ class TestCrossEditorConsistency:
         assert (
             divergent_description not in gemini_content
         ), "Gemini implement contains divergent description: 'updated criteria state'"
+
+
+class TestGetBundledAgents:
+    """Tests for get_bundled_agents function."""
+
+    def test_returns_list_of_paths(self):
+        """Should return a list of Path objects."""
+        agents = get_bundled_agents()
+        assert isinstance(agents, list)
+        for agent in agents:
+            assert isinstance(agent, Path)
+
+    def test_returns_only_markdown_files(self):
+        """Should return only .md files for OpenCode agents."""
+        agents = get_bundled_agents()
+        for agent in agents:
+            assert agent.suffix == ".md"
+
+    def test_returns_expected_agents(self):
+        """Should return simpletask-plan agent."""
+        agents = get_bundled_agents()
+        agent_names = {a.name for a in agents}
+
+        expected = {"simpletask-plan.md"}
+
+        assert expected.issubset(agent_names), f"Missing expected agents: {expected - agent_names}"
+
+
+class TestGetGlobalAgentsDir:
+    """Tests for get_global_agents_dir function."""
+
+    def test_returns_path_object(self):
+        """Should return a Path object."""
+        result = get_global_agents_dir()
+        assert isinstance(result, Path)
+
+    def test_returns_expected_location(self):
+        """Should return ~/.config/opencode/agents/"""
+        result = get_global_agents_dir()
+        expected = Path.home() / ".config" / "opencode" / "agents"
+        assert result == expected
+
+
+class TestGetLocalAgentsDir:
+    """Tests for get_local_agents_dir function."""
+
+    def test_returns_path_object(self):
+        """Should return a Path object."""
+        result = get_local_agents_dir()
+        assert isinstance(result, Path)
+
+    def test_returns_expected_location(self):
+        """Should return .opencode/agents/ in current directory."""
+        result = get_local_agents_dir()
+        expected = Path.cwd() / ".opencode" / "agents"
+        assert result == expected
+
+
+class TestInstallAgents:
+    """Tests for install_agents function."""
+
+    def test_install_to_empty_directory(self, tmp_path: Path):
+        """Should successfully install all agents to empty directory."""
+        target_dir = tmp_path / "agents"
+
+        installed, skipped, overwritten = install_agents(target_dir, no_overwrite=False)
+
+        # Should create target directory
+        assert target_dir.exists()
+
+        # Should install exactly simpletask-plan agent
+        assert len(installed) == 1
+        assert len(skipped) == 0
+        assert len(overwritten) == 0
+
+        # Installed agents should exist in target
+        for name in installed:
+            assert (target_dir / name).exists()
+
+    def test_overwrite_existing_files(self, tmp_path: Path):
+        """Should overwrite existing files when no_overwrite=False."""
+        target_dir = tmp_path / "agents"
+        target_dir.mkdir(parents=True)
+
+        # Create existing file
+        existing_file = target_dir / "simpletask-plan.md"
+        existing_file.write_text("old content")
+
+        installed, _skipped, overwritten = install_agents(target_dir, no_overwrite=False)
+
+        # Should report one overwrite
+        assert "simpletask-plan.md" in overwritten
+        assert len(overwritten) == 1
+
+        # Should not report overwritten files as newly installed
+        assert "simpletask-plan.md" not in installed
+
+        # File should have new content (not "old content")
+        assert existing_file.read_text() != "old content"
+        assert len(existing_file.read_text()) > 0
+
+    def test_no_overwrite_skips_existing(self, tmp_path: Path):
+        """Should skip existing files when no_overwrite=True."""
+        target_dir = tmp_path / "agents"
+        target_dir.mkdir(parents=True)
+
+        # Create existing file
+        existing_file = target_dir / "simpletask-plan.md"
+        old_content = "old content"
+        existing_file.write_text(old_content)
+
+        _installed, skipped, overwritten = install_agents(target_dir, no_overwrite=True)
+
+        # Should report one skip
+        assert "simpletask-plan.md" in skipped
+        assert len(skipped) == 1
+
+        # Should not report as overwritten
+        assert len(overwritten) == 0
+
+        # Original file should be unchanged
+        assert existing_file.read_text() == old_content
+
+    def test_creates_target_directory(self, tmp_path: Path):
+        """Should create target directory if it doesn't exist."""
+        target_dir = tmp_path / "nested" / "path" / "agents"
+
+        assert not target_dir.exists()
+
+        install_agents(target_dir, no_overwrite=False)
+
+        assert target_dir.exists()
+        assert target_dir.is_dir()
+
+
+class TestGetAgentsInstalledStatus:
+    """Tests for get_agents_installed_status function."""
+
+    def test_no_installations(self, tmp_path: Path, monkeypatch):
+        """Should report nothing installed when directories don't exist."""
+        # Mock the directory getters to use tmp_path
+        fake_global = tmp_path / "global"
+        fake_local = tmp_path / "local"
+
+        monkeypatch.setattr(
+            "simpletask.core.ai_templates._get_global_agents_dir",
+            lambda editor: fake_global,
+        )
+        monkeypatch.setattr(
+            "simpletask.core.ai_templates._get_local_agents_dir",
+            lambda editor: fake_local,
+        )
+
+        status = get_agents_installed_status()
+
+        # All agents should report not installed
+        for _agent_name, locations in status.items():
+            assert locations["global"] is False
+            assert locations["local"] is False
+
+    def test_no_bundled_agents_returns_empty(self, monkeypatch):
+        """Should return empty dict when no bundled agents exist."""
+        from simpletask.core.ai_templates import _get_agents_installed_status
+
+        # Mock _get_bundled_agents to return empty list
+        monkeypatch.setattr(
+            "simpletask.core.ai_templates._get_bundled_agents",
+            lambda editor: [],
+        )
+
+        status = _get_agents_installed_status("opencode")
+
+        # Should return empty dict without executing loops
+        assert status == {}
+
+    def test_global_only(self, tmp_path: Path, monkeypatch):
+        """Should detect agents in global directory only."""
+        fake_global = tmp_path / "global"
+        fake_global.mkdir(parents=True)
+        fake_local = tmp_path / "local"
+
+        # Install to global
+        install_agents(fake_global, no_overwrite=False)
+
+        monkeypatch.setattr(
+            "simpletask.core.ai_templates._get_global_agents_dir",
+            lambda editor: fake_global,
+        )
+        monkeypatch.setattr(
+            "simpletask.core.ai_templates._get_local_agents_dir",
+            lambda editor: fake_local,
+        )
+
+        status = get_agents_installed_status()
+
+        # All agents should be in global, none in local
+        for _agent_name, locations in status.items():
+            assert locations["global"] is True
+            assert locations["local"] is False
+
+    def test_local_only(self, tmp_path: Path, monkeypatch):
+        """Should detect agents in local directory only."""
+        fake_global = tmp_path / "global"
+        fake_local = tmp_path / "local"
+        fake_local.mkdir(parents=True)
+
+        # Install to local
+        install_agents(fake_local, no_overwrite=False)
+
+        monkeypatch.setattr(
+            "simpletask.core.ai_templates._get_global_agents_dir",
+            lambda editor: fake_global,
+        )
+        monkeypatch.setattr(
+            "simpletask.core.ai_templates._get_local_agents_dir",
+            lambda editor: fake_local,
+        )
+
+        status = get_agents_installed_status()
+
+        # All agents should be in local, none in global
+        for _agent_name, locations in status.items():
+            assert locations["global"] is False
+            assert locations["local"] is True
+
+    def test_both_locations(self, tmp_path: Path, monkeypatch):
+        """Should detect agents in both directories."""
+        fake_global = tmp_path / "global"
+        fake_global.mkdir(parents=True)
+        fake_local = tmp_path / "local"
+        fake_local.mkdir(parents=True)
+
+        # Install to both
+        install_agents(fake_global, no_overwrite=False)
+        install_agents(fake_local, no_overwrite=False)
+
+        monkeypatch.setattr(
+            "simpletask.core.ai_templates._get_global_agents_dir",
+            lambda editor: fake_global,
+        )
+        monkeypatch.setattr(
+            "simpletask.core.ai_templates._get_local_agents_dir",
+            lambda editor: fake_local,
+        )
+
+        status = get_agents_installed_status()
+
+        # All agents should be in both locations
+        for _agent_name, locations in status.items():
+            assert locations["global"] is True
+            assert locations["local"] is True
+
+
+class TestAgentEditorRestrictions:
+    """Tests for agent directory restrictions by editor type."""
+
+    def test_get_global_agents_dir_rejects_qwen(self):
+        """Should raise ValueError for Qwen editor."""
+        from simpletask.core.ai_templates import _get_global_agents_dir
+
+        with pytest.raises(ValueError, match="does not support agents"):
+            _get_global_agents_dir("qwen")
+
+    def test_get_global_agents_dir_rejects_gemini(self):
+        """Should raise ValueError for Gemini editor."""
+        from simpletask.core.ai_templates import _get_global_agents_dir
+
+        with pytest.raises(ValueError, match="does not support agents"):
+            _get_global_agents_dir("gemini")
+
+    def test_get_local_agents_dir_rejects_qwen(self):
+        """Should raise ValueError for Qwen editor."""
+        from simpletask.core.ai_templates import _get_local_agents_dir
+
+        with pytest.raises(ValueError, match="does not support agents"):
+            _get_local_agents_dir("qwen")
+
+    def test_get_local_agents_dir_rejects_gemini(self):
+        """Should raise ValueError for Gemini editor."""
+        from simpletask.core.ai_templates import _get_local_agents_dir
+
+        with pytest.raises(ValueError, match="does not support agents"):
+            _get_local_agents_dir("gemini")
+
+    def test_get_bundled_agents_qwen_returns_empty(self):
+        """Should return empty list for Qwen editor."""
+        from simpletask.core.ai_templates import _get_bundled_agents
+
+        result = _get_bundled_agents("qwen")
+        assert result == []
+
+    def test_get_bundled_agents_gemini_returns_empty(self):
+        """Should return empty list for Gemini editor."""
+        from simpletask.core.ai_templates import _get_bundled_agents
+
+        result = _get_bundled_agents("gemini")
+        assert result == []

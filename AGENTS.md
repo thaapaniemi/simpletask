@@ -98,12 +98,14 @@ cli/simpletask/           # Main CLI package
 │   │   ├── simpletask.plan.md
 │   │   ├── simpletask.split.md      # NEW: Task splitting command
 │   │   ├── simpletask.implement.md
+│   │   ├── simpletask.review.md
+│   │   └── agents/                  # OpenCode agents (.md)
+│   │       └── simpletask-plan.md   # NEW: Auto-planning agent
+│   ├── qwen/             # Qwen slash commands (.md)
+│   │   ├── simpletask.plan.md
+│   │   ├── simpletask.split.md      # NEW: Task splitting command
+│   │   ├── simpletask.implement.md
 │   │   └── simpletask.review.md
-│   ├── qwen/             # Qwen slash commands (.toml)
-│   │   ├── simpletask.plan.toml
-│   │   ├── simpletask.split.toml    # NEW: Task splitting command
-│   │   ├── simpletask.implement.toml
-│   │   └── simpletask.review.toml
 │   └── gemini/           # Gemini CLI slash commands (.toml)
 │       ├── simpletask.plan.toml
 │       ├── simpletask.split.toml    # NEW: Task splitting command
@@ -227,16 +229,62 @@ simpletask ai list
 ### Template Files
 
 **OpenCode** (Markdown with YAML frontmatter):
-- `cli/simpletask/templates/opencode/*.md`
-- Installed to: `~/.config/opencode/commands/` or `.opencode/commands/`
+- Commands: `cli/simpletask/templates/opencode/*.md`
+  - Installed to: `~/.config/opencode/commands/` or `.opencode/commands/`
+- Agents: `cli/simpletask/templates/opencode/agents/*.md`
+  - Installed to: `~/.config/opencode/agents/` or `.opencode/agents/`
 
-**Qwen CLI** (TOML format):
-- `cli/simpletask/templates/qwen/*.toml`
-- Installed to: `~/.config/qwen/commands/` or `.qwen/commands/`
+**Qwen CLI** (Markdown format):
+- Commands: `cli/simpletask/templates/qwen/*.md`
+  - Installed to: `~/.config/qwen/commands/` or `.qwen/commands/`
+- Agents: Not supported (OpenCode-only feature)
 
-**Gemini CLI** (TOML format, identical to Qwen):
-- `cli/simpletask/templates/gemini/*.toml`
-- Installed to: `~/.gemini/commands/` or `.gemini/commands/`
+**Gemini CLI** (TOML format):
+- Commands: `cli/simpletask/templates/gemini/*.toml`
+  - Installed to: `~/.gemini/commands/` or `.gemini/commands/`
+- Agents: Not supported (OpenCode-only feature)
+
+### AI Agents
+
+Agents are special OpenCode subagents that auto-generate branch names and execute tasks without interactive confirmation. Unlike slash commands which require user confirmation, agents run autonomously when invoked via `@agent-name` or delegated via the `Task()` tool.
+
+**Available Agents:**
+
+| Agent | Purpose | When to Use |
+|-------|---------|-------------|
+| `simpletask-plan` | Auto-generate branch names and create task specifications | Quickly start planning without confirmation |
+
+**Installation:**
+
+Agents are automatically installed alongside commands when you run:
+
+```bash
+simpletask ai install --opencode
+```
+
+This installs both:
+- Commands to `~/.config/opencode/commands/` (or `.opencode/commands/`)
+- Agents to `~/.config/opencode/agents/` (or `.opencode/agents/`)
+
+**Usage in OpenCode:**
+
+```bash
+# Invoke agent directly in OpenCode conversation
+@simpletask-plan
+
+# Or delegate from parent conversation via Task() tool
+# Pass the feature description as context
+```
+
+**Key Differences: Agents vs Slash Commands**
+
+| Aspect | Agents | Slash Commands |
+|--------|--------|-----------------|
+| **Invocation** | `@agent-name` or `Task()` delegation | `/command-name` in OpenCode input |
+| **Branch name generation** | Automatic (no user confirmation) | Asks user for branch name |
+| **Execution** | Runs autonomously, returns structured output | Interactive, guides user step-by-step |
+| **Use case** | Batch automation, programmatic delegation | Interactive exploration and learning |
+| **Support** | OpenCode only | OpenCode, Qwen, Gemini |
 
 ## Commands
 

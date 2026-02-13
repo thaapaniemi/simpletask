@@ -6,14 +6,18 @@ import typer
 
 from simpletask.core.ai_templates import (
     EDITOR_CONFIGS,
+    get_agents_installed_status,
+    get_bundled_agents,
     get_bundled_gemini_templates,
     get_bundled_qwen_templates,
     get_bundled_templates,
     get_gemini_installed_status,
+    get_global_agents_dir,
     get_global_commands_dir,
     get_global_gemini_commands_dir,
     get_global_qwen_commands_dir,
     get_installed_status,
+    get_local_agents_dir,
     get_local_commands_dir,
     get_local_gemini_commands_dir,
     get_local_qwen_commands_dir,
@@ -27,8 +31,7 @@ def _render_editor_table(
     editor_name: str,
     templates: list[Path],
     status: dict[str, dict[str, bool]],
-    global_dir: Path,
-    local_dir: Path,
+    name_label: str = "Command",
 ) -> None:
     """Render a table showing template installation status.
 
@@ -37,12 +40,11 @@ def _render_editor_table(
         editor_name: Display name for the editor (e.g., "OpenCode" or "Qwen").
         templates: List of template file paths.
         status: Installation status dict mapping filename to global/local bools.
-        global_dir: Path to global installation directory.
-        local_dir: Path to local installation directory.
+        name_label: Column label for the template type (e.g., "Command" or "Agent").
     """
     table = create_table(
         title=title,
-        columns=["Command", "Global", "Local"],
+        columns=[name_label, "Global", "Local"],
     )
 
     for template_path in templates:
@@ -55,11 +57,6 @@ def _render_editor_table(
         table.add_row(name, global_icon, local_icon)
 
     console.print(table)
-
-    # Show locations
-    console.print(f"\n[bold]{editor_name} Locations:[/bold]")
-    console.print(f"  Global: {global_dir}")
-    console.print(f"  Local:  {local_dir}\n")
 
 
 def list_command() -> None:
@@ -76,6 +73,10 @@ def list_command() -> None:
         opencode_templates = get_bundled_templates()
         opencode_status = get_installed_status()
 
+        # Get OpenCode agents
+        opencode_agents = get_bundled_agents()
+        opencode_agents_status = get_agents_installed_status()
+
         # Get Qwen templates
         qwen_templates = get_bundled_qwen_templates()
         qwen_status = get_qwen_installed_status()
@@ -84,20 +85,43 @@ def list_command() -> None:
         gemini_templates = get_bundled_gemini_templates()
         gemini_status = get_gemini_installed_status()
 
-        if not opencode_templates and not qwen_templates and not gemini_templates:
-            console.print("[dim]No templates found[/dim]")
+        if (
+            not opencode_templates
+            and not opencode_agents
+            and not qwen_templates
+            and not gemini_templates
+        ):
+            console.print("[dim]No templates or agents found[/dim]")
             return
 
-        # OpenCode table
+        # OpenCode commands table
         if opencode_templates:
             _render_editor_table(
                 title="OpenCode Commands",
                 editor_name=EDITOR_CONFIGS["opencode"].display_name,
                 templates=opencode_templates,
                 status=opencode_status,
-                global_dir=get_global_commands_dir(),
-                local_dir=get_local_commands_dir(),
             )
+
+        # OpenCode agents table
+        if opencode_agents:
+            _render_editor_table(
+                title="OpenCode Agents",
+                editor_name=EDITOR_CONFIGS["opencode"].display_name,
+                templates=opencode_agents,
+                status=opencode_agents_status,
+                name_label="Agent",
+            )
+
+        if opencode_templates or opencode_agents:
+            console.print(f"\n[bold]{EDITOR_CONFIGS['opencode'].display_name} Locations:[/bold]")
+            if opencode_templates:
+                console.print(f"  Commands Global: {get_global_commands_dir()}")
+                console.print(f"  Commands Local:  {get_local_commands_dir()}")
+            if opencode_agents:
+                console.print(f"  Agents Global:   {get_global_agents_dir()}")
+                console.print(f"  Agents Local:    {get_local_agents_dir()}")
+            console.print("")
 
         # Qwen table
         if qwen_templates:
@@ -106,9 +130,10 @@ def list_command() -> None:
                 editor_name=EDITOR_CONFIGS["qwen"].display_name,
                 templates=qwen_templates,
                 status=qwen_status,
-                global_dir=get_global_qwen_commands_dir(),
-                local_dir=get_local_qwen_commands_dir(),
             )
+            console.print(f"\n[bold]{EDITOR_CONFIGS['qwen'].display_name} Locations:[/bold]")
+            console.print(f"  Global: {get_global_qwen_commands_dir()}")
+            console.print(f"  Local:  {get_local_qwen_commands_dir()}\n")
 
         # Gemini CLI table
         if gemini_templates:
@@ -117,9 +142,10 @@ def list_command() -> None:
                 editor_name=EDITOR_CONFIGS["gemini"].display_name,
                 templates=gemini_templates,
                 status=gemini_status,
-                global_dir=get_global_gemini_commands_dir(),
-                local_dir=get_local_gemini_commands_dir(),
             )
+            console.print(f"\n[bold]{EDITOR_CONFIGS['gemini'].display_name} Locations:[/bold]")
+            console.print(f"  Global: {get_global_gemini_commands_dir()}")
+            console.print(f"  Local:  {get_local_gemini_commands_dir()}\n")
 
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")

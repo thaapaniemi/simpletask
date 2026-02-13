@@ -1,14 +1,17 @@
-"""Install OpenCode, Qwen, and Gemini CLI command templates."""
+"""Install OpenCode, Qwen, and Gemini CLI command templates and agents."""
 
 import typer
 
 from simpletask.core.ai_templates import (
+    get_global_agents_dir,
     get_global_commands_dir,
     get_global_gemini_commands_dir,
     get_global_qwen_commands_dir,
+    get_local_agents_dir,
     get_local_commands_dir,
     get_local_gemini_commands_dir,
     get_local_qwen_commands_dir,
+    install_agents,
     install_gemini_templates,
     install_qwen_templates,
     install_templates,
@@ -80,9 +83,10 @@ def install_command(
         help="Install Gemini CLI templates only",
     ),
 ) -> None:
-    """Install OpenCode, Qwen, and Gemini CLI command templates.
+    """Install OpenCode, Qwen, and Gemini CLI command templates and agents.
 
-    By default, installs ALL templates (OpenCode, Qwen, and Gemini CLI) globally.
+    By default, installs ALL templates (OpenCode, Qwen, and Gemini CLI) globally. OpenCode
+    agents are installed alongside OpenCode command templates.
     Use --opencode, --qwen, or --gemini to install only specific editor templates.
 
     Examples:
@@ -149,10 +153,31 @@ def install_command(
                 _report_installation_results(installed, skipped, overwritten) or any_skipped
             )
 
-        if any_skipped:
-            info("Tip: Use --no-overwrite to preserve existing files")
-
     except FileNotFoundError as e:
         error(str(e))
     except Exception as e:
         error(f"Unexpected error: {e}")
+
+    # Install OpenCode agents separately with independent error handling
+    if install_opencode:
+        try:
+            agents_dir = get_local_agents_dir() if local else get_global_agents_dir()
+
+            info(f"Installing OpenCode agents to {agents_dir}")
+
+            installed, skipped, overwritten = install_agents(
+                target_dir=agents_dir,
+                no_overwrite=no_overwrite,
+            )
+
+            any_skipped = (
+                _report_installation_results(installed, skipped, overwritten) or any_skipped
+            )
+
+        except FileNotFoundError as e:
+            warning(f"Skipping agents installation: {e}")
+        except Exception as e:
+            warning(f"Warning installing agents: {e}")
+
+    if any_skipped:
+        info("Tip: Use --no-overwrite to preserve existing files")
