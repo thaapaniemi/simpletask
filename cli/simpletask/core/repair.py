@@ -7,6 +7,7 @@ that have schema violations or invalid fields.
 from pathlib import Path
 
 from .models import SimpleTaskSpec
+from .task_file_ops import DEFAULT_CRITERION_DESCRIPTION
 from .yaml_parser import parse_task_file_lenient
 
 
@@ -15,7 +16,7 @@ def repair_task_file(file_path: Path) -> SimpleTaskSpec:
 
     This function:
     1. Strips unknown root-level fields (e.g., status, updated)
-    2. Fixes empty acceptance_criteria arrays by adding placeholder
+    2. Fixes empty acceptance_criteria arrays by adding default criterion
     3. Returns the repaired spec (does NOT write to disk)
 
     The calling function is responsible for writing the repaired spec
@@ -52,7 +53,7 @@ def repair_task_file(file_path: Path) -> SimpleTaskSpec:
         cleaned_data["acceptance_criteria"] = [
             {
                 "id": "AC1",
-                "description": "Task completion criteria (to be filled)",
+                "description": DEFAULT_CRITERION_DESCRIPTION,
                 "completed": False,
             }
         ]

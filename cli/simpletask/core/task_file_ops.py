@@ -6,6 +6,9 @@ from .models import AcceptanceCriterion, SimpleTaskSpec
 from .project import Project
 from .yaml_parser import write_task_file
 
+# Default description for acceptance criterion when none are provided
+DEFAULT_CRITERION_DESCRIPTION = "All tasks completed and quality checks pass"
+
 
 def create_task_file(
     project: Project,
@@ -22,7 +25,7 @@ def create_task_file(
         title: Human-readable task title
         prompt: Original user prompt/request
         criteria: Optional list of acceptance criteria descriptions.
-                 None or [] adds placeholder.
+                 None or [] adds default criterion.
 
     Returns:
         The created SimpleTaskSpec
@@ -34,25 +37,17 @@ def create_task_file(
         raise ValueError(f"Task '{branch}' already exists")
 
     # Build acceptance criteria
-    if criteria is None:
-        ac_list = [
-            AcceptanceCriterion(
-                id="AC1",
-                description="Task completion criteria (to be filled)",
-                completed=False,
-            )
-        ]
-    elif criteria:
+    if criteria:
         ac_list = [
             AcceptanceCriterion(id=f"AC{i + 1}", description=desc, completed=False)
             for i, desc in enumerate(criteria)
         ]
     else:
-        # Empty list or explicit [] both get placeholder
+        # None or empty list both get default criterion
         ac_list = [
             AcceptanceCriterion(
                 id="AC1",
-                description="Task completion criteria (to be filled)",
+                description=DEFAULT_CRITERION_DESCRIPTION,
                 completed=False,
             )
         ]

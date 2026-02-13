@@ -210,8 +210,8 @@ def new(
         title: Human-readable task title
         prompt: Original user prompt/request
         criteria: Optional list of acceptance criteria descriptions.
-                 If None, adds placeholder criterion.
-                 If empty list, no criteria added.
+                 If None or empty list, adds default criterion.
+                 If provided with items, must contain at least one item.
 
     Returns:
         SimpleTaskWriteResponse with minimal confirmation and summary.

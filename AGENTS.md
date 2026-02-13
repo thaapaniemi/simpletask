@@ -796,7 +796,7 @@ Creates a new task file without creating a git branch (atomic MCP operation).
 - `branch`: Branch/task identifier (e.g., 'feature/user-auth')
 - `title`: Human-readable task title
 - `prompt`: Original user prompt/request that led to task creation
-- `criteria` (optional): List of acceptance criteria descriptions. If `None` or empty list `[]`, adds a single placeholder criterion. If provided with items, must contain at least one item.
+- `criteria` (optional): List of acceptance criteria descriptions. If `None` or empty list `[]`, adds a single default criterion. If provided with items, must contain at least one item.
 
 **Returns:** `SimpleTaskWriteResponse` with minimal confirmation and summary
 
@@ -828,8 +828,8 @@ result = new(
 
 **Edge Cases:**
 - File already exists → raises `FileExistsError`
-- `criteria=[]` → creates placeholder criterion `AC1` with description "Task completion criteria (to be filled)"
-- `criteria=None` → creates placeholder criterion `AC1` with description "Task completion criteria (to be filled)"
+- `criteria=[]` → creates default criterion `AC1` with description "All tasks completed and quality checks pass"
+- `criteria=None` → creates default criterion `AC1` with description "All tasks completed and quality checks pass"
 
 #### task
 
@@ -1718,10 +1718,11 @@ The `.tasks/` directory contains task definition files used during development b
 - Run `pytest` before committing changes
 - Run `black .` and `ruff check .` before committing
 - **Version bumping strategy:**
-  - **On feature branches:** Bump version ONCE at the end, just before merging to main
+  - **On feature branches:** Bump version ONCE at the end when feature is complete, just before final commit
   - **On main branch:** Bump version for each commit with code changes
   - Always bump in BOTH `pyproject.toml` and `cli/simpletask/__init__.py`
-  - Use `git commit --no-verify` for intermediate commits on feature branches
+  - Use `git commit --no-verify` for intermediate commits on feature branches (before version bump)
+  - The final commit with version bump should NOT use `--no-verify` (let pre-commit hook validate)
 - Add type hints to all function signatures
 - Use Pydantic models for data validation
 - Write tests for new functionality

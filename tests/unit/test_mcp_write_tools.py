@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 import yaml
 from simpletask.core.models import TaskStatus
+from simpletask.core.task_file_ops import DEFAULT_CRITERION_DESCRIPTION
 from simpletask.core.yaml_parser import InvalidTaskFileError
 from simpletask.mcp.models import SimpleTaskItemResponse, SimpleTaskWriteResponse
 from simpletask.mcp.server import criteria, new, task
@@ -53,29 +54,29 @@ class TestSimpletaskNew:
         with pytest.raises(ValueError, match="already exists"):
             new(branch="test", title="T", prompt="P")
 
-    def test_criteria_none_adds_placeholder(self, temp_project):
-        """Test that criteria=None adds a placeholder criterion."""
+    def test_criteria_none_adds_default(self, temp_project):
+        """Test that criteria=None adds a default criterion."""
         result = new(branch="t", title="T", prompt="P", criteria=None)
         assert result.summary.criteria_total == 1
         assert "1 criteria" in result.message
 
-    def test_criteria_empty_list_creates_placeholder(self, temp_project):
-        """Test that criteria=[] creates a placeholder criterion."""
+    def test_criteria_empty_list_creates_default(self, temp_project):
+        """Test that criteria=[] creates a default criterion."""
         from simpletask.core.project import get_task_file_path
         from simpletask.core.yaml_parser import parse_task_file
 
         result = new(branch="t", title="T", prompt="P", criteria=[])
 
-        # Should succeed and create placeholder
+        # Should succeed and create default criterion
         assert result.success is True
         assert result.summary.criteria_total == 1
 
-        # Verify placeholder criterion by reading the file
+        # Verify default criterion by reading the file
         task_path = get_task_file_path("t")
         spec = parse_task_file(task_path)
         assert len(spec.acceptance_criteria) == 1
         assert spec.acceptance_criteria[0].id == "AC1"
-        assert "to be filled" in spec.acceptance_criteria[0].description.lower()
+        assert spec.acceptance_criteria[0].description == DEFAULT_CRITERION_DESCRIPTION
 
     def test_criteria_list_creates_criteria(self, temp_project):
         """Test that criteria list creates criteria with correct IDs."""
@@ -267,7 +268,7 @@ class TestSimpletaskCriteria:
 
     def test_remove_last_criterion_fails(self, task_project):
         """Test that removing the last criterion fails due to schema validation."""
-        # Task starts with 1 placeholder criterion due to criteria=None default
+        # Task starts with 1 default criterion due to criteria=None default
         # Removing it should fail due to min_length=1
         with pytest.raises(InvalidTaskFileError):
             criteria(action="remove", criterion_id="AC1")
@@ -364,13 +365,13 @@ class TestCriteriaRepair:
         result = criteria(action="add", description="New criterion")
 
         assert result.success is True
-        # Should have placeholder AC1 + new AC2
+        # Should have default AC1 + new AC2
         assert result.summary.criteria_total == 2
 
-        # Verify repair happened (placeholder was added) by reading file
+        # Verify repair happened (default criterion was added) by reading file
         spec = parse_task_file(task_path)
         assert spec.acceptance_criteria[0].id == "AC1"
-        assert "to be filled" in spec.acceptance_criteria[0].description.lower()
+        assert spec.acceptance_criteria[0].description == DEFAULT_CRITERION_DESCRIPTION
         assert spec.acceptance_criteria[1].id == "AC2"
         assert spec.acceptance_criteria[1].description == "New criterion"
 
@@ -457,7 +458,7 @@ class TestCriteriaRepair:
         assert not hasattr(spec, "updated")
         assert len(spec.acceptance_criteria) == 2
         assert spec.acceptance_criteria[0].id == "AC1"
-        assert "to be filled" in spec.acceptance_criteria[0].description.lower()
+        assert spec.acceptance_criteria[0].description == DEFAULT_CRITERION_DESCRIPTION
 
 
 class TestTaskStepsParameter:

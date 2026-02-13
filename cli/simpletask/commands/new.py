@@ -52,7 +52,7 @@ def new(
             branch=branch,
             title=title,
             prompt=prompt,
-            criteria=None,  # Will add placeholder AC1
+            criteria=None,  # Will add default AC1
         )
 
         # Get task file path for display
