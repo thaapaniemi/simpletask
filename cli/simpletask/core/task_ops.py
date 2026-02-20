@@ -3,12 +3,33 @@
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Union
 
-from .models import CodeExample, FileAction, Task, TaskStatus
+from .models import CodeExample, FileAction, SimpleTaskSpec, Task, TaskStatus
 from .repair import repair_task_file
 from .yaml_parser import InvalidTaskFileError, parse_task_file, write_task_file
 
 if TYPE_CHECKING:
     from ..mcp.models import BatchTaskOperation
+
+
+class _UnsetType:
+    """Singleton sentinel to distinguish 'not provided' from 'explicitly set to None'.
+
+    Using a typed singleton rather than a bare object() ensures that mypy can
+    reason about the sentinel throughout the call chain without requiring cast().
+    """
+
+    _instance: "_UnsetType | None" = None
+
+    def __new__(cls) -> "_UnsetType":
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+
+    def __repr__(self) -> str:
+        return "UNSET"
+
+
+_UNSET = _UnsetType()
 
 
 def get_next_task_id(tasks: list[Task]) -> str:
@@ -36,7 +57,8 @@ def add_implementation_task(
     prerequisites: list[str] | None = None,
     files: list[FileAction] | None = None,
     code_examples: list[CodeExample] | None = None,
-) -> str:
+    iteration: int | None = None,
+) -> tuple[str, SimpleTaskSpec]:
     """Add a new implementation task to the task file.
 
     Args:
@@ -49,9 +71,10 @@ def add_implementation_task(
         prerequisites: Optional list of prerequisite task IDs
         files: Optional list of FileAction objects specifying files to modify
         code_examples: Optional list of CodeExample objects with implementation patterns
+        iteration: Optional iteration ID to assign this task to
 
     Returns:
-        New task ID
+        Tuple of (new task ID, updated SimpleTaskSpec in-memory)
 
     Raises:
         FileNotFoundError: If task file doesn't exist
@@ -88,6 +111,7 @@ def add_implementation_task(
         files=files,
         code_examples=code_examples,
         notes=None,
+        iteration=iteration,
     )
 
     # Append task
@@ -98,7 +122,7 @@ def add_implementation_task(
     # Write back (auto-updates timestamp)
     write_task_file(file_path, spec)
 
-    return new_id
+    return new_id, spec
 
 
 def update_implementation_task(
@@ -112,7 +136,8 @@ def update_implementation_task(
     prerequisites: list[str] | None = None,
     files: list[FileAction] | None = None,
     code_examples: list[CodeExample] | None = None,
-) -> None:
+    iteration: int | None | _UnsetType = _UNSET,
+) -> SimpleTaskSpec:
     """Update an existing implementation task.
 
     Args:
@@ -126,6 +151,11 @@ def update_implementation_task(
         prerequisites: New prerequisite list (optional, replaces existing)
         files: New files list (optional, replaces existing)
         code_examples: New code examples list (optional, replaces existing)
+        iteration: Iteration ID to assign (int), None to unassign, or _UNSET to
+            preserve the existing value (default).
+
+    Returns:
+        Updated SimpleTaskSpec in-memory (after write)
 
     Raises:
         ValueError: If task not found
@@ -165,20 +195,27 @@ def update_implementation_task(
         task.files = files
     if code_examples is not None:
         task.code_examples = code_examples
+    if not isinstance(iteration, _UnsetType):
+        task.iteration = iteration  # type: ignore[assignment]  # narrowed to int | None
 
     # Write back (auto-updates timestamp)
     write_task_file(file_path, spec)
+
+    return spec
 
 
 def remove_implementation_task(
     file_path: Path,
     task_id: str,
-) -> None:
+) -> SimpleTaskSpec:
     """Remove an implementation task.
 
     Args:
         file_path: Path to task YAML file
         task_id: Task ID to remove
+
+    Returns:
+        Updated SimpleTaskSpec in-memory (after write)
 
     Raises:
         ValueError: If task not found
@@ -215,10 +252,12 @@ def remove_implementation_task(
     # Write back (auto-updates timestamp)
     write_task_file(file_path, spec)
 
+    return spec
+
 
 def batch_tasks(
     file_path: Path, operations: list[Union[dict[str, Any], "BatchTaskOperation"]]
-) -> list[str]:
+) -> tuple[list[str], SimpleTaskSpec]:
     """Perform multiple task operations atomically.
 
     All operations are performed in memory before writing. If any operation
@@ -229,7 +268,7 @@ def batch_tasks(
         operations: List of BatchTaskOperation dicts or objects
 
     Returns:
-        List of newly created task IDs (from add operations)
+        Tuple of (list of newly created task IDs, updated SimpleTaskSpec in-memory)
 
     Raises:
         ValueError: If any operation fails validation
@@ -249,7 +288,7 @@ def batch_tasks(
 
     # Convert all operations to dicts once upfront for efficiency
     ops_as_dicts: list[dict[str, Any]] = [
-        op if isinstance(op, dict) else op.model_dump()  # type: ignore[union-attr]
+        op if isinstance(op, dict) else op.model_dump(exclude_unset=True)  # type: ignore[union-attr]
         for op in operations
     ]
 
@@ -285,6 +324,25 @@ def batch_tasks(
         if op_type == "add":
             if not op_dict.get("name"):
                 raise ValueError(f"Operation {i}: name required for add operation")
+
+        # Validate prerequisites for update operations
+        if op_type == "update" and op_dict.get("prerequisites") is not None:
+            valid_task_ids = existing_task_ids - remove_ids
+            for prereq_id in op_dict["prerequisites"]:
+                if prereq_id not in valid_task_ids:
+                    raise ValueError(
+                        f"Operation {i}: Invalid prerequisite '{prereq_id}' - "
+                        f"task does not exist. Available: {sorted(valid_task_ids)}"
+                    )
+
+        # Validate iteration ID for update operations
+        if op_type == "update" and "iteration" in op_dict and op_dict["iteration"] is not None:
+            valid_iteration_ids = {it.id for it in (spec.iterations or [])}
+            if op_dict["iteration"] not in valid_iteration_ids:
+                raise ValueError(
+                    f"Operation {i}: Invalid iteration '{op_dict['iteration']}' - "
+                    f"iteration does not exist. Available: {sorted(valid_iteration_ids)}"
+                )
 
         # Validate status values for update operations
         if op_type == "update" and op_dict.get("status") is not None:
@@ -341,6 +399,10 @@ def batch_tasks(
             if op_dict.get("code_examples") is not None:
                 task.code_examples = [CodeExample(**c) for c in op_dict["code_examples"]]
 
+            # Update iteration field if provided (None means unassign)
+            if "iteration" in op_dict:
+                task.iteration = op_dict["iteration"]
+
     # Process add operations
     new_task_ids: list[str] = []
     for i, op_dict in enumerate(ops_as_dicts):
@@ -371,6 +433,16 @@ def batch_tasks(
                             f"task does not exist. Available: {sorted(valid_task_ids)}"
                         )
 
+            # Validate iteration ID for add operations
+            iteration_id = op_dict.get("iteration")
+            if iteration_id is not None:
+                valid_iteration_ids = {it.id for it in (spec.iterations or [])}
+                if iteration_id not in valid_iteration_ids:
+                    raise ValueError(
+                        f"Operation {i}: Invalid iteration '{iteration_id}' - "
+                        f"iteration does not exist. Available: {sorted(valid_iteration_ids)}"
+                    )
+
             # Convert files list[dict] to list[FileAction]
             files = None
             if op_dict.get("files"):
@@ -393,6 +465,7 @@ def batch_tasks(
                 files=files,
                 code_examples=code_examples,
                 notes=None,
+                iteration=op_dict.get("iteration"),
             )
 
             spec.tasks.append(new_task)
@@ -401,4 +474,4 @@ def batch_tasks(
     # Write back atomically (single write after all operations succeed)
     write_task_file(file_path, spec)
 
-    return new_task_ids
+    return new_task_ids, spec

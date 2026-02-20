@@ -299,6 +299,20 @@ PR READINESS: [READY TO MERGE | NEEDS CHANGES | NOT READY]
 
 If issues are found, automatically add fix tasks to the task file:
 
+0. **Optional: Create a new iteration for fix tasks** to group them separately from the original implementation:
+   
+   ```
+   Use simpletask_iteration() MCP tool:
+   - Call simpletask_iteration(action="add", label="review fixes")
+   - Returns new iteration ID to use when adding fix tasks
+   ```
+   
+   ```bash
+   simpletask iteration add "review fixes"
+   ```
+   
+   Then add fix tasks with `--iteration <id>` (CLI) or `iteration=<id>` (MCP) to group them.
+
 1. For each issue found, create a fix task using MCP tools:
    
    ```

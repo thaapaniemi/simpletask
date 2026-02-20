@@ -67,7 +67,7 @@ class TestBatchAddOperations:
         """Test adding a single task via batch."""
         operations = [{"op": "add", "name": "New Task", "goal": "New goal", "steps": ["Step 1"]}]
 
-        new_ids = batch_tasks(task_file, operations)
+        new_ids, _ = batch_tasks(task_file, operations)
 
         assert len(new_ids) == 1
         assert new_ids[0] == "T004"
@@ -89,7 +89,7 @@ class TestBatchAddOperations:
             {"op": "add", "name": "Task C", "goal": "Goal C"},
         ]
 
-        new_ids = batch_tasks(task_file, operations)
+        new_ids, _ = batch_tasks(task_file, operations)
 
         assert len(new_ids) == 3
         assert new_ids == ["T004", "T005", "T006"]
@@ -212,7 +212,7 @@ class TestBatchMixedOperations:
             {"op": "add", "name": "New Task", "goal": "Added after remove", "steps": ["Step 1"]},
         ]
 
-        new_ids = batch_tasks(task_file, operations)
+        new_ids, _ = batch_tasks(task_file, operations)
 
         assert len(new_ids) == 1
         assert new_ids[0] == "T004"
@@ -309,3 +309,83 @@ class TestBatchValidation:
         # Verify atomicity - no changes made
         spec = parse_task_file(task_file)
         assert spec.tasks[0].status == TaskStatus.NOT_STARTED  # Unchanged
+
+
+class TestBatchIterationOperations:
+    """Tests for iteration field handling in batch_tasks."""
+
+    @pytest.fixture
+    def spec_with_iteration(self) -> SimpleTaskSpec:
+        """Create a sample spec that includes an iteration."""
+        from datetime import UTC, datetime
+
+        from simpletask.core.models import Iteration
+
+        return SimpleTaskSpec(
+            branch="test-batch-iter",
+            title="Test Batch Iteration",
+            original_prompt="Test batch with iterations",
+            created=datetime.now(UTC),
+            acceptance_criteria=[
+                AcceptanceCriterion(id="AC1", description="Criterion", completed=False)
+            ],
+            tasks=[
+                Task(
+                    id="T001",
+                    name="Task 1",
+                    goal="First task",
+                    status=TaskStatus.NOT_STARTED,
+                    steps=["Step 1"],
+                ),
+            ],
+            iterations=[
+                Iteration(id=1, label="Sprint 1", created=datetime.now(UTC)),
+            ],
+        )
+
+    @pytest.fixture
+    def iter_task_file(self, tmp_path: Path, spec_with_iteration: SimpleTaskSpec) -> Path:
+        """Write spec_with_iteration to a temp file."""
+        task_file = tmp_path / "test-batch-iter.yml"
+        write_task_file(task_file, spec_with_iteration)
+        return task_file
+
+    def test_batch_add_with_iteration_assigns_field(self, iter_task_file: Path) -> None:
+        """Batch add operation sets iteration field on new task."""
+        operations = [
+            {"op": "add", "name": "New Task", "goal": "Goal", "steps": ["S"], "iteration": 1},
+        ]
+        batch_tasks(iter_task_file, operations)
+        spec = parse_task_file(iter_task_file)
+        new_task = next(t for t in spec.tasks if t.name == "New Task")
+        assert new_task.iteration == 1
+
+    def test_batch_update_assigns_iteration(self, iter_task_file: Path) -> None:
+        """Batch update operation assigns a task to an iteration."""
+        operations = [{"op": "update", "task_id": "T001", "iteration": 1}]
+        batch_tasks(iter_task_file, operations)
+        spec = parse_task_file(iter_task_file)
+        t001 = next(t for t in spec.tasks if t.id == "T001")
+        assert t001.iteration == 1
+
+    def test_batch_update_unassigns_iteration(self, iter_task_file: Path) -> None:
+        """Batch update with iteration=None unassigns a task from its iteration."""
+        # First assign
+        batch_tasks(iter_task_file, [{"op": "update", "task_id": "T001", "iteration": 1}])
+        # Then unassign
+        batch_tasks(iter_task_file, [{"op": "update", "task_id": "T001", "iteration": None}])
+        spec = parse_task_file(iter_task_file)
+        t001 = next(t for t in spec.tasks if t.id == "T001")
+        assert t001.iteration is None
+
+    def test_batch_update_without_iteration_key_leaves_assignment_unchanged(
+        self, iter_task_file: Path
+    ) -> None:
+        """Batch update that omits the iteration key does not change the iteration assignment."""
+        # Assign iteration first
+        batch_tasks(iter_task_file, [{"op": "update", "task_id": "T001", "iteration": 1}])
+        # Update something else without touching iteration
+        batch_tasks(iter_task_file, [{"op": "update", "task_id": "T001", "status": "completed"}])
+        spec = parse_task_file(iter_task_file)
+        t001 = next(t for t in spec.tasks if t.id == "T001")
+        assert t001.iteration == 1  # Unchanged

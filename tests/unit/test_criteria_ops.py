@@ -51,7 +51,7 @@ class TestAddAcceptanceCriterion:
 
     def test_add_criterion_basic(self, tmp_task_file):
         """Add criterion with basic properties."""
-        new_id = add_acceptance_criterion(tmp_task_file, description="New criterion")
+        new_id, _ = add_acceptance_criterion(tmp_task_file, description="New criterion")
         assert new_id == "AC3"
 
         spec = parse_task_file(tmp_task_file)
@@ -62,8 +62,8 @@ class TestAddAcceptanceCriterion:
 
     def test_add_multiple_criteria(self, tmp_task_file):
         """Add multiple criteria."""
-        id1 = add_acceptance_criterion(tmp_task_file, description="Criterion 1")
-        id2 = add_acceptance_criterion(tmp_task_file, description="Criterion 2")
+        id1, _ = add_acceptance_criterion(tmp_task_file, description="Criterion 1")
+        id2, _ = add_acceptance_criterion(tmp_task_file, description="Criterion 2")
 
         assert id1 == "AC3"
         assert id2 == "AC4"

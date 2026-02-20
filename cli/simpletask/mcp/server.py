@@ -3,9 +3,7 @@
 Exposes task file operations as MCP tools for AI editor integration.
 """
 
-from __future__ import annotations
-
-import builtins
+import builtins  # noqa: I001
 from typing import Literal, cast
 
 from mcp.server.fastmcp import FastMCP
@@ -20,6 +18,11 @@ from ..core.criteria_ops import (
     update_acceptance_criterion,
 )
 from ..core.design_ops import remove_design_field
+from ..core.iteration_ops import (
+    add_iteration_to_spec,
+    get_iteration_from_spec,
+    remove_iteration_from_spec,
+)
 from ..core.models import (
     ArchitecturalPattern,
     CodeExample,
@@ -41,6 +44,10 @@ from ..core.quality_ops import (
 )
 from ..core.task_file_ops import create_task_file
 from ..core.task_ops import (
+    _UNSET as _TASK_UNSET,
+    _UnsetType as _TaskUnsetType,
+)
+from ..core.task_ops import (
     add_implementation_task,
     batch_tasks,
     remove_implementation_task,
@@ -57,6 +64,7 @@ from .models import (
     SimpleTaskDesignResponse,
     SimpleTaskGetResponse,
     SimpleTaskItemResponse,
+    SimpleTaskIterationResponse,
     SimpleTaskNoteResponse,
     SimpleTaskQualityResponse,
     SimpleTaskWriteResponse,
@@ -97,6 +105,7 @@ __all__ = [
     "criteria",
     "design",
     "get",
+    "iteration",
     "list",
     "mcp",
     "new",
@@ -230,7 +239,7 @@ def new(
         message=f"Created task file for '{title}' with {len(spec.acceptance_criteria)} criteria",
         file_path=str(file_path),
         summary=summary,
-        new_item_id=None,
+        new_item_ids=[],
     )
 
 
@@ -247,6 +256,8 @@ def task(
     files: _list[dict] | None = None,
     code_examples: _list[dict] | None = None,
     operations: _list[dict] | None = None,
+    iteration: int | None = None,
+    unassign_iteration: bool = False,
 ) -> SimpleTaskWriteResponse | SimpleTaskItemResponse | SimpleTaskBatchResponse:
     """Manage implementation tasks.
 
@@ -264,6 +275,10 @@ def task(
         files: List of FileAction dicts with path and action fields (optional for add/update)
         code_examples: List of CodeExample dicts with path and description fields (optional for add/update)
         operations: List of BatchTaskOperation dicts (required for batch action)
+        iteration: Iteration ID (int) to assign the task to (for add/update). Omit or pass None to
+            preserve existing assignment. Use unassign_iteration=True to explicitly remove assignment.
+        unassign_iteration: Set True to explicitly remove the task's iteration assignment (update only).
+            Cannot be combined with an integer iteration value.
 
     Returns:
         SimpleTaskWriteResponse for write operations (add/update/remove).
@@ -305,7 +320,7 @@ def task(
                 files, code_examples
             )
 
-            add_implementation_task(
+            new_id, spec = add_implementation_task(
                 file_path,
                 name,
                 goal,
@@ -314,18 +329,16 @@ def task(
                 prerequisites=prerequisites,
                 files=files_converted,
                 code_examples=code_examples_converted,
+                iteration=iteration,
             )
-            spec = parse_task_file(file_path)
             summary = compute_status_summary(spec)
-            # Find the newly added task (should be last one)
-            new_task = spec.tasks[-1] if spec.tasks else None
             return SimpleTaskWriteResponse(
                 success=True,
                 action="task_added",
-                message=f"Added task '{name}' ({new_task.id if new_task else 'unknown'})",
+                message=f"Added task '{name}' ({new_id})",
                 file_path=str(file_path),
                 summary=summary,
-                new_item_id=new_task.id if new_task else None,
+                new_item_ids=[new_id],
             )
 
         case "update":
@@ -344,7 +357,21 @@ def task(
                 files, code_examples
             )
 
-            update_implementation_task(
+            # Resolve iteration sentinel — three distinct states over MCP JSON:
+            #   unassign_iteration=True   → explicitly remove assignment (set to None)
+            #   iteration=<int>           → assign to that iteration ID
+            #   neither (default)         → preserve existing assignment (_TASK_UNSET)
+            # We need unassign_iteration because MCP JSON cannot distinguish "omit" from "null":
+            # both arrive as iteration=None, so None alone is ambiguous.
+            if unassign_iteration and iteration is not None:
+                raise ValueError("'unassign_iteration' and 'iteration' are mutually exclusive")
+            iteration_value: int | None | _TaskUnsetType = _TASK_UNSET
+            if unassign_iteration:
+                iteration_value = None
+            elif iteration is not None:
+                iteration_value = iteration
+
+            spec = update_implementation_task(
                 file_path,
                 task_id,
                 name,
@@ -355,8 +382,8 @@ def task(
                 prerequisites,
                 files_converted,
                 code_examples_converted,
+                iteration=iteration_value,
             )
-            spec = parse_task_file(file_path)
             summary = compute_status_summary(spec)
             return SimpleTaskWriteResponse(
                 success=True,
@@ -364,14 +391,13 @@ def task(
                 message=f"Updated task {task_id}",
                 file_path=str(file_path),
                 summary=summary,
-                new_item_id=None,
+                new_item_ids=[],
             )
 
         case "remove":
             if not task_id:
                 raise ValueError("'task_id' is required for action='remove'")
-            remove_implementation_task(file_path, task_id)
-            spec = parse_task_file(file_path)
+            spec = remove_implementation_task(file_path, task_id)
             summary = compute_status_summary(spec)
             return SimpleTaskWriteResponse(
                 success=True,
@@ -379,7 +405,7 @@ def task(
                 message=f"Removed task {task_id}",
                 file_path=str(file_path),
                 summary=summary,
-                new_item_id=None,
+                new_item_ids=[],
             )
 
         case "batch":
@@ -395,9 +421,8 @@ def task(
                     loc = ".".join(str(x) for x in err["loc"])
                     errors.append(f"{loc}: {err['msg']}")
                 raise ValueError(f"Invalid batch operations: {'; '.join(errors)}") from e
-            # Execute batch operations atomically
-            new_task_ids = batch_tasks(file_path, validated_ops)  # type: ignore[arg-type]
-            spec = parse_task_file(file_path)
+            # Execute batch operations atomically; returns (new_ids, updated spec)
+            new_task_ids, spec = batch_tasks(file_path, validated_ops)  # type: ignore[arg-type]
             summary = compute_status_summary(spec)
             return SimpleTaskBatchResponse(
                 success=True,
@@ -405,7 +430,6 @@ def task(
                 message=f"Applied {len(operations)} batch operations",
                 file_path=str(file_path),
                 summary=summary,
-                new_item_id=None,
                 new_item_ids=new_task_ids,
             )
 
@@ -458,25 +482,21 @@ def criteria(
                 )
             if not description:
                 raise ValueError("'description' is required for action='add'")
-            add_acceptance_criterion(file_path, description)
-            spec = parse_task_file(file_path)
+            new_id, spec = add_acceptance_criterion(file_path, description)
             summary = compute_status_summary(spec)
-            # Find the newly added criterion (should be last one)
-            new_criterion = spec.acceptance_criteria[-1] if spec.acceptance_criteria else None
             return SimpleTaskWriteResponse(
                 success=True,
                 action="criterion_added",
-                message=f"Added criterion ({new_criterion.id if new_criterion else 'unknown'}): {description}",
+                message=f"Added criterion ({new_id}): {description}",
                 file_path=str(file_path),
                 summary=summary,
-                new_item_id=new_criterion.id if new_criterion else None,
+                new_item_ids=[new_id],
             )
 
         case "complete":
             if not criterion_id:
                 raise ValueError("'criterion_id' is required for action='complete'")
-            mark_criterion_complete(file_path, criterion_id, completed)
-            spec = parse_task_file(file_path)
+            spec = mark_criterion_complete(file_path, criterion_id, completed)
             summary = compute_status_summary(spec)
             status_word = "completed" if completed else "incomplete"
             return SimpleTaskWriteResponse(
@@ -485,14 +505,13 @@ def criteria(
                 message=f"Marked criterion {criterion_id} as {status_word}",
                 file_path=str(file_path),
                 summary=summary,
-                new_item_id=None,
+                new_item_ids=[],
             )
 
         case "remove":
             if not criterion_id:
                 raise ValueError("'criterion_id' is required for action='remove'")
-            remove_acceptance_criterion(file_path, criterion_id)
-            spec = parse_task_file(file_path)
+            spec = remove_acceptance_criterion(file_path, criterion_id)
             summary = compute_status_summary(spec)
             return SimpleTaskWriteResponse(
                 success=True,
@@ -500,7 +519,7 @@ def criteria(
                 message=f"Removed criterion {criterion_id}",
                 file_path=str(file_path),
                 summary=summary,
-                new_item_id=None,
+                new_item_ids=[],
             )
 
         case "update":
@@ -508,8 +527,7 @@ def criteria(
                 raise ValueError("'criterion_id' is required for action='update'")
             if not description:
                 raise ValueError("'description' is required for action='update'")
-            update_acceptance_criterion(file_path, criterion_id, description)
-            spec = parse_task_file(file_path)
+            spec = update_acceptance_criterion(file_path, criterion_id, description)
             summary = compute_status_summary(spec)
             return SimpleTaskWriteResponse(
                 success=True,
@@ -517,7 +535,7 @@ def criteria(
                 message=f"Updated criterion {criterion_id}: {description}",
                 file_path=str(file_path),
                 summary=summary,
-                new_item_id=None,
+                new_item_ids=[],
             )
 
 
@@ -641,7 +659,7 @@ def quality(
                 message=f"Updated quality configuration for {config_type}",
                 file_path=str(file_path),
                 summary=summary,
-                new_item_id=None,
+                new_item_ids=[],
             )
 
         case "preset":
@@ -661,7 +679,7 @@ def quality(
                 message=f"Applied preset '{preset_name}' (filled gaps only)",
                 file_path=str(file_path),
                 summary=summary,
-                new_item_id=None,
+                new_item_ids=[],
             )
 
 
@@ -795,7 +813,7 @@ def design(
                 message=message,
                 file_path=str(file_path),
                 summary=summary,
-                new_item_id=None,
+                new_item_ids=[],
             )
 
         case "remove":
@@ -819,7 +837,7 @@ def design(
                 message=message,
                 file_path=str(file_path),
                 summary=summary,
-                new_item_id=None,
+                new_item_ids=[],
             )
 
 
@@ -890,7 +908,7 @@ def note(
                 message=f"Added note to {location}",
                 file_path=str(file_path),
                 summary=summary,
-                new_item_id=None,
+                new_item_ids=[],
             )
 
         case "remove":
@@ -913,7 +931,7 @@ def note(
                 message=message,
                 file_path=str(file_path),
                 summary=summary,
-                new_item_id=None,
+                new_item_ids=[],
             )
 
 
@@ -968,7 +986,7 @@ def constraint(
                 message="Added constraint",
                 file_path=str(file_path),
                 summary=summary,
-                new_item_id=None,
+                new_item_ids=[],
             )
 
         case "remove":
@@ -987,7 +1005,7 @@ def constraint(
                 message=message,
                 file_path=str(file_path),
                 summary=summary,
-                new_item_id=None,
+                new_item_ids=[],
             )
 
 
@@ -1044,7 +1062,7 @@ def context(
                 message=f"Set context key '{key}'",
                 file_path=str(file_path),
                 summary=summary,
-                new_item_id=None,
+                new_item_ids=[],
             )
 
         case "remove":
@@ -1063,7 +1081,84 @@ def context(
                 message=message,
                 file_path=str(file_path),
                 summary=summary,
-                new_item_id=None,
+                new_item_ids=[],
+            )
+
+
+@mcp.tool()
+def iteration(
+    action: Literal["add", "list", "get", "remove"],
+    label: str | None = None,
+    iteration_id: int | None = None,
+) -> SimpleTaskIterationResponse | SimpleTaskWriteResponse:
+    """Manage task iterations for semantic separation of development rounds.
+
+    Args:
+        action: Operation to perform ('add', 'list', 'get', 'remove')
+        label: Human-readable label for the iteration (required for add)
+        iteration_id: Iteration ID (required for get/remove)
+
+    Returns:
+        SimpleTaskIterationResponse for list/get actions.
+        SimpleTaskWriteResponse for add/remove actions.
+
+    Raises:
+        ValueError: If required parameters missing or iteration not found.
+    """
+    file_path = get_current_task_file_path()
+    spec = parse_task_file(file_path)
+
+    match action:
+        case "list":
+            iterations = spec.iterations or []
+            summary = compute_status_summary(spec)
+            return SimpleTaskIterationResponse(
+                action="iteration_list",
+                iterations=iterations,
+                file_path=str(file_path),
+                summary=summary,
+            )
+
+        case "get":
+            if iteration_id is None:
+                raise ValueError("'iteration_id' is required for action='get'")
+            iter_obj = get_iteration_from_spec(spec, iteration_id)
+            summary = compute_status_summary(spec)
+            return SimpleTaskIterationResponse(
+                action="iteration_get",
+                iterations=[iter_obj],
+                file_path=str(file_path),
+                summary=summary,
+            )
+
+        case "add":
+            if not label:
+                raise ValueError("'label' is required for action='add'")
+            spec, new_id = add_iteration_to_spec(spec, label)
+            write_task_file(file_path, spec)
+            summary = compute_status_summary(spec)
+            return SimpleTaskWriteResponse(
+                success=True,
+                action="iteration_added",
+                message=f"Added iteration {new_id}: {label}",
+                file_path=str(file_path),
+                summary=summary,
+                new_item_ids=[str(new_id)],
+            )
+
+        case "remove":
+            if iteration_id is None:
+                raise ValueError("'iteration_id' is required for action='remove'")
+            spec = remove_iteration_from_spec(spec, iteration_id)
+            write_task_file(file_path, spec)
+            summary = compute_status_summary(spec)
+            return SimpleTaskWriteResponse(
+                success=True,
+                action="iteration_removed",
+                message=f"Removed iteration {iteration_id}",
+                file_path=str(file_path),
+                summary=summary,
+                new_item_ids=[],
             )
 
 

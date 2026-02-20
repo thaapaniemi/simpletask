@@ -56,7 +56,9 @@ class TestAddImplementationTask:
 
     def test_add_task_basic(self, tmp_task_file):
         """Add task with basic properties."""
-        new_id = add_implementation_task(tmp_task_file, name="New task", goal="Complete new task")
+        new_id, _ = add_implementation_task(
+            tmp_task_file, name="New task", goal="Complete new task"
+        )
         assert new_id == "T003"
 
         spec = parse_task_file(tmp_task_file)
@@ -69,7 +71,7 @@ class TestAddImplementationTask:
 
     def test_add_task_default_goal(self, tmp_task_file):
         """Add task with default goal (uses name)."""
-        new_id = add_implementation_task(tmp_task_file, name="New task")
+        new_id, _ = add_implementation_task(tmp_task_file, name="New task")
         assert new_id == "T003"
 
         spec = parse_task_file(tmp_task_file)
@@ -92,7 +94,7 @@ class TestAddImplementationTask:
         write_task_file(task_file, sample_spec)
 
         # Add first task
-        new_id = add_implementation_task(task_file, name="First task")
+        new_id, _ = add_implementation_task(task_file, name="First task")
         assert new_id == "T001"
 
         spec = parse_task_file(task_file)

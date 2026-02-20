@@ -103,10 +103,30 @@ def parse_task_file_lenient(path: Path) -> dict[str, Any]:
 def write_task_file(path: Path, spec: SimpleTaskSpec) -> None:
     """Write task YAML file.
 
+    Revalidates the spec before writing to catch constraint violations from
+    in-place mutations (e.g. removing the last acceptance criterion).
+
     Args:
         path: Path to task file (will be created/overwritten)
         spec: SimpleTaskSpec instance to serialize to YAML
+
+    Raises:
+        InvalidTaskFileError: If the spec fails schema validation before write
     """
+    # Revalidate to catch constraint violations from in-place mutations
+    try:
+        SimpleTaskSpec.model_validate(spec.model_dump(mode="json", exclude_none=True))
+    except ValidationError as e:
+        error_messages = []
+        for error in e.errors():
+            field = ".".join(str(x) for x in error["loc"])
+            message = error["msg"]
+            error_type = error["type"]
+            error_messages.append(f"  • {field}: {message} (type: {error_type})")
+        raise InvalidTaskFileError(
+            "Cannot write task file - schema validation failed:\n\n" + "\n".join(error_messages)
+        ) from e
+
     # Ensure parent directory exists
     path.parent.mkdir(parents=True, exist_ok=True)
 

@@ -296,7 +296,17 @@ PR READINESS: [READY TO MERGE | NEEDS CHANGES | NOT READY]
 
 If issues are found, automatically add fix tasks to the task file:
 
-1. For each issue found, create a fix task:
+1. Optionally create a new iteration to group fix tasks:
+   
+   ```
+   Use simpletask_iteration() MCP tool:
+   - Call simpletask_iteration(action="add", label="v2 fixes")
+   - Returns new iteration ID to use when adding fix tasks
+   ```
+   
+   simpletask iteration add "v2 fixes"
+
+2. For each issue found, create a fix task (optionally assign to the new iteration):
    
    ```
    Use simpletask_task() MCP tool:

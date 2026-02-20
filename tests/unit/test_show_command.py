@@ -245,12 +245,12 @@ class TestShowCommandNotes:
 
                     output_calls = [str(call) for call in mock_console.print.call_args_list]
                     # Should show "3 notes across 2 tasks"
-                    assert any(
-                        "3 notes across 2 tasks" in str(call) for call in output_calls
-                    ), "Should show task notes summary"
-                    assert any(
-                        "simpletask note list" in str(call) for call in output_calls
-                    ), "Should show details command"
+                    assert any("3 notes across 2 tasks" in str(call) for call in output_calls), (
+                        "Should show task notes summary"
+                    )
+                    assert any("simpletask note list" in str(call) for call in output_calls), (
+                        "Should show details command"
+                    )
 
     def test_show_with_both_notes(self, spec_with_both_notes, monkeypatch, tmp_path):
         """Verify both root and task notes display."""

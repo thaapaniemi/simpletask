@@ -706,9 +706,9 @@ simpletask task list --branch feature/other-branch
 
 ### Available Tools
 
-The MCP server exposes 10 tools for task management:
+The MCP server exposes 11 tools for task management:
 
-**Note:** MCP clients automatically prefix tool names with the server name. When invoked through an MCP client (like OpenCode), these tools become `simpletask_get`, `simpletask_list`, `simpletask_new`, `simpletask_task`, `simpletask_criteria`, `simpletask_quality`, `simpletask_design`, `simpletask_note`, `simpletask_constraint`, and `simpletask_context`.
+**Note:** MCP clients automatically prefix tool names with the server name. When invoked through an MCP client (like OpenCode), these tools become `simpletask_get`, `simpletask_list`, `simpletask_new`, `simpletask_task`, `simpletask_criteria`, `simpletask_quality`, `simpletask_design`, `simpletask_note`, `simpletask_constraint`, `simpletask_context`, and `simpletask_iteration`.
 
 | Tool | Description | Parameters |
 |------|-------------|------------|
@@ -722,6 +722,7 @@ The MCP server exposes 10 tools for task management:
 | `note` | Manage notes for root-level and task-level | `action` (str): 'add', 'remove', or 'list'<br>`content` (str, optional): Note content (required for add)<br>`task_id` (str, optional): Task ID for task-level notes; if omitted, operates on root notes<br>`index` (int, optional): Note index to remove (0-based, required for remove unless all=True)<br>`all` (bool, optional): Remove all notes (for remove action)<br>`root_only` (bool, optional): Only return root notes (for list action) |
 | `constraint` | Manage implementation constraints (add/remove/list) | `action` (str): 'add', 'remove', or 'list'<br>`value` (str, optional): Constraint text (required for add)<br>`index` (int, optional): Constraint index to remove (0-based, required for remove unless all=True)<br>`all` (bool, optional): Remove all constraints (for remove action) |
 | `context` | Manage context key-value pairs (set/remove/show) | `action` (str): 'set', 'remove', or 'show'<br>`key` (str, optional): Context key (required for set/remove)<br>`value` (str, optional): Context value (required for set)<br>`all` (bool, optional): Remove all context entries (for remove action) |
+| `iteration` | Manage iterations for grouping tasks (add/list/get/remove) | `action` (str): 'add', 'list', 'get', or 'remove'<br>`label` (str, optional): Iteration label (required for add)<br>`iteration_id` (int, optional): Iteration ID (required for get/remove) |
 
 ### Tool Details
 
@@ -846,6 +847,7 @@ Unified tool for managing implementation tasks with five actions.
 - `prerequisites` (optional): List of prerequisite task IDs (for add/update)
 - `files` (optional): List of FileAction dicts with path and action fields (for add/update)
 - `code_examples` (optional): List of CodeExample dicts with path and description fields (for add/update)
+- `iteration` (optional): Iteration ID (int) to assign task to an iteration, or None to unassign (for update)
 - `operations` (optional): List of BatchTaskOperation dicts (required for batch action)
 
 **Note:** This tool always uses the current git branch.
@@ -1505,6 +1507,95 @@ simpletask context remove --all          # Remove all entries
 - Missing required params → raises `ValueError`
 - Key not found in remove action → raises `ValueError`
 - Remove with neither key nor all=True → raises `ValueError`
+
+#### iteration
+
+Unified tool for managing iterations, which group related tasks into time-boxed units of work.
+
+**Actions:**
+- `add`: Create a new iteration with a label
+- `list`: List all iterations
+- `get`: Get a specific iteration by ID
+- `remove`: Remove an iteration (clears task assignments)
+
+**Parameters:**
+- `action` (required): Operation to perform ('add', 'list', 'get', 'remove')
+- `label` (optional): Human-readable iteration label (required for add action)
+- `iteration_id` (optional): Iteration ID integer (required for get/remove actions)
+
+**Note:** This tool always uses the current git branch.
+
+**Returns:**
+- For `add` and `remove`: `SimpleTaskWriteResponse` with success confirmation. The `new_item_ids` field on the write response contains the new iteration ID as a string (for `add`).
+- For `list` and `get`: `SimpleTaskIterationResponse` with:
+  - `action`: str ("iteration_list" or "iteration_get")
+  - `iterations`: list[Iteration]
+  - `file_path`: str
+  - `summary`: StatusSummary
+
+**Iteration Model Fields:**
+- `id`: int (ge=1) - Unique iteration identifier
+- `label`: str - Human-readable label (e.g., "Sprint 1", "Week 1", "Alpha")
+- `created`: datetime (UTC) - Creation timestamp
+
+**Task Integration:**
+
+Tasks have an optional `iteration` field (`int | None`) that assigns them to an iteration. Use the `task` tool's `update` action to assign tasks:
+
+```python
+# Assign task to iteration 1
+simpletask_task(action="update", task_id="T001", iteration=1)
+
+# Remove task from iteration (set to None)
+simpletask_task(action="update", task_id="T001", iteration=None)
+```
+
+**Example Usage:**
+
+```python
+# Add a new iteration
+result = iteration(action="add", label="Sprint 1")
+# result.new_item_ids = ["1"]  # New iteration ID
+
+# Add another iteration
+result = iteration(action="add", label="Sprint 2")
+
+# List all iterations
+result = iteration(action="list")
+# result.iterations = [Iteration(id=1, label="Sprint 1", ...), Iteration(id=2, label="Sprint 2", ...)]
+
+# Get specific iteration
+result = iteration(action="get", iteration_id=1)
+# result.iterations = [Iteration(id=1, label="Sprint 1", ...)]
+
+# Remove iteration (also clears Task.iteration refs)
+result = iteration(action="remove", iteration_id=1)
+```
+
+**CLI Commands:**
+
+```bash
+# Add iteration
+simpletask iteration add "Sprint 1"
+simpletask iteration add "Week 1 - Core Models"
+
+# List all iterations
+simpletask iteration list
+
+# Remove iteration
+simpletask iteration remove 1    # Remove iteration with ID 1
+```
+
+**Use Cases:**
+- Organize tasks into time-boxed sprints or work periods
+- Track which tasks belong to which phase of development
+- Group related tasks for focused implementation sessions
+- Plan incremental delivery milestones
+
+**Edge Cases:**
+- Missing required params → raises `ValueError`
+- Iteration ID not found → raises `ValueError`
+- Remove cleans up all `Task.iteration` references automatically
 
 ### Error Handling
 

@@ -155,9 +155,25 @@ Use simpletask_task() MCP tool to add each task:
       "First specific action",
       "Second specific action",
       "Third specific action"
-    ]
+    ],
+    iteration=<iteration_id>  # Optional: assign to an iteration if iterations are defined
   )
 - Repeat for each implementation task
+```
+
+**Optionally group tasks into iterations** for phased delivery (e.g., MVP, polish, v2):
+
+```
+Use simpletask_iteration() MCP tool to create iterations first:
+- simpletask_iteration(action="add", label="MVP")
+- simpletask_iteration(action="add", label="Polish")
+Then assign tasks: simpletask_task(action="add", name="...", iteration=1)
+```
+
+```bash
+# CLI equivalent
+simpletask iteration add "MVP"
+simpletask task add "First feature" --iteration 1
 ```
 
 **Expected task structure:**

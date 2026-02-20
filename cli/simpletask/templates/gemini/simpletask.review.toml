@@ -295,28 +295,38 @@ PR READINESS: [READY TO MERGE | NEEDS CHANGES | NOT READY]
 
 If issues are found, automatically add fix tasks to the task file:
 
-1. For each issue found, create a fix task:
+1. Optionally create a new iteration to group fix tasks together:
+
+   ```
+   Use simpletask_iteration() MCP tool:
+   - Call simpletask_iteration(action="add", label="review fixes")
+   - Returns new iteration ID (e.g., 2)
+   ```
+
+   simpletask iteration add "review fixes"
+
+2. For each issue found, create a fix task (optionally assign to the fix iteration):
    
    ```
    Use simpletask_task() MCP tool:
-   - Call simpletask_task(action="add", name="Fix: [issue summary]", goal="[detailed goal with file path and remediation]")
+   - Call simpletask_task(action="add", name="Fix: [issue summary]", goal="[detailed goal with file path and remediation]", iteration=<iter_id>)
    - Returns SimpleTaskWriteResponse with success confirmation
    ```
    
-   simpletask task add "Fix: [issue summary]" -g "[detailed goal with file path and remediation]"
+   simpletask task add "Fix: [issue summary]" -g "[detailed goal with file path and remediation]" -i <iter_id>
    ```
-   simpletask_task(action="add", name="Fix: Security vulnerability in auth.py", goal="Add input validation to prevent SQL injection in login function at line 45")
+   simpletask_task(action="add", name="Fix: Security vulnerability in auth.py", goal="Add input validation to prevent SQL injection in login function at line 45", iteration=2)
    
-   simpletask_task(action="add", name="Fix: Performance issue in data_processor.py", goal="Replace O(n²) algorithm with O(n) approach in process_items function")
+   simpletask_task(action="add", name="Fix: Performance issue in data_processor.py", goal="Replace O(n²) algorithm with O(n) approach in process_items function", iteration=2)
    
-   simpletask_task(action="add", name="Fix: Missing error handling in api.py", goal="Add try/catch blocks and proper error responses to API endpoints")
+   simpletask_task(action="add", name="Fix: Missing error handling in api.py", goal="Add try/catch blocks and proper error responses to API endpoints", iteration=2)
    ```
    
-   simpletask task add "Fix: Security vulnerability in auth.py" -g "Add input validation to prevent SQL injection in login function at line 45"
+   simpletask task add "Fix: Security vulnerability in auth.py" -g "Add input validation to prevent SQL injection in login function at line 45" -i 2
    
-   simpletask task add "Fix: Performance issue in data_processor.py" -g "Replace O(n²) algorithm with O(n) approach in process_items function"
+   simpletask task add "Fix: Performance issue in data_processor.py" -g "Replace O(n²) algorithm with O(n) approach in process_items function" -i 2
    
-   simpletask task add "Fix: Missing error handling in api.py" -g "Add try/catch blocks and proper error responses to API endpoints"
+   simpletask task add "Fix: Missing error handling in api.py" -g "Add try/catch blocks and proper error responses to API endpoints" -i 2
    Fix tasks added to .tasks/[branch-name].yml:
      - T00X: Fix: Security vulnerability in auth.py
      - T00Y: Fix: Performance issue in data_processor.py

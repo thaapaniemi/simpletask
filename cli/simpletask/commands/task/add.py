@@ -11,6 +11,9 @@ from simpletask.utils.console import handle_exception, success
 def add_command(
     name: str = typer.Argument(..., help="Task name"),
     goal: str | None = typer.Option(None, "--goal", "-g", help="Task goal/description"),
+    iteration: int | None = typer.Option(
+        None, "--iteration", "-i", help="Assign task to iteration by ID"
+    ),
     branch: str | None = typer.Option(
         None, "--branch", "-b", help="Branch name (defaults to current git branch)"
     ),
@@ -20,6 +23,7 @@ def add_command(
     Examples:
         simpletask task add "Implement authentication"
         simpletask task add "Add tests" --goal "Write unit tests for auth"
+        simpletask task add "Fix bug" --iteration 1
         simpletask task add "Update docs" --branch feature-123
 
     Raises:
@@ -30,9 +34,10 @@ def add_command(
     try:
         # Resolve task file path
         file_path = get_task_file_path(branch)
-        new_id = add_implementation_task(file_path, name, goal)
+        new_id, _ = add_implementation_task(file_path, name, goal, iteration=iteration)
 
-        success(f"Added task {new_id}: {name}")
+        iter_suffix = f" (iteration {iteration})" if iteration is not None else ""
+        success(f"Added task {new_id}: {name}{iter_suffix}")
 
     except (ValueError, FileNotFoundError, InvalidTaskFileError) as e:
         handle_exception(e, "adding implementation task")

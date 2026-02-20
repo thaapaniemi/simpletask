@@ -154,10 +154,26 @@ Use simpletask_task() MCP tool to add each task:
       "First specific action",
       "Second specific action",
       "Third specific action"
-    ]
+    ],
+    iteration=<iter_id>  # Optional: assign to an iteration (see below)
   )
 - Repeat for each implementation task
 ```
+
+**Optional: Group tasks into iterations**
+
+If the feature has natural phases (e.g., MVP, polish, v2), create iterations first:
+
+```
+Use simpletask_iteration() MCP tool:
+- Call simpletask_iteration(action="add", label="MVP")
+- Call simpletask_iteration(action="add", label="polish")
+```
+
+simpletask iteration add "MVP"
+simpletask iteration add "polish"
+
+Then assign tasks to iterations using the `iteration` parameter when adding tasks.
 
 **Expected task structure:**
 ```yaml
@@ -166,6 +182,7 @@ tasks:
     name: Short descriptive name
     status: not_started
     goal: One sentence explaining what this task accomplishes
+    iteration: 1  # Optional: iteration ID
     steps:
       - "First specific action - be explicit"
       - "Second specific action - include details"

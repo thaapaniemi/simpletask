@@ -44,6 +44,9 @@ User input: $ARGUMENTS
    # List all tasks and their current status
    simpletask task list
    
+   # List tasks filtered by iteration (if using iterations)
+   simpletask task list --iteration 1
+   
    # List acceptance criteria status
    simpletask criteria list
 **Step 3: Execute Tasks in Order**

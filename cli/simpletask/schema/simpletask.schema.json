@@ -68,6 +68,13 @@
       "items": {
         "$ref": "#/$defs/Task"
       }
+    },
+    "iterations": {
+      "type": ["array", "null"],
+      "description": "List of development iterations for semantic separation of work rounds",
+      "items": {
+        "$ref": "#/$defs/Iteration"
+      }
     }
   },
   "$defs": {
@@ -159,6 +166,11 @@
           "items": {
             "$ref": "#/$defs/FileAction"
           }
+        },
+        "iteration": {
+          "type": ["integer", "null"],
+          "minimum": 1,
+          "description": "ID of the iteration this task belongs to"
         }
       }
     },
@@ -195,6 +207,28 @@
           "type": "string",
           "enum": ["create", "modify", "delete"],
           "description": "Action to perform on the file"
+        }
+      }
+    },
+    "Iteration": {
+      "type": "object",
+      "description": "A development iteration representing a round of work",
+      "required": ["id", "label", "created"],
+      "properties": {
+        "id": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Unique iteration identifier"
+        },
+        "label": {
+          "type": "string",
+          "description": "Human-readable label for this iteration",
+          "examples": ["Initial implementation", "Review feedback", "Performance improvements"]
+        },
+        "created": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when the iteration was created (ISO 8601 format)"
         }
       }
     }

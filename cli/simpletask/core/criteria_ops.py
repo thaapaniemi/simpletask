@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from .models import AcceptanceCriterion
+from .models import AcceptanceCriterion, SimpleTaskSpec
 from .repair import repair_task_file
 from .yaml_parser import InvalidTaskFileError, parse_task_file, write_task_file
 
@@ -25,7 +25,7 @@ def get_next_criterion_id(criteria: list[AcceptanceCriterion]) -> str:
 def add_acceptance_criterion(
     file_path: Path,
     description: str,
-) -> str:
+) -> tuple[str, SimpleTaskSpec]:
     """Add a new acceptance criterion to the task file.
 
     Automatically repairs broken task files with empty criteria or unknown fields.
@@ -35,7 +35,7 @@ def add_acceptance_criterion(
         description: Criterion description
 
     Returns:
-        New criterion ID
+        Tuple of (new criterion ID, updated SimpleTaskSpec in-memory)
 
     Raises:
         FileNotFoundError: If task file doesn't exist
@@ -64,20 +64,23 @@ def add_acceptance_criterion(
     # Write back (auto-updates timestamp)
     write_task_file(file_path, spec)
 
-    return new_id
+    return new_id, spec
 
 
 def mark_criterion_complete(
     file_path: Path,
     criterion_id: str,
     completed: bool = True,
-) -> None:
+) -> SimpleTaskSpec:
     """Mark an acceptance criterion as completed or not completed.
 
     Args:
         file_path: Path to task YAML file
         criterion_id: Criterion ID to update
         completed: Whether criterion is completed (default: True)
+
+    Returns:
+        Updated SimpleTaskSpec in-memory (after write)
 
     Raises:
         ValueError: If criterion not found
@@ -98,18 +101,23 @@ def mark_criterion_complete(
     # Write back (auto-updates timestamp)
     write_task_file(file_path, spec)
 
+    return spec
+
 
 def update_acceptance_criterion(
     file_path: Path,
     criterion_id: str,
     description: str,
-) -> None:
+) -> SimpleTaskSpec:
     """Update an existing acceptance criterion's description.
 
     Args:
         file_path: Path to task YAML file
         criterion_id: Criterion ID to update
         description: New criterion description
+
+    Returns:
+        Updated SimpleTaskSpec in-memory (after write)
 
     Raises:
         ValueError: If criterion not found
@@ -130,16 +138,21 @@ def update_acceptance_criterion(
     # Write back (auto-updates timestamp)
     write_task_file(file_path, spec)
 
+    return spec
+
 
 def remove_acceptance_criterion(
     file_path: Path,
     criterion_id: str,
-) -> None:
+) -> SimpleTaskSpec:
     """Remove an acceptance criterion.
 
     Args:
         file_path: Path to task YAML file
         criterion_id: Criterion ID to remove
+
+    Returns:
+        Updated SimpleTaskSpec in-memory (after write)
 
     Raises:
         ValueError: If criterion not found
@@ -161,3 +174,5 @@ def remove_acceptance_criterion(
 
     # Write back (auto-updates timestamp)
     write_task_file(file_path, spec)
+
+    return spec

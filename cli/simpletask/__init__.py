@@ -1,6 +1,6 @@
 """simpletask: A Python CLI for managing AI-friendly task definition YAML files."""
 
-__version__ = "0.25.0"
+__version__ = "0.26.0"
 
 import typer
 
@@ -12,6 +12,7 @@ from .commands import (
     context,
     criteria,
     design,
+    iteration,
     new,
     note,
     quality,
@@ -69,6 +70,7 @@ app.add_typer(note.app, name="note")
 app.add_typer(constraint.app, name="constraint")
 app.add_typer(context.app, name="context")
 app.add_typer(ai.app, name="ai")
+app.add_typer(iteration.app, name="iteration")
 
 
 def main_cli():

@@ -810,9 +810,9 @@ class TestGeminiAndQwenTemplateDifferences:
         qwen_bases = sorted([t.stem for t in qwen_templates])
         gemini_bases = sorted([t.stem for t in gemini_templates])
 
-        assert (
-            qwen_bases == gemini_bases
-        ), "Qwen and Gemini should have the same template names (ignoring extensions)"
+        assert qwen_bases == gemini_bases, (
+            "Qwen and Gemini should have the same template names (ignoring extensions)"
+        )
 
 
 class TestSplitTemplateContent:
@@ -904,9 +904,9 @@ class TestSplitTemplateContent:
         content = split_template.read_text()
         line_count = len(content.splitlines())
 
-        assert (
-            line_count < 500
-        ), f"Split template is {line_count} lines, should be <500 for token efficiency"
+        assert line_count < 500, (
+            f"Split template is {line_count} lines, should be <500 for token efficiency"
+        )
 
     def test_qwen_split_template_has_markdown_structure(self):
         """Qwen split template should have valid Markdown with YAML frontmatter structure."""
@@ -949,9 +949,9 @@ class TestSplitTemplateContent:
         content = split_template.read_text()
         line_count = len(content.splitlines())
 
-        assert (
-            line_count < 500
-        ), f"Qwen split template is {line_count} lines, should be <500 for token efficiency"
+        assert line_count < 500, (
+            f"Qwen split template is {line_count} lines, should be <500 for token efficiency"
+        )
 
     def test_gemini_split_template_exists(self):
         """Gemini split template should exist (uses TOML format, while Qwen uses Markdown)."""
@@ -1002,9 +1002,9 @@ class TestSplitTemplateContent:
         content = split_template.read_text()
         line_count = len(content.splitlines())
 
-        assert (
-            line_count < 500
-        ), f"Gemini split template is {line_count} lines, should be <500 for token efficiency"
+        assert line_count < 500, (
+            f"Gemini split template is {line_count} lines, should be <500 for token efficiency"
+        )
 
 
 class TestAgentTemplateContent:
@@ -1060,9 +1060,9 @@ class TestCrossEditorConsistency:
         qwen_bases = sorted([t.stem for t in qwen_templates])
         gemini_bases = sorted([t.stem for t in gemini_templates])
 
-        assert (
-            opencode_bases == qwen_bases == gemini_bases
-        ), "All editors should have the same template base names"
+        assert opencode_bases == qwen_bases == gemini_bases, (
+            "All editors should have the same template base names"
+        )
 
     def test_all_split_templates_have_splitting_criteria(self):
         """All split templates should define the same splitting criteria."""
@@ -1320,28 +1320,28 @@ class TestCrossEditorConsistency:
         # All templates should use the same description for SimpleTaskWriteResponse
         expected_description = "Returns SimpleTaskWriteResponse with success confirmation"
 
-        assert (
-            expected_description in opencode_content
-        ), "OpenCode implement has inconsistent SimpleTaskWriteResponse description"
-        assert (
-            expected_description in qwen_content
-        ), "Qwen implement has inconsistent SimpleTaskWriteResponse description"
-        assert (
-            expected_description in gemini_content
-        ), "Gemini implement has inconsistent SimpleTaskWriteResponse description"
+        assert expected_description in opencode_content, (
+            "OpenCode implement has inconsistent SimpleTaskWriteResponse description"
+        )
+        assert expected_description in qwen_content, (
+            "Qwen implement has inconsistent SimpleTaskWriteResponse description"
+        )
+        assert expected_description in gemini_content, (
+            "Gemini implement has inconsistent SimpleTaskWriteResponse description"
+        )
 
         # Also verify absence of known divergent phrasings
         divergent_description = "Returns SimpleTaskWriteResponse with updated criteria state"
 
-        assert (
-            divergent_description not in opencode_content
-        ), "OpenCode implement contains divergent description: 'updated criteria state'"
-        assert (
-            divergent_description not in qwen_content
-        ), "Qwen implement contains divergent description: 'updated criteria state'"
-        assert (
-            divergent_description not in gemini_content
-        ), "Gemini implement contains divergent description: 'updated criteria state'"
+        assert divergent_description not in opencode_content, (
+            "OpenCode implement contains divergent description: 'updated criteria state'"
+        )
+        assert divergent_description not in qwen_content, (
+            "Qwen implement contains divergent description: 'updated criteria state'"
+        )
+        assert divergent_description not in gemini_content, (
+            "Gemini implement contains divergent description: 'updated criteria state'"
+        )
 
 
 class TestGetBundledAgents:

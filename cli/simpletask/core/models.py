@@ -4,11 +4,11 @@ This module defines the data models matching simpletask.schema.json.
 All models use Pydantic v2 for validation.
 """
 
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class TaskStatus(str, Enum):
@@ -334,6 +334,21 @@ class QualityRequirements(BaseModel):
     )
 
 
+class Iteration(BaseModel):
+    """A development iteration grouping related tasks."""
+
+    model_config = {"extra": "forbid"}
+
+    id: int = Field(..., ge=1, description="Unique iteration number (e.g., 1, 2, 3)")
+    label: str = Field(
+        ..., min_length=1, description="Short label for the iteration (e.g., 'MVP', 'v2 polish')"
+    )
+    created: datetime = Field(
+        default_factory=lambda: datetime.now(UTC),
+        description="Timestamp when the iteration was created (UTC)",
+    )
+
+
 class Task(BaseModel):
     """A single implementation task."""
 
@@ -353,6 +368,9 @@ class Task(BaseModel):
         None, description="Task IDs that must complete before this task"
     )
     files: list[FileAction] | None = Field(None, description="Files to create or modify")
+    iteration: int | None = Field(
+        None, ge=1, description="Iteration ID this task belongs to (optional)"
+    )
 
 
 class SimpleTaskSpec(BaseModel):
@@ -392,6 +410,9 @@ class SimpleTaskSpec(BaseModel):
         None, description="Flexible context for requirements, dependencies, etc."
     )
     tasks: list[Task] | None = Field(None, description="List of implementation tasks")
+    iterations: list[Iteration] | None = Field(
+        None, description="Development iterations for grouping tasks"
+    )
 
     @field_validator("tasks")
     @classmethod
@@ -412,6 +433,42 @@ class SimpleTaskSpec(BaseModel):
                         )
         return v
 
+    @field_validator("iterations")
+    @classmethod
+    def validate_unique_iteration_ids(cls, v: "list[Iteration] | None") -> "list[Iteration] | None":
+        """Ensure all iteration IDs are unique."""
+        if not v:
+            return v
+        seen: set[int] = set()
+        for it in v:
+            if it.id in seen:
+                raise ValueError(f"Duplicate iteration ID {it.id} in iterations list")
+            seen.add(it.id)
+        return v
+
+    @model_validator(mode="after")
+    def validate_task_iterations_exist(self) -> "SimpleTaskSpec":
+        """Ensure all task iteration IDs reference existing iterations."""
+        if not self.tasks or not self.iterations:
+            # If no iterations, ensure no task references one
+            if self.tasks:
+                for task in self.tasks:
+                    if task.iteration is not None:
+                        raise ValueError(
+                            f"Task {task.id} references iteration {task.iteration} "
+                            f"but no iterations are defined"
+                        )
+            return self
+
+        iteration_ids = {it.id for it in self.iterations}
+        for task in self.tasks:
+            if task.iteration is not None and task.iteration not in iteration_ids:
+                raise ValueError(
+                    f"Task {task.id} references iteration {task.iteration} "
+                    f"which does not exist in iterations list"
+                )
+        return self
+
 
 # Export all models
 __all__ = [
@@ -420,6 +477,7 @@ __all__ = [
     "Design",
     "DesignReference",
     "FileAction",
+    "Iteration",
     "LintingConfig",
     "QualityRequirements",
     "SecurityCheckConfig",

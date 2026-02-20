@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field, model_validator
 from ..core.models import (
     AcceptanceCriterion,
     Design,
+    Iteration,
     QualityRequirements,
     SimpleTaskSpec,
     Task,
@@ -19,6 +20,7 @@ from ..core.models import (
 
 __all__ = [
     "BatchTaskOperation",
+    "IterationSummary",
     "QualityCheckResult",
     "SimpleTaskBatchResponse",
     "SimpleTaskConstraintResponse",
@@ -26,6 +28,7 @@ __all__ = [
     "SimpleTaskDesignResponse",
     "SimpleTaskGetResponse",
     "SimpleTaskItemResponse",
+    "SimpleTaskIterationResponse",
     "SimpleTaskNoteResponse",
     "SimpleTaskQualityResponse",
     "SimpleTaskWriteResponse",
@@ -56,6 +59,9 @@ class BatchTaskOperation(BaseModel):
     prerequisites: list[str] | None = Field(None, description="Task IDs that must complete first")
     files: list[dict] | None = Field(None, description="Files to create/modify/delete")
     code_examples: list[dict] | None = Field(None, description="Code patterns to follow")
+    iteration: int | None = Field(
+        None, description="Iteration ID to assign task to (for add/update)"
+    )
 
     @model_validator(mode="after")
     def validate_required_fields(self) -> "BatchTaskOperation":
@@ -65,6 +71,21 @@ class BatchTaskOperation(BaseModel):
         if self.op == "add" and not self.name:
             raise ValueError("name is required for add operation")
         return self
+
+
+class IterationSummary(BaseModel):
+    """Per-iteration task status counts."""
+
+    model_config = {"extra": "forbid"}
+
+    id: int = Field(..., description="Iteration identifier")
+    label: str = Field(..., description="Iteration label/name")
+    tasks_total: int = Field(0, description="Total tasks in this iteration")
+    tasks_completed: int = Field(0, description="Completed tasks in this iteration")
+    tasks_in_progress: int = Field(0, description="In-progress tasks in this iteration")
+    tasks_not_started: int = Field(0, description="Not started tasks in this iteration")
+    tasks_blocked: int = Field(0, description="Blocked tasks in this iteration")
+    tasks_paused: int = Field(0, description="Paused tasks in this iteration")
 
 
 class QualityCheckResult(BaseModel):
@@ -96,6 +117,9 @@ class StatusSummary(BaseModel):
     tasks_blocked: int = Field(0, description="Blocked tasks")
     tasks_paused: int = Field(0, description="Paused tasks")
     notes_total: int = Field(0, description="Total notes (root + task-level)")
+    iteration_summaries: list["IterationSummary"] | None = Field(
+        None, description="Per-iteration task counts (None if no iterations defined)"
+    )
 
 
 class ValidationResult(BaseModel):
@@ -136,8 +160,8 @@ class SimpleTaskWriteResponse(BaseModel):
     message: str = Field(..., description="Human-readable confirmation message")
     file_path: str = Field(..., description="Path to task file")
     summary: StatusSummary = Field(..., description="Pre-computed status summary")
-    new_item_id: str | None = Field(
-        None, description="ID of newly created item (for add operations)"
+    new_item_ids: list[str] = Field(
+        default_factory=list, description="IDs of newly created items (for add operations)"
     )
 
 
@@ -147,10 +171,6 @@ class SimpleTaskBatchResponse(SimpleTaskWriteResponse):
     Extends SimpleTaskWriteResponse with new_item_ids for tracking multiple
     created items from batch add operations.
     """
-
-    new_item_ids: list[str] = Field(
-        default_factory=list, description="IDs of newly created items (for batch add operations)"
-    )
 
 
 class SimpleTaskItemResponse(BaseModel):
@@ -256,6 +276,44 @@ class SimpleTaskContextResponse(BaseModel):
     summary: StatusSummary = Field(..., description="Pre-computed status summary")
 
 
+class SimpleTaskIterationResponse(BaseModel):
+    """Response model for simpletask_iteration tool.
+
+    Used for iteration add/list/get/remove actions.
+    """
+
+    model_config = {"extra": "forbid"}
+
+    action: str = Field(
+        ..., description="Action performed (e.g., 'iteration_added', 'iteration_list')"
+    )
+    iterations: list[Iteration] | None = Field(
+        None, description="List of iterations (for list/get actions)"
+    )
+    file_path: str = Field(..., description="Path to task file")
+    summary: StatusSummary = Field(..., description="Pre-computed status summary")
+
+
+def _increment_status_counts(counts: dict[str, int], status: TaskStatus) -> None:
+    """Increment the appropriate status counter in a counts dict.
+
+    Args:
+        counts: Dict with task status count keys (tasks_completed, tasks_in_progress, etc.)
+        status: The task status to increment.
+    """
+    match status:
+        case TaskStatus.COMPLETED:
+            counts["tasks_completed"] += 1
+        case TaskStatus.IN_PROGRESS:
+            counts["tasks_in_progress"] += 1
+        case TaskStatus.NOT_STARTED:
+            counts["tasks_not_started"] += 1
+        case TaskStatus.BLOCKED:
+            counts["tasks_blocked"] += 1
+        case TaskStatus.PAUSED:
+            counts["tasks_paused"] += 1
+
+
 def compute_status_summary(spec: SimpleTaskSpec) -> StatusSummary:
     """Compute status summary from a task specification.
 
@@ -270,37 +328,29 @@ def compute_status_summary(spec: SimpleTaskSpec) -> StatusSummary:
     criteria_completed = sum(1 for ac in spec.acceptance_criteria if ac.completed)
 
     # Count tasks by status
+    global_counts: dict[str, int] = {
+        "tasks_completed": 0,
+        "tasks_in_progress": 0,
+        "tasks_not_started": 0,
+        "tasks_blocked": 0,
+        "tasks_paused": 0,
+    }
     tasks_total = 0
-    tasks_completed = 0
-    tasks_in_progress = 0
-    tasks_not_started = 0
-    tasks_blocked = 0
-    tasks_paused = 0
 
     if spec.tasks:
         tasks_total = len(spec.tasks)
         for task in spec.tasks:
-            match task.status:
-                case TaskStatus.COMPLETED:
-                    tasks_completed += 1
-                case TaskStatus.IN_PROGRESS:
-                    tasks_in_progress += 1
-                case TaskStatus.NOT_STARTED:
-                    tasks_not_started += 1
-                case TaskStatus.BLOCKED:
-                    tasks_blocked += 1
-                case TaskStatus.PAUSED:
-                    tasks_paused += 1
+            _increment_status_counts(global_counts, task.status)
 
     # Derive overall status
     # Priority: blocked > paused > in_progress > completed > not_started
-    if tasks_blocked > 0:
+    if global_counts["tasks_blocked"] > 0:
         overall_status = TaskStatus.BLOCKED
-    elif tasks_paused > 0:
+    elif global_counts["tasks_paused"] > 0:
         overall_status = TaskStatus.PAUSED
-    elif tasks_in_progress > 0:
+    elif global_counts["tasks_in_progress"] > 0:
         overall_status = TaskStatus.IN_PROGRESS
-    elif tasks_total > 0 and tasks_completed == tasks_total:
+    elif tasks_total > 0 and global_counts["tasks_completed"] == tasks_total:
         overall_status = TaskStatus.COMPLETED
     else:
         overall_status = TaskStatus.NOT_STARTED
@@ -314,6 +364,33 @@ def compute_status_summary(spec: SimpleTaskSpec) -> StatusSummary:
             if task.notes:
                 notes_total += len(task.notes)
 
+    # Build per-iteration summaries
+    iteration_summaries: list[IterationSummary] | None = None
+    if spec.iterations:
+        # Accumulate counts in plain dicts to avoid mutating Pydantic model instances
+        iter_counts: dict[int, dict[str, int]] = {
+            it.id: {
+                "tasks_total": 0,
+                "tasks_completed": 0,
+                "tasks_in_progress": 0,
+                "tasks_not_started": 0,
+                "tasks_blocked": 0,
+                "tasks_paused": 0,
+            }
+            for it in spec.iterations
+        }
+        if spec.tasks:
+            for task in spec.tasks:
+                if task.iteration is not None and task.iteration in iter_counts:
+                    counts = iter_counts[task.iteration]
+                    counts["tasks_total"] += 1
+                    _increment_status_counts(counts, task.status)
+        # iter_counts keys are exactly spec.iterations IDs — no guard needed
+        iteration_summaries = [
+            IterationSummary(id=it.id, label=it.label, **iter_counts[it.id])
+            for it in spec.iterations
+        ]
+
     return StatusSummary(
         branch=spec.branch,
         title=spec.title,
@@ -321,10 +398,7 @@ def compute_status_summary(spec: SimpleTaskSpec) -> StatusSummary:
         criteria_total=criteria_total,
         criteria_completed=criteria_completed,
         tasks_total=tasks_total,
-        tasks_completed=tasks_completed,
-        tasks_in_progress=tasks_in_progress,
-        tasks_not_started=tasks_not_started,
-        tasks_blocked=tasks_blocked,
-        tasks_paused=tasks_paused,
         notes_total=notes_total,
+        iteration_summaries=iteration_summaries,
+        **global_counts,
     )

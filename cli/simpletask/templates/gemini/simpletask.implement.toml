@@ -42,6 +42,12 @@ User input: {{args}}
    
    # List all tasks and their current status
    simpletask task list
+
+   # Filter tasks by iteration (if iterations are used)
+   simpletask task list --iteration 1
+
+   # List tasks flat (no grouping) 
+   simpletask task list --flat
    
    # List acceptance criteria status
    simpletask criteria list
