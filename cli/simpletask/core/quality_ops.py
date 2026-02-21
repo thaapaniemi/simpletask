@@ -1,8 +1,9 @@
 """Shared quality operations logic for CLI and MCP."""
 
-from typing import TYPE_CHECKING, Any, Literal
+from typing import Any, Literal
 
 from simpletask.core.models import (
+    QualityCheckResult,
     QualityRequirements,
     SecurityCheckConfig,
     SimpleTaskSpec,
@@ -12,12 +13,6 @@ from simpletask.core.models import (
 from simpletask.core.presets import apply_preset as apply_preset_impl
 from simpletask.core.quality_checker import QualityChecker
 
-if TYPE_CHECKING:
-    from simpletask.mcp.models import QualityCheckResult
-else:
-    # Import at runtime to avoid circular dependency
-    from simpletask.mcp.models import QualityCheckResult
-
 
 def run_quality_checks(
     requirements: QualityRequirements,
@@ -25,7 +20,7 @@ def run_quality_checks(
     test_only: bool = False,
     type_only: bool = False,
     security_only: bool = False,
-) -> tuple[list["QualityCheckResult"], bool]:
+) -> tuple[list[QualityCheckResult], bool]:
     """Run enabled quality checks based on requirements.
 
     Args:
@@ -38,6 +33,13 @@ def run_quality_checks(
     Returns:
         Tuple of (list of check results, all checks passed)
     """
+    active_filters = sum((lint_only, test_only, type_only, security_only))
+    if active_filters > 1:
+        raise ValueError(
+            "Filter flags are mutually exclusive: at most one of lint_only, test_only, "
+            "type_only, security_only may be set at a time"
+        )
+
     checker = QualityChecker(requirements)
 
     # Run specific checks or all checks

@@ -470,6 +470,18 @@ class SimpleTaskSpec(BaseModel):
         return self
 
 
+class QualityCheckResult(BaseModel):
+    """Result of a single quality check."""
+
+    model_config = {"extra": "forbid"}
+
+    check_name: str = Field(..., description="Name of the check (e.g., 'Linting', 'Testing')")
+    passed: bool = Field(..., description="Whether the check passed")
+    command: str = Field(..., description="Command that was executed")
+    stdout: str = Field(default="", description="Standard output from command")
+    stderr: str = Field(default="", description="Standard error from command")
+
+
 # Export all models
 __all__ = [
     "AcceptanceCriterion",
@@ -479,6 +491,7 @@ __all__ = [
     "FileAction",
     "Iteration",
     "LintingConfig",
+    "QualityCheckResult",
     "QualityRequirements",
     "SecurityCheckConfig",
     "SimpleTaskSpec",

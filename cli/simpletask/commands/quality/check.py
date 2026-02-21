@@ -7,10 +7,10 @@ from typing import Annotated
 import typer
 from rich.table import Table
 
+from simpletask.core.models import QualityCheckResult
 from simpletask.core.project import get_task_file_path
 from simpletask.core.quality_ops import run_quality_checks
 from simpletask.core.yaml_parser import parse_task_file
-from simpletask.mcp.models import QualityCheckResult
 from simpletask.utils.console import console, error
 
 
@@ -187,5 +187,8 @@ def check_command(
 
     except FileNotFoundError as e:
         error(str(e))
+    except ValueError as e:
+        error(str(e))
+        raise typer.Exit(1) from None
     except Exception as e:
         error(f"Unexpected error: {e}")

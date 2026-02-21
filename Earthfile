@@ -36,17 +36,17 @@ lint:
     COPY --dir cli tests .
     RUN ruff check .
 
-# Check code formatting (black) - fails if not formatted
+# Check code formatting (ruff format) - fails if not formatted
 format-check:
     FROM +deps
     COPY --dir cli tests .
-    RUN black --check .
+    RUN ruff format --check .
 
 # Fix formatting and auto-fixable lint issues - writes back to local filesystem
 format:
     FROM +deps
     COPY --dir cli tests .
-    RUN black .
+    RUN ruff format .
     RUN ruff check --fix . || true
     SAVE ARTIFACT cli AS LOCAL cli
     SAVE ARTIFACT tests AS LOCAL tests
@@ -73,5 +73,5 @@ dev:
     FROM +deps
     COPY --dir cli tests .
     RUN echo "simpletask development environment ready"
-    RUN echo "Try: simpletask --help, pytest, black ., ruff check ."
+    RUN echo "Try: simpletask --help, pytest, ruff format ., ruff check ."
     # Use: earthly -i +dev

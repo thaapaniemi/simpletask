@@ -5,6 +5,7 @@ from unittest.mock import Mock
 import pytest
 from simpletask.core.models import (
     LintingConfig,
+    QualityCheckResult,
     QualityRequirements,
     SecurityCheckConfig,
     TestingConfig,
@@ -12,7 +13,6 @@ from simpletask.core.models import (
     TypeCheckConfig,
 )
 from simpletask.core.quality_checker import QualityChecker
-from simpletask.mcp.models import QualityCheckResult
 
 
 @pytest.fixture

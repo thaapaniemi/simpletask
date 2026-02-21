@@ -549,6 +549,10 @@ def quality(
     min_coverage: int | None = None,
     timeout: int | None = None,
     preset_name: str | None = None,
+    lint_only: bool = False,
+    test_only: bool = False,
+    type_only: bool = False,
+    security_only: bool = False,
 ) -> SimpleTaskQualityResponse | SimpleTaskWriteResponse:
     """Manage quality requirements and run quality checks.
 
@@ -561,16 +565,37 @@ def quality(
         min_coverage: Minimum coverage for 'set' action with testing type
         timeout: Timeout in seconds for 'set' action (default: 300)
         preset_name: Preset name for 'preset' action
+        lint_only: Only run linting check (for 'check' action). Raises ValueError
+            if combined with a non-check action or combined with another filter flag.
+        test_only: Only run testing check (for 'check' action). Raises ValueError
+            if combined with a non-check action or combined with another filter flag.
+        type_only: Only run type-checking check (for 'check' action). Raises
+            ValueError if combined with a non-check action or another filter flag.
+        security_only: Only run security check (for 'check' action). Raises
+            ValueError if combined with a non-check action or another filter flag.
+
+    Note:
+        lint_only, test_only, type_only, and security_only are mutually exclusive.
+        Pass at most one. They are only valid with action='check'.
 
     Returns:
         SimpleTaskQualityResponse for check/get actions.
         SimpleTaskWriteResponse for set/preset actions.
 
     Raises:
-        ValueError: If required parameters missing or invalid values provided.
+        ValueError: If required parameters missing, invalid values provided,
+            or filter flags (lint_only, test_only, type_only, security_only)
+            are used with a non-check action or combined together.
     """
     file_path = get_current_task_file_path()
     spec = parse_task_file(file_path)
+
+    # Validate that filter flags are only used with action='check'
+    if action != "check" and any((lint_only, test_only, type_only, security_only)):
+        raise ValueError(
+            "Filter flags (lint_only, test_only, type_only, security_only) "
+            "are only valid with action='check'"
+        )
 
     # Parse args if provided
     args_list: _list[str] = []
@@ -604,10 +629,17 @@ def quality(
             quality_reqs = spec.quality_requirements
             check_results: _list[QualityCheckResult]
             if quality_reqs is None:
-                check_results = []
-                all_passed = True
-            else:
-                check_results, all_passed = run_quality_checks(quality_reqs)
+                raise ValueError(
+                    "No quality_requirements configuration found in task file. "
+                    "Use action='set' or action='preset' to configure quality checks first."
+                )
+            check_results, all_passed = run_quality_checks(
+                quality_reqs,
+                lint_only=lint_only,
+                test_only=test_only,
+                type_only=type_only,
+                security_only=security_only,
+            )
 
             summary = compute_status_summary(spec)
 

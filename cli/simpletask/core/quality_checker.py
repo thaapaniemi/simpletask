@@ -3,9 +3,8 @@
 import subprocess
 from typing import Protocol
 
-from simpletask.core.models import QualityRequirements, ToolName
+from simpletask.core.models import QualityCheckResult, QualityRequirements, ToolName
 from simpletask.core.presets import build_command
-from simpletask.mcp.models import QualityCheckResult
 
 # Maximum output size (1MB) to prevent memory exhaustion
 MAX_OUTPUT_SIZE = 1024 * 1024  # 1MB in bytes

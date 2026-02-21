@@ -12,6 +12,7 @@ from ..core.models import (
     AcceptanceCriterion,
     Design,
     Iteration,
+    QualityCheckResult,
     QualityRequirements,
     SimpleTaskSpec,
     Task,
@@ -86,18 +87,6 @@ class IterationSummary(BaseModel):
     tasks_not_started: int = Field(0, description="Not started tasks in this iteration")
     tasks_blocked: int = Field(0, description="Blocked tasks in this iteration")
     tasks_paused: int = Field(0, description="Paused tasks in this iteration")
-
-
-class QualityCheckResult(BaseModel):
-    """Result of a single quality check."""
-
-    model_config = {"extra": "forbid"}
-
-    check_name: str = Field(..., description="Name of the check (e.g., 'Linting', 'Testing')")
-    passed: bool = Field(..., description="Whether the check passed")
-    command: str = Field(..., description="Command that was executed")
-    stdout: str = Field(default="", description="Standard output from command")
-    stderr: str = Field(default="", description="Standard error from command")
 
 
 class StatusSummary(BaseModel):

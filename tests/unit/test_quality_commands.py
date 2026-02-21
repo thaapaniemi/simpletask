@@ -62,7 +62,7 @@ class TestCheckCommand:
         self, mock_run_checks, mock_get_path, mock_parse, sample_spec_with_quality
     ):
         """All checks passing exits with code 0."""
-        from simpletask.mcp.models import QualityCheckResult
+        from simpletask.core.models import QualityCheckResult
 
         mock_get_path.return_value = Path(".tasks/test-feature.yml")
         mock_parse.return_value = sample_spec_with_quality
@@ -94,7 +94,7 @@ class TestCheckCommand:
         self, mock_run_checks, mock_get_path, mock_parse, sample_spec_with_quality
     ):
         """Some checks failing exits with code 1."""
-        from simpletask.mcp.models import QualityCheckResult
+        from simpletask.core.models import QualityCheckResult
 
         mock_get_path.return_value = Path(".tasks/test-feature.yml")
         mock_parse.return_value = sample_spec_with_quality
@@ -129,7 +129,7 @@ class TestCheckCommand:
         self, mock_run_checks, mock_get_path, mock_parse, sample_spec_with_quality
     ):
         """--lint-only flag runs only linting check."""
-        from simpletask.mcp.models import QualityCheckResult
+        from simpletask.core.models import QualityCheckResult
 
         mock_get_path.return_value = Path(".tasks/test-feature.yml")
         mock_parse.return_value = sample_spec_with_quality
@@ -157,7 +157,7 @@ class TestCheckCommand:
         self, mock_run_checks, mock_get_path, mock_parse, sample_spec_with_quality
     ):
         """--test-only flag runs only testing check."""
-        from simpletask.mcp.models import QualityCheckResult
+        from simpletask.core.models import QualityCheckResult
 
         mock_get_path.return_value = Path(".tasks/test-feature.yml")
         mock_parse.return_value = sample_spec_with_quality
@@ -177,6 +177,20 @@ class TestCheckCommand:
         mock_run_checks.assert_called_once()
         call_args = mock_run_checks.call_args
         assert call_args[1]["test_only"] is True
+
+    @patch("simpletask.commands.quality.check.parse_task_file")
+    @patch("simpletask.commands.quality.check.get_task_file_path")
+    def test_check_mutually_exclusive_flags_exits_cleanly(
+        self, mock_get_path, mock_parse, sample_spec_with_quality
+    ):
+        """Passing two mutually exclusive filter flags exits with code 1, not 'Unexpected error'."""
+        mock_get_path.return_value = Path(".tasks/test-feature.yml")
+        mock_parse.return_value = sample_spec_with_quality
+
+        with pytest.raises(typer.Exit) as exc_info:
+            check_command(lint_only=True, test_only=True)
+
+        assert exc_info.value.exit_code == 1
 
     @patch("simpletask.commands.quality.check.parse_task_file")
     @patch("simpletask.commands.quality.check.get_task_file_path")

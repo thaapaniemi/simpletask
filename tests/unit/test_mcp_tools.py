@@ -1,11 +1,19 @@
-"""Unit tests for MCP tools (get, list, iteration)."""
+"""Unit tests for MCP tools (get, list, quality, iteration)."""
 
 import builtins
 from unittest.mock import MagicMock, patch
 
 import pytest
+from simpletask.core.models import (
+    LintingConfig,
+    QualityRequirements,
+    SimpleTaskSpec,
+    TestingConfig,
+    ToolName,
+)
+from simpletask.core.quality_ops import run_quality_checks
 from simpletask.core.yaml_parser import InvalidTaskFileError
-from simpletask.mcp.server import get, iteration, list, task
+from simpletask.mcp.server import get, iteration, list, quality, task
 
 
 class TestSimpletaskGet:
@@ -424,3 +432,208 @@ class TestMCPIterationTool:
         assert sprint_summary.tasks_total == 1
         assert sprint_summary.tasks_not_started == 1
         assert sprint_summary.tasks_completed == 0
+
+
+class TestMCPQuality:
+    """Tests for quality() MCP tool filter flags."""
+
+    def _make_mock_spec(self, tmp_project_with_task):
+        """Return (task_file, mock_spec) with a non-None quality_requirements."""
+        _project_root, task_file = tmp_project_with_task
+        mock_spec = MagicMock(spec=SimpleTaskSpec)
+        # Spec-constrained so any access to a non-existent attribute raises AttributeError
+        mock_spec.quality_requirements = MagicMock(spec=QualityRequirements)
+        # Real strings required by StatusSummary Pydantic model
+        mock_spec.branch = "test-feature"
+        mock_spec.title = "Test Feature"
+        mock_spec.acceptance_criteria = []
+        mock_spec.tasks = []
+        mock_spec.notes = []
+        mock_spec.iterations = None
+        return task_file, mock_spec
+
+    def test_quality_check_no_filters(self, tmp_project_with_task):
+        """All filter flags default to False when quality check is called without them."""
+        task_file, mock_spec = self._make_mock_spec(tmp_project_with_task)
+
+        with patch("simpletask.mcp.server.get_current_task_file_path", return_value=task_file):
+            with patch("simpletask.mcp.server.parse_task_file", return_value=mock_spec):
+                with patch("simpletask.mcp.server.run_quality_checks") as mock_run:
+                    mock_run.return_value = ([], True)
+                    quality(action="check")
+
+        mock_run.assert_called_once()
+        call_kwargs = mock_run.call_args.kwargs
+        assert call_kwargs["lint_only"] is False
+        assert call_kwargs["test_only"] is False
+        assert call_kwargs["type_only"] is False
+        assert call_kwargs["security_only"] is False
+
+    def test_quality_check_lint_only(self, tmp_project_with_task):
+        """lint_only=True is forwarded to run_quality_checks."""
+        task_file, mock_spec = self._make_mock_spec(tmp_project_with_task)
+
+        with patch("simpletask.mcp.server.get_current_task_file_path", return_value=task_file):
+            with patch("simpletask.mcp.server.parse_task_file", return_value=mock_spec):
+                with patch("simpletask.mcp.server.run_quality_checks") as mock_run:
+                    mock_run.return_value = ([], True)
+                    quality(action="check", lint_only=True)
+
+        call_kwargs = mock_run.call_args.kwargs
+        assert call_kwargs["lint_only"] is True
+        assert call_kwargs["test_only"] is False
+        assert call_kwargs["type_only"] is False
+        assert call_kwargs["security_only"] is False
+
+    def test_quality_check_test_only(self, tmp_project_with_task):
+        """test_only=True is forwarded to run_quality_checks."""
+        task_file, mock_spec = self._make_mock_spec(tmp_project_with_task)
+
+        with patch("simpletask.mcp.server.get_current_task_file_path", return_value=task_file):
+            with patch("simpletask.mcp.server.parse_task_file", return_value=mock_spec):
+                with patch("simpletask.mcp.server.run_quality_checks") as mock_run:
+                    mock_run.return_value = ([], True)
+                    quality(action="check", test_only=True)
+
+        call_kwargs = mock_run.call_args.kwargs
+        assert call_kwargs["lint_only"] is False
+        assert call_kwargs["test_only"] is True
+        assert call_kwargs["type_only"] is False
+        assert call_kwargs["security_only"] is False
+
+    def test_quality_check_type_only(self, tmp_project_with_task):
+        """type_only=True is forwarded to run_quality_checks."""
+        task_file, mock_spec = self._make_mock_spec(tmp_project_with_task)
+
+        with patch("simpletask.mcp.server.get_current_task_file_path", return_value=task_file):
+            with patch("simpletask.mcp.server.parse_task_file", return_value=mock_spec):
+                with patch("simpletask.mcp.server.run_quality_checks") as mock_run:
+                    mock_run.return_value = ([], True)
+                    quality(action="check", type_only=True)
+
+        call_kwargs = mock_run.call_args.kwargs
+        assert call_kwargs["lint_only"] is False
+        assert call_kwargs["test_only"] is False
+        assert call_kwargs["type_only"] is True
+        assert call_kwargs["security_only"] is False
+
+    def test_quality_check_security_only(self, tmp_project_with_task):
+        """security_only=True is forwarded to run_quality_checks."""
+        task_file, mock_spec = self._make_mock_spec(tmp_project_with_task)
+
+        with patch("simpletask.mcp.server.get_current_task_file_path", return_value=task_file):
+            with patch("simpletask.mcp.server.parse_task_file", return_value=mock_spec):
+                with patch("simpletask.mcp.server.run_quality_checks") as mock_run:
+                    mock_run.return_value = ([], True)
+                    quality(action="check", security_only=True)
+
+        call_kwargs = mock_run.call_args.kwargs
+        assert call_kwargs["lint_only"] is False
+        assert call_kwargs["test_only"] is False
+        assert call_kwargs["type_only"] is False
+        assert call_kwargs["security_only"] is True
+
+    def test_quality_check_no_quality_reqs_raises(self, tmp_project_with_task):
+        """quality(action='check') raises ValueError when quality_requirements is None.
+
+        This aligns with CLI behavior which exits with code 1 when no quality
+        requirements are configured.
+        """
+        task_file, mock_spec = self._make_mock_spec(tmp_project_with_task)
+        mock_spec.quality_requirements = None
+
+        with patch("simpletask.mcp.server.get_current_task_file_path", return_value=task_file):
+            with patch("simpletask.mcp.server.parse_task_file", return_value=mock_spec):
+                with patch("simpletask.mcp.server.run_quality_checks") as mock_run:
+                    with pytest.raises(ValueError, match="No quality_requirements configuration"):
+                        quality(action="check")
+
+        mock_run.assert_not_called()
+
+    @pytest.mark.parametrize(
+        "action, extra_kwargs",
+        [
+            ("get", {}),
+            # action='set' requires config_type; supply it so the filter-flag guard fires
+            # first rather than a missing-config_type error — making the test independent
+            # of validation ordering.
+            ("set", {"config_type": "linting"}),
+            ("preset", {"preset_name": "python"}),
+        ],
+    )
+    def test_quality_filter_flags_raise_on_non_check_action(
+        self, tmp_project_with_task, action, extra_kwargs
+    ):
+        """Filter flags raise ValueError when used with non-check actions."""
+        task_file, mock_spec = self._make_mock_spec(tmp_project_with_task)
+
+        with patch("simpletask.mcp.server.get_current_task_file_path", return_value=task_file):
+            with patch("simpletask.mcp.server.parse_task_file", return_value=mock_spec):
+                with pytest.raises(
+                    ValueError, match=r"Filter flags.*only valid with action='check'"
+                ):
+                    quality(action=action, lint_only=True, **extra_kwargs)
+
+    def test_quality_check_multiple_flags_raises(self, tmp_project_with_task):
+        """Passing more than one filter flag simultaneously must raise ValueError.
+
+        The flags lint_only, test_only, type_only, and security_only are mutually exclusive.
+        Passing two at once would silently drop one due to the elif chain in run_quality_checks;
+        run_quality_checks() enforces this guard directly.
+        """
+        task_file, mock_spec = self._make_mock_spec(tmp_project_with_task)
+
+        with patch("simpletask.mcp.server.get_current_task_file_path", return_value=task_file):
+            with patch("simpletask.mcp.server.parse_task_file", return_value=mock_spec):
+                with pytest.raises(ValueError, match="mutually exclusive"):
+                    quality(action="check", lint_only=True, test_only=True)
+
+
+class TestRunQualityChecksMutualExclusivity:
+    """Direct unit tests for run_quality_checks() defence-in-depth guard.
+
+    These tests bypass the MCP layer entirely and call quality_ops.run_quality_checks()
+    directly, validating that the guard works for any caller — not just the MCP server.
+    """
+
+    def _make_requirements(self):
+        return QualityRequirements(
+            linting=LintingConfig(enabled=True, tool=ToolName.RUFF),
+            testing=TestingConfig(enabled=True, tool=ToolName.PYTEST),
+        )
+
+    def test_two_flags_raises_value_error(self):
+        """run_quality_checks raises ValueError when more than one filter flag is True."""
+        reqs = self._make_requirements()
+        with pytest.raises(ValueError, match="at most one"):
+            run_quality_checks(reqs, lint_only=True, test_only=True)
+
+    def test_three_flags_raises_value_error(self):
+        """run_quality_checks raises ValueError when three filter flags are True."""
+        reqs = self._make_requirements()
+        with pytest.raises(ValueError, match="at most one"):
+            run_quality_checks(reqs, lint_only=True, test_only=True, type_only=True)
+
+    @pytest.mark.parametrize(
+        "flag_name, checker_method",
+        [
+            ("lint_only", "run_linting_only"),
+            ("test_only", "run_testing_only"),
+            ("type_only", "run_type_checking_only"),
+            ("security_only", "run_security_only"),
+        ],
+    )
+    def test_single_flag_does_not_raise(self, flag_name, checker_method):
+        """run_quality_checks does not raise when exactly one filter flag is set.
+
+        Parametrized over all four filter flags to ensure no branch swap in the
+        elif chain would go undetected.
+        """
+        reqs = self._make_requirements()
+        with patch("simpletask.core.quality_ops.QualityChecker") as mock_checker_cls:
+            mock_checker = MagicMock()
+            mock_checker_cls.return_value = mock_checker
+            getattr(mock_checker, checker_method).return_value = ([], True)
+            result = run_quality_checks(reqs, **{flag_name: True})
+            getattr(mock_checker, checker_method).assert_called_once()
+            assert result == ([], True)

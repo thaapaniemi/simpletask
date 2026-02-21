@@ -19,8 +19,7 @@ AI-friendly task definition manager for branch-based development workflows.
 | Tool | Purpose |
 |------|---------|
 | pytest + pytest-cov | Testing with coverage |
-| black | Code formatting (100 char line length) |
-| ruff | Linting |
+| ruff | Linting and formatting (100 char line length) |
 | mypy | Static type checking |
 
 ## Git Hooks
@@ -322,8 +321,8 @@ earthly -i +dev
 |--------|-------------|
 | `+test` | Run pytest with coverage |
 | `+lint` | Run ruff linter |
-| `+format-check` | Check black formatting |
-| `+format` | Fix formatting (black + ruff --fix) |
+| `+format-check` | Check ruff formatting |
+| `+format` | Fix formatting (ruff format + ruff --fix) |
 | `+type-check` | Run mypy type checking |
 | `+check` | Run all quality checks |
 | `+all` | Run tests + all quality checks |
@@ -355,7 +354,7 @@ earthly -i +dev
 # Inside the container:
 simpletask --help
 pytest tests/unit/test_models.py -v
-black .
+ruff format .
 ruff check .
 ```
 
@@ -597,11 +596,11 @@ earthly +check
 
 # Run individual checks
 earthly +lint          # ruff check .
-earthly +format-check  # black --check .
+earthly +format-check  # ruff format --check .
 earthly +type-check    # mypy cli/simpletask
 
 # Fix formatting issues
-earthly +format        # black . && ruff check --fix .
+earthly +format        # ruff format . && ruff check --fix .
 ```
 
 For interactive fixing:
@@ -610,7 +609,7 @@ For interactive fixing:
 earthly -i +dev
 
 # Inside container:
-black .                    # Format code
+ruff format .              # Format code
 ruff check .               # Lint code  
 ruff check --fix .         # Auto-fix lint issues
 mypy cli/simpletask        # Type checking
@@ -673,6 +672,51 @@ uv tool dir simpletask
 
 **Note:** For Qwen CLI and Gemini CLI configuration, see [docs/MCP.md](docs/MCP.md).
 
+### Breaking Changes in v0.19.0
+
+#### `quality(action='check')` Raises `ValueError` When No Quality Requirements Configured
+
+**Affected tool:** `quality`
+
+**What changed:** `quality(action='check')` now raises `ValueError` when the task file has no
+`quality_requirements` section (i.e. `quality_requirements` is `None`).
+
+**Why:** Silently succeeding or returning empty results when no quality configuration exists masks
+misconfiguration. A `ValueError` makes the missing config explicit so callers can detect and fix it.
+
+**Migration:**
+
+Before (v0.18.x) — returned empty results with no error:
+```python
+result = simpletask_quality(action="check")
+# result.check_results == []  (no error raised)
+```
+
+After (v0.19.0):
+```python
+try:
+    result = simpletask_quality(action="check")
+except ValueError as e:
+    # e.g. "No quality_requirements configuration found in task file"
+    # Configure quality requirements first:
+    simpletask_quality(action="preset", preset_name="python")
+```
+
+#### Filter Flags Mutex Guard Enforced in `run_quality_checks()` (Single Location)
+
+**Affected:** `quality(action='check')` MCP tool, `simpletask quality check` CLI command
+
+**What changed:** The mutual-exclusivity check for filter flags (`lint_only`, `test_only`,
+`type_only`, `security_only`) is now enforced **only** inside `run_quality_checks()` in
+`quality_ops.py`. Duplicate guards that previously existed in `server.py` and `check.py` have
+been removed.
+
+**Why:** Defence-in-depth at the function level is sufficient. Duplicating the same guard across
+three call sites creates maintenance risk (diverging messages, missed updates).
+
+**Behaviour is unchanged** — passing more than one filter flag at the same time still raises
+`ValueError: Filter flags are mutually exclusive: at most one of ...`.
+
 ### Breaking Changes in v0.18.0
 
 #### MCP Tools No Longer Accept `branch` Parameter
@@ -717,7 +761,7 @@ The MCP server exposes 11 tools for task management:
 | `new` | Create a new task file | `branch` (str): Branch identifier<br>`title` (str): Task title<br>`prompt` (str): Original user request<br>`criteria` (list[str] \| None, optional): Acceptance criteria |
 | `task` | Manage implementation tasks (add/update/remove/get/batch) | `action` (str): 'add', 'update', 'remove', 'get', or 'batch'<br>`task_id` (str, optional): Task ID (required for update/remove/get)<br>`name` (str, optional): Task name (required for add)<br>`goal` (str, optional): Task goal/description<br>`status` (str, optional): Status for update ('not_started', 'in_progress', 'completed', 'blocked', 'paused')<br>`steps` (list[str] \| None, optional): Task steps for add action. None or [] adds placeholder ['To be defined']<br>`done_when` (list[str] \| None, optional): Completion verification conditions<br>`prerequisites` (list[str] \| None, optional): Prerequisite task IDs<br>`files` (list[dict] \| None, optional): Files to create/modify/delete<br>`code_examples` (list[dict] \| None, optional): Code patterns to follow<br>`operations` (list[dict], optional): List of BatchTaskOperation dicts (required for batch action) |
 | `criteria` | Manage acceptance criteria (add/complete/remove/get/update) | `action` (str): 'add', 'complete', 'remove', 'get', or 'update'<br>`criterion_id` (str, optional): Criterion ID (required for complete/remove/get/update)<br>`description` (str, optional): Description (required for add/update)<br>`completed` (bool, optional): Completion status for 'complete' (default: true) |
-| `quality` | Manage quality requirements (check/set/get/preset) | `action` (str): 'check', 'set', 'get', or 'preset'<br>`config_type` (str, optional): 'linting', 'type-checking', 'testing', or 'security' (for set action)<br>`tool` (str, optional): Tool name from ToolName enum (for set action)<br>`args` (str, optional): Comma-separated tool arguments (for set action)<br>`enabled` (bool, optional): Enable/disable check (for set action)<br>`min_coverage` (int, optional): Minimum coverage % (for testing config only)<br>`timeout` (int, optional): Timeout in seconds (default: 300)<br>`preset_name` (str, optional): Preset name (for preset action) |
+| `quality` | Manage quality requirements (check/set/get/preset) | `action` (str): 'check', 'set', 'get', or 'preset'<br>`config_type` (str, optional): 'linting', 'type-checking', 'testing', or 'security' (for set action)<br>`tool` (str, optional): Tool name from ToolName enum (for set action)<br>`args` (str, optional): Comma-separated tool arguments (for set action)<br>`enabled` (bool, optional): Enable/disable check (for set action)<br>`min_coverage` (int, optional): Minimum coverage % (for testing config only)<br>`timeout` (int, optional): Timeout in seconds (default: 300)<br>`preset_name` (str, optional): Preset name (for preset action)<br>`lint_only` (bool, optional): Only run linting check (for check action, default: false)<br>`test_only` (bool, optional): Only run testing check (for check action, default: false)<br>`type_only` (bool, optional): Only run type-checking check (for check action, default: false)<br>`security_only` (bool, optional): Only run security check (for check action, default: false) |
 | `design` | Manage design section (set/get/remove) | `action` (str): 'set', 'get', or 'remove'<br>`field` (str, optional): Field to modify: 'pattern', 'reference', 'constraint', 'security', 'error-handling' (for set/remove)<br>`value` (str, optional): Value to add (for set action)<br>`reason` (str, optional): Reason for reference (required when field='reference')<br>`index` (int, optional): Index to remove (for remove action on list fields)<br>`all` (bool, optional): Remove all items or entire section (for remove action) |
 | `note` | Manage notes for root-level and task-level | `action` (str): 'add', 'remove', or 'list'<br>`content` (str, optional): Note content (required for add)<br>`task_id` (str, optional): Task ID for task-level notes; if omitted, operates on root notes<br>`index` (int, optional): Note index to remove (0-based, required for remove unless all=True)<br>`all` (bool, optional): Remove all notes (for remove action)<br>`root_only` (bool, optional): Only return root notes (for list action) |
 | `constraint` | Manage implementation constraints (add/remove/list) | `action` (str): 'add', 'remove', or 'list'<br>`value` (str, optional): Constraint text (required for add)<br>`index` (int, optional): Constraint index to remove (0-based, required for remove unless all=True)<br>`all` (bool, optional): Remove all constraints (for remove action) |
@@ -1100,6 +1144,10 @@ Unified tool for managing quality requirements with four actions.
 - `min_coverage` (optional): Minimum test coverage percentage 0-100 (only for testing config in set action)
 - `timeout` (optional): Timeout in seconds for the check (for set action, default: 300)
 - `preset_name` (optional): Preset name (required for preset action)
+- `lint_only` (optional): Only run linting check (for check action, default: false)
+- `test_only` (optional): Only run testing check (for check action, default: false)
+- `type_only` (optional): Only run type-checking check (for check action, default: false)
+- `security_only` (optional): Only run security check (for check action, default: false)
 
 **Note:** This tool always uses the current git branch.
 
@@ -1162,6 +1210,18 @@ result = quality(
 
 # Apply a quality preset (fills gaps only)
 result = quality(action="preset", preset_name="python")
+
+# Run only linting (filter flag)
+result = quality(action="check", lint_only=True)
+
+# Run only testing (filter flag)
+result = quality(action="check", test_only=True)
+
+# Raises ValueError: filter flags are mutually exclusive
+# quality(action="check", lint_only=True, test_only=True)
+
+# Raises ValueError: filter flags only valid with action="check"
+# quality(action="get", lint_only=True)
 ```
 
 **Edge Cases:**
@@ -1807,7 +1867,7 @@ The `.tasks/` directory contains task definition files used during development b
 ### Always Do
 
 - Run `pytest` before committing changes
-- Run `black .` and `ruff check .` before committing
+- Run `ruff format .` and `ruff check .` before committing
 - **Version bumping strategy:**
   - **On feature branches:** Bump version ONCE at the end when feature is complete, just before final commit
   - **On main branch:** Bump version for each commit with code changes
