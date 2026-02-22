@@ -1,10 +1,12 @@
 ---
-description: Comprehensive code review and analysis against plan and specification using simpletask.
+description: Scope-bounded code review: verifies implementation against original prompt and acceptance criteria only.
 ---
 
 User input: $ARGUMENTS
 
-You are conducting a thorough, technically precise code review. Be brutally honest about issues, inefficiencies, and shortcomings. Your goal is to identify EVERY flaw and provide actionable, specific feedback.
+**IMPORTANT: Scope constraint**
+
+This review is strictly scoped to the original prompt and acceptance criteria defined in the task file. Your job is to verify that the implementation satisfies those requirements — nothing more. Do NOT suggest features, refactoring, or improvements beyond what was explicitly requested. Do NOT flag issues in code outside the git diff. Do NOT expand the PR.
 
 **Step 1: Identify Task File**
 
@@ -13,16 +15,17 @@ You are conducting a thorough, technically precise code review. Be brutally hone
    git branch --show-current
    ```
 
-2. Load and verify task file exists using MCP tools:
+2. Load task file using MCP tools:
    
    ```
    Use simpletask_get() MCP tool to retrieve task data:
    - Call simpletask_get() to use current git branch (auto-detected)
    - Returns SimpleTaskGetResponse with spec, file_path, and summary
-   - If error occurs, task file does not exist
+   - If error occurs, task file does not exist — abort and inform the user
    ```
    
    simpletask show
+
 **Step 2: Analyze Task Completion**
 
 1. Get all task data using MCP tools:
@@ -34,13 +37,11 @@ You are conducting a thorough, technically precise code review. Be brutally hone
      - summary.tasks_total, tasks_completed, tasks_in_progress, tasks_not_started, tasks_blocked
    
    From the response:
-   - Count tasks by status:
-     - Filter spec.tasks where status == "completed"
-     - Filter spec.tasks where status == "in_progress" (should be 0 after implementation)
-     - Filter spec.tasks where status == "not_started" (incomplete)
-     - Filter spec.tasks where status == "blocked" (need attention)
-     - Filter spec.tasks where status == "paused" (intentionally deferred)
-   - Check done_when conditions for tasks claiming completion
+   - Filter spec.tasks where status == "completed"
+   - Filter spec.tasks where status == "in_progress" (should be 0 after implementation)
+   - Filter spec.tasks where status == "not_started" (incomplete)
+   - Filter spec.tasks where status == "blocked" (need attention)
+   - Filter spec.tasks where status == "paused" (intentionally deferred)
    ```
    
    ```bash
@@ -73,69 +74,41 @@ You are conducting a thorough, technically precise code review. Be brutally hone
    simpletask criteria list
    simpletask criteria list --completed
    simpletask criteria list --incomplete
-**Step 4: Deep Code Analysis**
 
-Examine the actual implementation changes. Review key modified files for:
+**Step 4: Verify Implementation Against Criteria and Diff**
 
-### Code Quality Issues
-- Anti-patterns, code smells, violation of SOLID principles
-- Unclear naming, magic numbers, commented-out code
-- Poor abstraction, tight coupling, low cohesion
-- Missing or inadequate comments for complex logic
-- Inconsistent code style
+Scope: only the files in `git diff --name-only main..HEAD` (or master..HEAD). Do not review anything outside the diff.
 
-### Architecture & Design
-- Questionable design decisions
-- Violations of separation of concerns
-- Unnecessary complexity or over-engineering
-- Missing abstractions or improper layering
-- Deviation from existing patterns in the codebase
-
-### Performance
-- Inefficient algorithms or data structures (O(n²) when O(n) possible)
-- Unnecessary database queries (N+1 problems)
-- Missing caching opportunities
-- Excessive memory usage or resource waste
-- Unnecessary loops or redundant operations
-
-### Security
-- Authentication/authorization gaps
-- Input validation failures
-- Potential injection vulnerabilities (SQL, XSS, command injection)
-- Exposed credentials, API keys, or secrets
-- Missing HTTPS, encryption, or security headers
-- Insecure dependencies
-
-### Error Handling
-- Missing error handling
-- Edge cases not covered
-- Lack of input validation or sanitization
-- Poor error messages
-- Missing resource cleanup (memory leaks, unclosed connections)
-
-### Implementation Notes Review (Optional)
-
-Check if notes were added during implementation to understand context:
+For each acceptance criterion, check whether the diff actually satisfies it. Also read any implementation notes for context on decisions made.
 
 ```
 Use simpletask_note() MCP tool to list notes:
 - Call simpletask_note(action="list")
 - Returns root_notes (feature-wide decisions) and task_notes (task-specific context)
-- Review notes for:
-  - Useful context explaining non-obvious decisions
-  - Technical debt that should be tracked
-  - Workarounds that might need better solutions
-  - Security or performance considerations mentioned
+- Use notes to understand non-obvious implementation decisions before raising issues
 ```
 
-# List all notes
 simpletask note list
 
-# List notes for specific tasks
-simpletask note list --task T003
+Look for:
 
-# List only root-level notes
-simpletask note list --root-only
+### Criteria Satisfaction
+- For each criterion: does the diff contain code that implements it?
+- Are there acceptance criteria that are marked complete but have no corresponding changes in the diff?
+- Are there criteria still marked incomplete that are actually implemented?
+
+### Security (within diff scope only)
+- Exposed credentials, API keys, or secrets introduced by the diff
+- Input validation gaps that are directly relevant to the feature being implemented
+- Injection vulnerabilities (SQL, XSS, command injection) in new code only
+
+### Correctness
+- Logic errors in the changed code that would prevent acceptance criteria from being met
+- Missing edge cases for paths described in the acceptance criteria
+- Error handling gaps in new code that would cause failures visible to users
+
+**Do NOT flag:** code style, naming conventions, missing abstractions, performance of unchanged code, documentation outside the feature scope, test coverage for untouched code paths, or architectural patterns in unmodified files.
+
 **Step 5: Analyze Git Changes**
 
 1. Get branch comparison:
@@ -160,55 +133,33 @@ simpletask note list --root-only
 4. Analyze:
    - Number of commits on feature branch
    - Files modified, lines added/removed
-   - Key modified files (up to 10)
-   - Commit message quality (descriptive or lazy?)
-   - Are changes focused or scattered across unrelated areas?
+   - Are changes focused on the feature or scattered across unrelated areas? (Scope creep signal)
+   - Do any modified files look unrelated to the original prompt? Flag these.
 
-**Step 6: Generate Specific, Actionable Feedback**
+**Step 6: Generate Scoped, Actionable Feedback**
 
-Be BRUTALLY HONEST and SPECIFIC. Don't sugarcoat. For each issue found:
+Only report issues that:
+- Prevent an acceptance criterion from being met, OR
+- Are Critical/High severity security or correctness issues in the changed code
 
 **Format for each issue:**
 ```
-[SEVERITY: Critical/High/Medium/Low]
+[SEVERITY: Critical/High]
 File: path/to/file.py:123
+Criterion: [ACx - criterion description this relates to, or "regression risk"]
 Issue: [Clear description of the problem]
-Why it matters: [Technical explanation]
+Why it matters: [How this breaks or undermines the stated requirement]
 Fix: [Specific, actionable remediation]
 ```
 
-**Categories to cover:**
+**Categories:**
 
-1. **CODE QUALITY ISSUES**
-   - Every anti-pattern with file path and line reference
-   - Code smells with specific examples
-   - SOLID principle violations
+1. **UNMET CRITERIA** — Acceptance criteria not satisfied by the implementation
+2. **SECURITY** — Critical/High severity issues in new/changed code only
+3. **CORRECTNESS** — Logic errors preventing the feature from working as specified
+4. **SCOPE CREEP** — Changes that go beyond the original prompt (informational — do NOT create tasks)
 
-2. **ARCHITECTURAL CONCERNS**
-   - Design problems with technical explanations
-   - Separation of concerns violations
-   - Missing or improper abstractions
-
-3. **PERFORMANCE PROBLEMS**
-   - Inefficiencies with specific examples
-   - Algorithm complexity issues
-   - Resource waste
-
-4. **SECURITY VULNERABILITIES**
-   - Security issues with severity rating
-   - Clear remediation steps
-   - References to security best practices
-
-5. **TESTING GAPS**
-   - Missing test coverage for critical paths
-   - Untested edge cases or error conditions
-   - Missing integration or E2E tests
-   - Brittle or poorly designed tests
-
-6. **DOCUMENTATION ISSUES**
-   - Missing or inadequate inline documentation
-   - Undocumented API changes
-   - Missing README updates
+Medium/Low severity observations (style, naming, minor inefficiencies) are noted in the summary but do NOT trigger fix tasks.
 
 **Step 7: Determine PR Readiness**
 
@@ -217,27 +168,28 @@ Evaluate and report one of:
 ### READY TO MERGE
 - All tasks have `status: completed`
 - All acceptance criteria have `completed: true`
-- No critical or high severity issues found
-- Code quality is solid
-- Tests pass and coverage is adequate
+- No Critical or High severity blocking issues found
+- Changes are scoped to the original prompt
 
 ### NEEDS CHANGES
-- All tasks complete, all criteria met
-- BUT has code quality/security/performance issues
+- All tasks complete, all criteria marked done
+- BUT has Critical/High severity security or correctness issues in the diff
 - Issues are fixable without major rework
 
 ### NOT READY
 - Tasks remain with `status: not_started` or `status: in_progress`
 - Acceptance criteria remain with `completed: false`
-- Critical flaws found that require significant rework
-- Missing core functionality
+- Critical flaws prevent the feature from working as specified
 
-**Step 8: Display Comprehensive Review Summary**
+**Step 8: Display Review Summary**
 
 ```
 ╭─────────────────────────────────────────────────────────────╮
 │ Code Review: [branch-name]                                  │
 ╰─────────────────────────────────────────────────────────────╯
+
+ORIGINAL PROMPT
+  [spec.prompt from task file — one line summary]
 
 TASK COMPLETION
   Tasks: X/Y completed (Z%)
@@ -263,43 +215,41 @@ GIT CHANGES
   Commits: N commits ahead of main
   Changes: M files modified, +A/-R lines
   
-  Key files:
+  Key files changed:
     - path/to/file1.py
     - path/to/file2.py
     - ...
+  
+  Scope: [FOCUSED | CONTAINS OUT-OF-SCOPE CHANGES]
 
-ISSUES FOUND
+BLOCKING ISSUES (require fix tasks)
 
-  [Critical] CODE QUALITY (X issues)
-    - file.py:123 - [issue description]
-    - file.py:456 - [issue description]
+  [Critical/High] UNMET CRITERIA (X issues)
+    - AC1: file.py:123 - [issue description]
 
-  [High] SECURITY (X issues)
+  [Critical/High] SECURITY (X issues)
     - file.py:789 - [issue description]
 
-  [Medium] PERFORMANCE (X issues)
+  [Critical/High] CORRECTNESS (X issues)
     - file.py:101 - [issue description]
 
-  [Low] DOCUMENTATION (X issues)
-    - file.py:112 - [issue description]
-
-IMPROVEMENT SUGGESTIONS
-  1. [Specific, actionable suggestion with rationale]
-  2. [Another specific suggestion]
-  ...
+OBSERVATIONS (informational only — no tasks created)
+  - [Low/Medium severity notes about the diff, if any]
 
 ───────────────────────────────────────────────────────────────
 PR READINESS: [READY TO MERGE | NEEDS CHANGES | NOT READY]
 
-[Honest assessment with justification]
+[Assessment with justification referencing specific criteria]
 ───────────────────────────────────────────────────────────────
 ```
 
-**Step 9: Auto-Inject Fix Tasks (if issues found)**
+**Step 9: Auto-Inject Fix Tasks (blocking issues only)**
 
-If issues are found, automatically add fix tasks to the task file:
+Only auto-inject fix tasks if there are **Critical or High severity** issues that prevent acceptance criteria from being met or introduce regressions/security vulnerabilities in the diff. Do NOT create tasks for Medium/Low/Observations.
 
-0. **Optional: Create a new iteration for fix tasks** to group them separately from the original implementation:
+If blocking issues exist:
+
+1. Create a new iteration to group fix tasks:
    
    ```
    Use simpletask_iteration() MCP tool:
@@ -310,58 +260,34 @@ If issues are found, automatically add fix tasks to the task file:
    ```bash
    simpletask iteration add "review fixes"
    ```
-   
-   Then add fix tasks with `--iteration <id>` (CLI) or `iteration=<id>` (MCP) to group them.
 
-1. For each issue found, create a fix task using MCP tools:
+2. For each **blocking** issue only, create a fix task:
    
    ```
    Use simpletask_task() MCP tool to add fix tasks:
    - Call simpletask_task(
        action="add",
        name="Fix: [issue summary]",
-       goal="[detailed goal with file path and remediation]"
+       goal="[detailed goal with file path and remediation]",
+       iteration=<iter_id>
      )
-   - Returns SimpleTaskWriteResponse with success confirmation
-   - Repeat for each fix needed
    ```
    
-   simpletask task add "Fix: [issue summary]" -g "[detailed goal with file path and remediation]"
-   **Using MCP tools:**
-   ```
-   simpletask_task(
-     action="add",
-     name="Fix: Security vulnerability in auth.py",
-     goal="Add input validation to prevent SQL injection in login function at line 45"
-   )
-   
-   simpletask_task(
-     action="add",
-     name="Fix: Performance issue in data_processor.py",
-     goal="Replace O(n²) algorithm with O(n) approach in process_items function"
-   )
-   ```
-   
-   **Using CLI:**
-   ```bash
-   simpletask task add "Fix: Security vulnerability in auth.py" -g "Add input validation to prevent SQL injection in login function at line 45"
-   
-   simpletask task add "Fix: Performance issue in data_processor.py" -g "Replace O(n²) algorithm with O(n) approach in process_items function"
-   
-   simpletask task add "Fix: Missing error handling in api.py" -g "Add try/catch blocks and proper error responses to API endpoints"
-   ```
+   simpletask task add "Fix: [issue summary]" -g "[detailed goal with file path and remediation]" -i <iter_id>
 
-4. After adding fix tasks, show summary:
+3. After adding fix tasks, show summary:
    ```
    Fix tasks added to .tasks/[branch-name].yml:
-     - T00X: Fix: Security vulnerability in auth.py
-     - T00Y: Fix: Performance issue in data_processor.py
-     - T00Z: Fix: Missing error handling in api.py
+     - T00X: Fix: [blocking issue 1]
+     - T00Y: Fix: [blocking issue 2]
+   
+   Observations (not tracked as tasks):
+     - [Medium/Low items listed here for awareness]
    
    Run /simpletask.implement to execute fix tasks.
    ```
 
-5. Validate the updated task file:
+4. Validate the updated task file:
    
    ```
    Use simpletask_get() MCP tool with validation:
@@ -370,22 +296,23 @@ If issues are found, automatically add fix tasks to the task file:
    ```
    
    simpletask schema validate
+
+If no blocking issues exist: report "No fix tasks needed." Do NOT create an iteration or any tasks.
+
 ---
 
 ## Review Workflow
 
-The review command creates a natural feedback loop:
-
 ```
-/simpletask.plan     → Creates task file with tasks and criteria
+/simpletask.plan      → Creates task file with tasks and criteria
         ↓
 /simpletask.implement → Executes tasks, updates status
         ↓
-/simpletask.review   → Reviews implementation, adds fix tasks if needed
+/simpletask.review    → Verifies implementation against original criteria
         ↓
-    Issues found?
+    Blocking issues?
         ↓
-    Yes → /simpletask.implement (execute fix tasks)
+    Yes (Critical/High) → /simpletask.implement (fix tasks only)
         ↓
         → /simpletask.review (verify fixes)
         ↓
@@ -428,24 +355,22 @@ simpletask task list --status paused
 simpletask criteria list
 simpletask criteria list --completed
 simpletask criteria list --incomplete
-### Add Fix Tasks
+### Add Fix Tasks (blocking issues only)
 
 ```
 Use simpletask_task() MCP tool:
 
-# Add a fix task
+# Add a fix task (only for Critical/High blocking issues)
 simpletask_task(
   action="add",
   name="Fix: [description]",
-  goal="[goal]"
+  goal="[goal]",
+  iteration=<iter_id>
 )
 ```
 
 # Add a fix task
-simpletask task add "Fix: [description]" -g "[goal]"
-
-# Add task with specific branch
-simpletask task add "Fix: [description]" -g "[goal]" -b [branch-name]
+simpletask task add "Fix: [description]" -g "[goal]" -i <iter_id>
 ### Validation
 
 ```
@@ -458,29 +383,30 @@ simpletask_get(validate=True)
 
 # Validate task file
 simpletask schema validate
+
 ---
 
 ## Important Guidelines
 
+### Stay Scoped
+- Only review files in the git diff
+- Only flag issues that violate stated acceptance criteria or introduce blocking regressions
+- Do NOT audit the whole codebase — that is not what this command is for
+- If you notice improvements outside scope, do NOT create tasks for them
+
 ### Be SPECIFIC
 - Include file paths, function names, line numbers
 - Quote actual code when pointing out issues
-- Reference specific acceptance criteria or tasks
+- Reference specific acceptance criteria by ID
 
 ### Be HONEST
-- Don't hide problems to be nice
-- Call out every issue, no matter how small
-- If implementation is poor, say so clearly
-
-### Be TECHNICAL
-- Explain WHY something is a problem
-- Reference best practices, patterns, principles
-- Provide technical justification for concerns
+- Don't hide genuine blocking problems
+- Distinguish clearly between blocking issues (require fix) and observations (informational)
+- If the implementation is out of scope (added extra things not requested), say so
 
 ### Be ACTIONABLE
-- Every issue must have a clear fix
-- Fix tasks should be specific and implementable
-- Include enough detail for any developer to act on
+- Every fix task must have a clear, implementable goal
+- Reference the exact criterion it relates to
 
 ---
 
@@ -498,7 +424,7 @@ Before marking as "READY TO MERGE":
 2. **All criteria met**: 
    - MCP: Check `summary.criteria_completed == summary.criteria_total` in `simpletask_get()` response
    - CLI: `simpletask criteria list --incomplete` returns empty
-3. **No critical issues**: No security vulnerabilities, no major bugs
+3. **No blocking issues**: No Critical/High security vulnerabilities or correctness failures in the diff
 4. **Tests pass**: All automated tests pass
 5. **Schema valid**: 
    - MCP: `simpletask_get(validate=True)` returns `validation.valid == True`
