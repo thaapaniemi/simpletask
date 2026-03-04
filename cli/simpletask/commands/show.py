@@ -231,6 +231,7 @@ def show(
                     console.rule(
                         f"[dim]{label} ({done}/{len(group_tasks)} done)[/dim]",
                         style="dim",
+                        align="left",
                     )
                     for task in group_tasks:
                         icon, color = _task_status_parts(task)
