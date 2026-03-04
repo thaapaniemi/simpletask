@@ -140,6 +140,27 @@ def _count_task_notes(tasks: list[Task] | None) -> tuple[int, int]:
     return total_notes, tasks_with_notes
 
 
+def _task_status_parts(task: Task) -> tuple[str, str]:
+    """Return (status_icon, status_color) for a task.
+
+    Args:
+        task: Task to get status display parts for
+
+    Returns:
+        Tuple of (icon, color) for Rich markup
+    """
+    if task.status.value == "completed":
+        return "✓", "green"
+    elif task.status.value == "in_progress":
+        return "▶", "yellow"
+    elif task.status.value == "blocked":
+        return "✗", "red"
+    elif task.status.value == "paused":
+        return "⏸", "blue"
+    else:  # not_started
+        return "○", "white"
+
+
 def show(
     branch: str | None = typer.Argument(None, help="Branch name (defaults to current git branch)"),
 ) -> None:
@@ -149,8 +170,8 @@ def show(
     - Task file location
     - Title and branch
     - Acceptance criteria with completion status
-    - Implementation tasks (if defined)
     - Constraints (if defined)
+    - Implementation tasks, grouped by iteration when iterations are defined
     - Quality requirements summary (if configured)
     - Design summary (if configured)
     - Original prompt (truncated to 160 chars)
@@ -196,25 +217,43 @@ def show(
         # Tasks
         if spec.tasks:
             console.print("\n[bold green]Implementation Tasks:[/bold green]")
-            for task in spec.tasks:
-                if task.status.value == "completed":
-                    status_icon = "✓"
-                    status_color = "green"
-                elif task.status.value == "in_progress":
-                    status_icon = "▶"
-                    status_color = "yellow"
-                elif task.status.value == "blocked":
-                    status_icon = "✗"
-                    status_color = "red"
-                elif task.status.value == "paused":
-                    status_icon = "⏸"
-                    status_color = "blue"
-                else:  # not_started
-                    status_icon = "○"
-                    status_color = "white"
-                console.print(
-                    f"  [{status_color}]{status_icon}[/{status_color}] {task.id}: {task.name} ({task.status.value})"
-                )
+            if spec.iterations:
+                # Group tasks by iteration; None key = unassigned
+                groups: dict[int | None, list[Task]] = {None: []}
+                for it in sorted(spec.iterations, key=lambda i: i.id):
+                    groups[it.id] = []
+                for task in spec.tasks:
+                    groups.setdefault(task.iteration, []).append(task)
+
+                def _print_group(label: str, group_tasks: list[Task]) -> None:
+                    done = sum(1 for t in group_tasks if t.status.value == "completed")
+                    console.print()
+                    console.rule(
+                        f"[dim]{label} ({done}/{len(group_tasks)} done)[/dim]",
+                        style="dim",
+                    )
+                    for task in group_tasks:
+                        icon, color = _task_status_parts(task)
+                        console.print(
+                            f"    [{color}]{icon}[/{color}] {task.id}: {task.name} ({task.status.value})"
+                        )
+
+                # Unassigned first
+                if groups[None]:
+                    _print_group("Unassigned", groups[None])
+
+                # Then iterations in id order
+                for it in sorted(spec.iterations, key=lambda i: i.id):
+                    group = groups.get(it.id, [])
+                    if group:
+                        _print_group(f"Iteration {it.id} · {it.label}", group)
+            else:
+                # Flat list — no iterations defined
+                for task in spec.tasks:
+                    icon, color = _task_status_parts(task)
+                    console.print(
+                        f"  [{color}]{icon}[/{color}] {task.id}: {task.name} ({task.status.value})"
+                    )
         else:
             console.print("\n[dim]No implementation tasks defined yet[/dim]")
 
