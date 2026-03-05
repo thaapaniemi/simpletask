@@ -287,32 +287,32 @@ This installs both:
 
 ## Commands
 
-### Earthly Development Environment
+### Moonly Development Environment
 
-**IMPORTANT:** Use Earthly for all development and testing. This ensures a completely isolated, reproducible environment matching CI.
+**IMPORTANT:** Use Moonly for all development and testing. This ensures a completely isolated, reproducible environment matching CI.
 
 #### Prerequisites
 
-- [Earthly](https://earthly.dev/get-earthly) installed (`earthly --version`)
+- [Moonly](https://github.com/moonly-run/moonly) installed (`moonly --version`)
 - Docker running
 
 #### Quick Start
 
 ```bash
 # Run all tests and quality checks
-earthly +all
+moonly +all
 
 # Run just tests
-earthly +test
+moonly +test
 
 # Run just linting
-earthly +lint
+moonly +lint
 
 # Run all quality checks (lint + format + types)
-earthly +check
+moonly +check
 
 # Interactive development shell
-earthly -i +dev
+moonly -i +dev
 ```
 
 #### Available Targets
@@ -330,17 +330,17 @@ earthly -i +dev
 
 #### Testing Local Changes
 
-Your local code is automatically mounted when running Earthly targets:
+Your local code is automatically mounted when running Moonly targets:
 
 ```bash
 # Edit code locally, then test
-earthly +test
+moonly +test
 
 # Quick lint check after changes
-earthly +lint
+moonly +lint
 
 # Fix formatting issues automatically
-earthly +format
+moonly +format
 ```
 
 #### Interactive Development
@@ -349,7 +349,7 @@ For exploratory work or debugging:
 
 ```bash
 # Start interactive shell with all dependencies
-earthly -i +dev
+moonly -i +dev
 
 # Inside the container:
 simpletask --help
@@ -360,11 +360,11 @@ ruff check .
 
 ### Development
 
-The simpletask CLI can be tested using Earthly's interactive mode:
+The simpletask CLI can be tested using Moonly's interactive mode:
 
 ```bash
 # Start dev shell
-earthly -i +dev
+moonly -i +dev
 
 # Inside the container, simpletask is available:
 simpletask --help
@@ -568,17 +568,17 @@ design:
 
 ```bash
 # Run all tests
-earthly +test
+moonly +test
 
 # Run just tests and quality checks
-earthly +all
+moonly +all
 ```
 
 For interactive testing/debugging:
 
 ```bash
 # Start dev shell
-earthly -i +dev
+moonly -i +dev
 
 # Inside the container:
 pytest
@@ -592,21 +592,21 @@ pytest -v
 
 ```bash
 # Run all quality checks
-earthly +check
+moonly +check
 
 # Run individual checks
-earthly +lint          # ruff check .
-earthly +format-check  # ruff format --check .
-earthly +type-check    # mypy cli/simpletask
+moonly +lint          # ruff check .
+moonly +format-check  # ruff format --check .
+moonly +type-check    # mypy cli/simpletask
 
 # Fix formatting issues
-earthly +format        # ruff format . && ruff check --fix .
+moonly +format        # ruff format . && ruff check --fix .
 ```
 
 For interactive fixing:
 
 ```bash
-earthly -i +dev
+moonly -i +dev
 
 # Inside container:
 ruff format .              # Format code
