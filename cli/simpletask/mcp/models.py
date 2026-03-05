@@ -89,6 +89,20 @@ class IterationSummary(BaseModel):
     tasks_paused: int = Field(0, description="Paused tasks in this iteration")
 
 
+class CompactStatusSummary(BaseModel):
+    """Minimal status summary for write operation responses.
+
+    Excludes detailed task/criteria/iteration counts to reduce response payload size.
+    Use for add/update/remove/complete operations where callers don't need full counts.
+    """
+
+    model_config = {"extra": "forbid"}
+
+    branch: str = Field(..., description="Branch/task identifier")
+    title: str = Field(..., description="Task title")
+    overall_status: TaskStatus = Field(..., description="Computed overall task status")
+
+
 class StatusSummary(BaseModel):
     """Pre-computed status counts for a task file."""
 
@@ -138,6 +152,7 @@ class SimpleTaskWriteResponse(BaseModel):
 
     Returns just enough information to confirm the operation succeeded
     and provide current status, without the full task specification.
+    Uses CompactStatusSummary to minimize payload size.
     """
 
     model_config = {"extra": "forbid"}
@@ -148,7 +163,10 @@ class SimpleTaskWriteResponse(BaseModel):
     )
     message: str = Field(..., description="Human-readable confirmation message")
     file_path: str = Field(..., description="Path to task file")
-    summary: StatusSummary = Field(..., description="Pre-computed status summary")
+    summary: StatusSummary | CompactStatusSummary = Field(
+        ...,
+        description="Status summary (CompactStatusSummary for write ops, StatusSummary for other ops)",
+    )
     new_item_ids: list[str] = Field(
         default_factory=list, description="IDs of newly created items (for add operations)"
     )
@@ -234,7 +252,9 @@ class SimpleTaskNoteResponse(BaseModel):
     )
     total_count: int = Field(..., description="Total number of notes (root + task)")
     file_path: str = Field(..., description="Path to task file")
-    summary: StatusSummary = Field(..., description="Pre-computed status summary")
+    summary: StatusSummary | CompactStatusSummary = Field(
+        ..., description="Pre-computed status summary"
+    )
 
 
 class SimpleTaskConstraintResponse(BaseModel):
@@ -248,7 +268,9 @@ class SimpleTaskConstraintResponse(BaseModel):
     action: str = Field(..., description="Action performed (e.g., 'constraint_list')")
     constraints: list[str] | None = Field(None, description="List of constraints")
     file_path: str = Field(..., description="Path to task file")
-    summary: StatusSummary = Field(..., description="Pre-computed status summary")
+    summary: StatusSummary | CompactStatusSummary = Field(
+        ..., description="Pre-computed status summary"
+    )
 
 
 class SimpleTaskContextResponse(BaseModel):
@@ -262,7 +284,9 @@ class SimpleTaskContextResponse(BaseModel):
     action: str = Field(..., description="Action performed (e.g., 'context_show')")
     context: dict[str, Any] | None = Field(None, description="Context key-value pairs")
     file_path: str = Field(..., description="Path to task file")
-    summary: StatusSummary = Field(..., description="Pre-computed status summary")
+    summary: StatusSummary | CompactStatusSummary = Field(
+        ..., description="Pre-computed status summary"
+    )
 
 
 class SimpleTaskIterationResponse(BaseModel):
@@ -280,7 +304,9 @@ class SimpleTaskIterationResponse(BaseModel):
         None, description="List of iterations (for list/get actions)"
     )
     file_path: str = Field(..., description="Path to task file")
-    summary: StatusSummary = Field(..., description="Pre-computed status summary")
+    summary: StatusSummary | CompactStatusSummary = Field(
+        ..., description="Pre-computed status summary"
+    )
 
 
 def _increment_status_counts(counts: dict[str, int], status: TaskStatus) -> None:
@@ -390,4 +416,51 @@ def compute_status_summary(spec: SimpleTaskSpec) -> StatusSummary:
         notes_total=notes_total,
         iteration_summaries=iteration_summaries,
         **global_counts,
+    )
+
+
+def compute_compact_status_summary(spec: SimpleTaskSpec) -> CompactStatusSummary:
+    """Compute minimal status summary for write operation responses.
+
+    Returns only branch, title, and overall_status to minimize response payload size.
+    Use for add/update/remove/complete operations.
+
+    Args:
+        spec: Task specification to analyze.
+
+    Returns:
+        CompactStatusSummary with only essential fields.
+    """
+    # Count tasks by status to derive overall status (same logic as full summary)
+    global_counts: dict[str, int] = {
+        "tasks_completed": 0,
+        "tasks_in_progress": 0,
+        "tasks_not_started": 0,
+        "tasks_blocked": 0,
+        "tasks_paused": 0,
+    }
+    tasks_total = 0
+
+    if spec.tasks:
+        tasks_total = len(spec.tasks)
+        for task in spec.tasks:
+            _increment_status_counts(global_counts, task.status)
+
+    # Derive overall status
+    # Priority: blocked > paused > in_progress > completed > not_started
+    if global_counts["tasks_blocked"] > 0:
+        overall_status = TaskStatus.BLOCKED
+    elif global_counts["tasks_paused"] > 0:
+        overall_status = TaskStatus.PAUSED
+    elif global_counts["tasks_in_progress"] > 0:
+        overall_status = TaskStatus.IN_PROGRESS
+    elif tasks_total > 0 and global_counts["tasks_completed"] == tasks_total:
+        overall_status = TaskStatus.COMPLETED
+    else:
+        overall_status = TaskStatus.NOT_STARTED
+
+    return CompactStatusSummary(
+        branch=spec.branch,
+        title=spec.title,
+        overall_status=overall_status,
     )

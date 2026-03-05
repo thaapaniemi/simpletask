@@ -57,6 +57,7 @@ from ..core.validation import validate_task_file
 from ..core.yaml_parser import parse_task_file, write_task_file
 from .models import (
     BatchTaskOperation,
+    CompactStatusSummary,
     QualityCheckResult,
     SimpleTaskBatchResponse,
     SimpleTaskConstraintResponse,
@@ -68,7 +69,9 @@ from .models import (
     SimpleTaskNoteResponse,
     SimpleTaskQualityResponse,
     SimpleTaskWriteResponse,
+    StatusSummary,
     ValidationResult,
+    compute_compact_status_summary,
     compute_status_summary,
 )
 
@@ -231,7 +234,7 @@ def new(
     project = ensure_project()
     spec = create_task_file(project, branch, title, prompt, criteria)
     file_path = project.get_task_file(branch)
-    summary = compute_status_summary(spec)
+    summary = compute_compact_status_summary(spec)
 
     return SimpleTaskWriteResponse(
         success=True,
@@ -289,6 +292,7 @@ def task(
         ValueError: If required parameters missing or invalid values provided.
     """
     file_path = get_current_task_file_path()
+    summary: StatusSummary | CompactStatusSummary
 
     match action:
         case "get":
@@ -331,7 +335,7 @@ def task(
                 code_examples=code_examples_converted,
                 iteration=iteration,
             )
-            summary = compute_status_summary(spec)
+            summary = compute_compact_status_summary(spec)
             return SimpleTaskWriteResponse(
                 success=True,
                 action="task_added",
@@ -384,7 +388,7 @@ def task(
                 code_examples_converted,
                 iteration=iteration_value,
             )
-            summary = compute_status_summary(spec)
+            summary = compute_compact_status_summary(spec)
             return SimpleTaskWriteResponse(
                 success=True,
                 action="task_updated",
@@ -398,7 +402,7 @@ def task(
             if not task_id:
                 raise ValueError("'task_id' is required for action='remove'")
             spec = remove_implementation_task(file_path, task_id)
-            summary = compute_status_summary(spec)
+            summary = compute_compact_status_summary(spec)
             return SimpleTaskWriteResponse(
                 success=True,
                 action="task_removed",
@@ -423,7 +427,7 @@ def task(
                 raise ValueError(f"Invalid batch operations: {'; '.join(errors)}") from e
             # Execute batch operations atomically; returns (new_ids, updated spec)
             new_task_ids, spec = batch_tasks(file_path, validated_ops)  # type: ignore[arg-type]
-            summary = compute_status_summary(spec)
+            summary = compute_compact_status_summary(spec)
             return SimpleTaskBatchResponse(
                 success=True,
                 action="batch_tasks_applied",
@@ -458,6 +462,7 @@ def criteria(
         Note: Removing the last criterion fails due to min_length=1 schema constraint.
     """
     file_path = get_current_task_file_path()
+    summary: StatusSummary | CompactStatusSummary
 
     match action:
         case "get":
@@ -483,7 +488,7 @@ def criteria(
             if not description:
                 raise ValueError("'description' is required for action='add'")
             new_id, spec = add_acceptance_criterion(file_path, description)
-            summary = compute_status_summary(spec)
+            summary = compute_compact_status_summary(spec)
             return SimpleTaskWriteResponse(
                 success=True,
                 action="criterion_added",
@@ -497,7 +502,7 @@ def criteria(
             if not criterion_id:
                 raise ValueError("'criterion_id' is required for action='complete'")
             spec = mark_criterion_complete(file_path, criterion_id, completed)
-            summary = compute_status_summary(spec)
+            summary = compute_compact_status_summary(spec)
             status_word = "completed" if completed else "incomplete"
             return SimpleTaskWriteResponse(
                 success=True,
@@ -512,7 +517,7 @@ def criteria(
             if not criterion_id:
                 raise ValueError("'criterion_id' is required for action='remove'")
             spec = remove_acceptance_criterion(file_path, criterion_id)
-            summary = compute_status_summary(spec)
+            summary = compute_compact_status_summary(spec)
             return SimpleTaskWriteResponse(
                 success=True,
                 action="criterion_removed",
@@ -528,7 +533,7 @@ def criteria(
             if not description:
                 raise ValueError("'description' is required for action='update'")
             spec = update_acceptance_criterion(file_path, criterion_id, description)
-            summary = compute_status_summary(spec)
+            summary = compute_compact_status_summary(spec)
             return SimpleTaskWriteResponse(
                 success=True,
                 action="criterion_updated",
@@ -589,6 +594,7 @@ def quality(
     """
     file_path = get_current_task_file_path()
     spec = parse_task_file(file_path)
+    summary: StatusSummary | CompactStatusSummary
 
     # Validate that filter flags are only used with action='check'
     if action != "check" and any((lint_only, test_only, type_only, security_only)):
@@ -683,7 +689,7 @@ def quality(
             )
 
             write_task_file(file_path, spec)
-            summary = compute_status_summary(spec)
+            summary = compute_compact_status_summary(spec)
 
             return SimpleTaskWriteResponse(
                 success=True,
@@ -703,7 +709,7 @@ def quality(
             spec.quality_requirements = merged
 
             write_task_file(file_path, spec)
-            summary = compute_status_summary(spec)
+            summary = compute_compact_status_summary(spec)
 
             return SimpleTaskWriteResponse(
                 success=True,
@@ -745,6 +751,7 @@ def design(
     """
     file_path = get_current_task_file_path()
     spec = parse_task_file(file_path)
+    summary: StatusSummary | CompactStatusSummary
 
     match action:
         case "get":
@@ -837,7 +844,7 @@ def design(
                 )
 
             write_task_file(file_path, spec)
-            summary = compute_status_summary(spec)
+            summary = compute_compact_status_summary(spec)
 
             return SimpleTaskWriteResponse(
                 success=True,
@@ -861,7 +868,7 @@ def design(
             )
 
             write_task_file(file_path, spec)
-            summary = compute_status_summary(spec)
+            summary = compute_compact_status_summary(spec)
 
             return SimpleTaskWriteResponse(
                 success=True,
@@ -900,6 +907,7 @@ def note(
         ValueError: If required parameters missing, task not found, or invalid index.
     """
     file_path = get_current_task_file_path()
+    summary: StatusSummary | CompactStatusSummary
 
     match action:
         case "list":
@@ -931,7 +939,7 @@ def note(
             spec = parse_task_file(file_path)
             spec = add_note(spec=spec, content=content, task_id=task_id)
             write_task_file(file_path, spec)
-            summary = compute_status_summary(spec)
+            summary = compute_compact_status_summary(spec)
 
             location = f"task {task_id}" if task_id else "root"
             return SimpleTaskWriteResponse(
@@ -949,7 +957,7 @@ def note(
             spec = parse_task_file(file_path)
             spec = remove_note(spec=spec, index=index, task_id=task_id, all=all)
             write_task_file(file_path, spec)
-            summary = compute_status_summary(spec)
+            summary = compute_compact_status_summary(spec)
 
             location = f"task {task_id}" if task_id else "root"
             if all:
@@ -990,6 +998,7 @@ def constraint(
         ValueError: If required parameters missing or invalid index.
     """
     file_path = get_current_task_file_path()
+    summary: StatusSummary | CompactStatusSummary
 
     match action:
         case "list":
@@ -1010,7 +1019,7 @@ def constraint(
             spec = parse_task_file(file_path)
             spec = add_constraint(spec=spec, value=value)
             write_task_file(file_path, spec)
-            summary = compute_status_summary(spec)
+            summary = compute_compact_status_summary(spec)
 
             return SimpleTaskWriteResponse(
                 success=True,
@@ -1027,7 +1036,7 @@ def constraint(
             spec = parse_task_file(file_path)
             spec = remove_constraint(spec=spec, index=index, all=all)
             write_task_file(file_path, spec)
-            summary = compute_status_summary(spec)
+            summary = compute_compact_status_summary(spec)
 
             message = "Removed all constraints" if all else f"Removed constraint {index}"
 
@@ -1064,6 +1073,7 @@ def context(
         ValueError: If required parameters missing or invalid key.
     """
     file_path = get_current_task_file_path()
+    summary: StatusSummary | CompactStatusSummary
 
     match action:
         case "show":
@@ -1086,7 +1096,7 @@ def context(
             spec = parse_task_file(file_path)
             spec = set_context(spec=spec, key=key, value=value)
             write_task_file(file_path, spec)
-            summary = compute_status_summary(spec)
+            summary = compute_compact_status_summary(spec)
 
             return SimpleTaskWriteResponse(
                 success=True,
@@ -1103,7 +1113,7 @@ def context(
             spec = parse_task_file(file_path)
             spec = remove_context(spec=spec, key=key, all=all)
             write_task_file(file_path, spec)
-            summary = compute_status_summary(spec)
+            summary = compute_compact_status_summary(spec)
 
             message = "Removed all context entries" if all else f"Removed context key '{key}'"
 
@@ -1139,6 +1149,7 @@ def iteration(
     """
     file_path = get_current_task_file_path()
     spec = parse_task_file(file_path)
+    summary: StatusSummary | CompactStatusSummary
 
     match action:
         case "list":
@@ -1168,7 +1179,7 @@ def iteration(
                 raise ValueError("'label' is required for action='add'")
             spec, new_id = add_iteration_to_spec(spec, label)
             write_task_file(file_path, spec)
-            summary = compute_status_summary(spec)
+            summary = compute_compact_status_summary(spec)
             return SimpleTaskWriteResponse(
                 success=True,
                 action="iteration_added",
@@ -1183,7 +1194,7 @@ def iteration(
                 raise ValueError("'iteration_id' is required for action='remove'")
             spec = remove_iteration_from_spec(spec, iteration_id)
             write_task_file(file_path, spec)
-            summary = compute_status_summary(spec)
+            summary = compute_compact_status_summary(spec)
             return SimpleTaskWriteResponse(
                 success=True,
                 action="iteration_removed",

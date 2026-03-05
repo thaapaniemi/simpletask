@@ -54,16 +54,14 @@ class TestTaskCRUDCycle:
         )
         assert result.summary.branch == "feature/crud-test"
         assert result.summary.title == "CRUD Test Task"
-        assert result.summary.criteria_total == 1
-        assert result.summary.tasks_total == 0
+        assert result.summary.overall_status == TaskStatus.NOT_STARTED
 
         # ADD: Add first task
         result = task(
             action="add",
             name="First task",
         )
-        assert result.summary.tasks_total == 1
-        assert result.summary.tasks_not_started == 1
+        assert result.summary.overall_status == TaskStatus.NOT_STARTED
         # Get task details using action='get'
         task_result = task(
             action="get",
@@ -79,8 +77,7 @@ class TestTaskCRUDCycle:
             name="Second task",
             goal="Complete this task",
         )
-        assert result.summary.tasks_total == 2
-        assert result.summary.tasks_not_started == 2
+        assert result.summary.overall_status == TaskStatus.NOT_STARTED
 
         # UPDATE: Mark first task as in_progress
         result = task(
@@ -88,8 +85,7 @@ class TestTaskCRUDCycle:
             task_id="T001",
             status="in_progress",
         )
-        assert result.summary.tasks_in_progress == 1
-        assert result.summary.tasks_not_started == 1
+        assert result.summary.overall_status == TaskStatus.IN_PROGRESS
         # Get task details using action='get'
         task_result = task(
             action="get",
@@ -103,9 +99,7 @@ class TestTaskCRUDCycle:
             task_id="T001",
             status="completed",
         )
-        assert result.summary.tasks_completed == 1
-        assert result.summary.tasks_in_progress == 0
-        assert result.summary.tasks_not_started == 1
+        assert result.summary.overall_status == TaskStatus.NOT_STARTED
         # Get task details using action='get'
         task_result = task(
             action="get",
@@ -133,9 +127,7 @@ class TestTaskCRUDCycle:
             action="remove",
             task_id="T001",
         )
-        assert result.summary.tasks_total == 1
-        assert result.summary.tasks_completed == 0
-        assert result.summary.tasks_not_started == 1
+        assert result.summary.overall_status == TaskStatus.NOT_STARTED
         # Verify using get to check task list
         get_result = get()
         assert len(get_result.spec.tasks) == 1
@@ -161,8 +153,7 @@ class TestCriteriaCRUDCycle:
             prompt="Test CRUD operation",
             criteria=["Initial criterion"],
         )
-        assert result.summary.criteria_total == 1
-        assert result.summary.criteria_completed == 0
+        assert result.summary.overall_status == TaskStatus.NOT_STARTED
         # Get criterion details using action='get'
         criterion_result = criteria(
             action="get",
@@ -178,8 +169,7 @@ class TestCriteriaCRUDCycle:
             action="add",
             description="Second criterion",
         )
-        assert result.summary.criteria_total == 2
-        assert result.summary.criteria_completed == 0
+        assert result.summary.overall_status == TaskStatus.NOT_STARTED
         # Get criterion details using action='get'
         criterion_result = criteria(
             action="get",
@@ -194,7 +184,7 @@ class TestCriteriaCRUDCycle:
             action="add",
             description="Third criterion",
         )
-        assert result.summary.criteria_total == 3
+        assert result.summary.overall_status == TaskStatus.NOT_STARTED
         # Get criterion details using action='get'
         criterion_result = criteria(
             action="get",
@@ -208,7 +198,7 @@ class TestCriteriaCRUDCycle:
             criterion_id="AC1",
             completed=True,
         )
-        assert result.summary.criteria_completed == 1
+        assert result.summary.overall_status == TaskStatus.NOT_STARTED
         # Get criterion details using action='get'
         criterion_result = criteria(
             action="get",
@@ -222,7 +212,7 @@ class TestCriteriaCRUDCycle:
             criterion_id="AC2",
             completed=True,
         )
-        assert result.summary.criteria_completed == 2
+        assert result.summary.overall_status == TaskStatus.NOT_STARTED
         # Get criterion details using action='get'
         criterion_result = criteria(
             action="get",
@@ -236,7 +226,7 @@ class TestCriteriaCRUDCycle:
             criterion_id="AC1",
             completed=False,
         )
-        assert result.summary.criteria_completed == 1
+        assert result.summary.overall_status == TaskStatus.NOT_STARTED
         # Get criterion details using action='get'
         criterion_result = criteria(
             action="get",
@@ -249,8 +239,7 @@ class TestCriteriaCRUDCycle:
             action="remove",
             criterion_id="AC1",
         )
-        assert result.summary.criteria_total == 2
-        assert result.summary.criteria_completed == 1
+        assert result.summary.overall_status == TaskStatus.NOT_STARTED
         # Verify using get to check criteria list
         get_result = get()
         assert len(get_result.spec.acceptance_criteria) == 2
@@ -263,8 +252,7 @@ class TestCriteriaCRUDCycle:
             action="remove",
             criterion_id="AC2",
         )
-        assert result.summary.criteria_total == 1
-        assert result.summary.criteria_completed == 0
+        assert result.summary.overall_status == TaskStatus.NOT_STARTED
         # Verify using get to check criteria list
         get_result = get()
         assert len(get_result.spec.acceptance_criteria) == 1
@@ -298,8 +286,7 @@ class TestMixedCRUDOperations:
             prompt="Test CRUD operation",
             criteria=["Criterion 1", "Criterion 2", "Criterion 3"],
         )
-        assert result.summary.criteria_total == 3
-        assert result.summary.tasks_total == 0
+        assert result.summary.overall_status == TaskStatus.NOT_STARTED
 
         # Add tasks
         task(
@@ -314,8 +301,7 @@ class TestMixedCRUDOperations:
             action="add",
             name="Task 3",
         )
-        assert result.summary.tasks_total == 3
-        assert result.summary.tasks_not_started == 3
+        assert result.summary.overall_status == TaskStatus.NOT_STARTED
 
         # Update task statuses to different states
         task(
@@ -333,10 +319,7 @@ class TestMixedCRUDOperations:
             task_id="T003",
             status="blocked",
         )
-        assert result.summary.tasks_in_progress == 1
-        assert result.summary.tasks_completed == 1
-        assert result.summary.tasks_blocked == 1
-        assert result.summary.tasks_not_started == 0
+        assert result.summary.overall_status == TaskStatus.BLOCKED
 
         # Complete some criteria
         criteria(
@@ -349,7 +332,7 @@ class TestMixedCRUDOperations:
             criterion_id="AC3",
             completed=True,
         )
-        assert result.summary.criteria_completed == 2
+        assert result.summary.overall_status == TaskStatus.BLOCKED
 
         # VERIFY: Final comprehensive state
         result = get()

@@ -8,7 +8,13 @@ import yaml
 from simpletask.core.models import TaskStatus
 from simpletask.core.task_file_ops import DEFAULT_CRITERION_DESCRIPTION
 from simpletask.core.yaml_parser import InvalidTaskFileError
-from simpletask.mcp.models import SimpleTaskItemResponse, SimpleTaskWriteResponse
+from simpletask.mcp.models import (
+    CompactStatusSummary,
+    SimpleTaskBatchResponse,
+    SimpleTaskItemResponse,
+    SimpleTaskWriteResponse,
+    StatusSummary,
+)
 from simpletask.mcp.server import criteria, new, task
 
 
@@ -57,7 +63,7 @@ class TestSimpletaskNew:
     def test_criteria_none_adds_default(self, temp_project):
         """Test that criteria=None adds a default criterion."""
         result = new(branch="t", title="T", prompt="P", criteria=None)
-        assert result.summary.criteria_total == 1
+        assert result.summary.overall_status == TaskStatus.NOT_STARTED
         assert "1 criteria" in result.message
 
     def test_criteria_empty_list_creates_default(self, temp_project):
@@ -69,7 +75,7 @@ class TestSimpletaskNew:
 
         # Should succeed and create default criterion
         assert result.success is True
-        assert result.summary.criteria_total == 1
+        assert result.summary.overall_status == TaskStatus.NOT_STARTED
 
         # Verify default criterion by reading the file
         task_path = get_task_file_path("t")
@@ -81,14 +87,14 @@ class TestSimpletaskNew:
     def test_criteria_list_creates_criteria(self, temp_project):
         """Test that criteria list creates criteria with correct IDs."""
         result = new(branch="t", title="T", prompt="P", criteria=["First", "Second"])
-        assert result.summary.criteria_total == 2
+        assert result.summary.overall_status == TaskStatus.NOT_STARTED
 
     def test_returns_correct_summary(self, temp_project):
-        """Test that returned summary has correct counts."""
+        """Test that returned summary has compact write fields."""
         result = new(branch="t", title="T", prompt="P", criteria=["A", "B", "C"])
-        assert result.summary.criteria_total == 3
-        assert result.summary.criteria_completed == 0
-        assert result.summary.tasks_total == 0
+        assert result.summary.branch == "t"
+        assert result.summary.title == "T"
+        assert result.summary.overall_status == TaskStatus.NOT_STARTED
 
 
 class TestSimpletaskTask:
@@ -100,7 +106,7 @@ class TestSimpletaskTask:
         assert isinstance(result, SimpleTaskWriteResponse)
         assert result.success is True
         assert result.action == "task_added"
-        assert result.summary.tasks_total == 1
+        assert result.summary.overall_status == TaskStatus.NOT_STARTED
         assert "Task 1" in result.message
 
     def test_add_missing_name_raises(self, task_project):
@@ -158,7 +164,7 @@ class TestSimpletaskTask:
         """Test removing a task successfully."""
         task(action="add", name="Task")
         result = task(action="remove", task_id="T001")
-        assert result.summary.tasks_total == 0
+        assert result.summary.overall_status == TaskStatus.NOT_STARTED
 
     def test_remove_missing_task_id_raises(self, task_project):
         """Test that remove without task_id raises ValueError."""
@@ -206,8 +212,7 @@ class TestSimpletaskCriteria:
         assert isinstance(result, SimpleTaskWriteResponse)
         assert result.success is True
         assert result.action == "criterion_added"
-        # Started with 1 placeholder, now have 2
-        assert result.summary.criteria_total == 2
+        assert result.summary.overall_status == TaskStatus.NOT_STARTED
         assert "New criterion" in result.message
 
     def test_add_missing_description_raises(self, task_project):
@@ -221,7 +226,7 @@ class TestSimpletaskCriteria:
         assert isinstance(result, SimpleTaskWriteResponse)
         assert result.success is True
         assert result.action == "criterion_completed"
-        assert result.summary.criteria_completed == 1
+        assert result.summary.overall_status == TaskStatus.NOT_STARTED
         # Verify it was actually completed by getting it
         get_result = criteria(action="get", criterion_id="AC1")
         assert get_result.criterion.completed is True
@@ -231,7 +236,7 @@ class TestSimpletaskCriteria:
         criteria(action="complete", criterion_id="AC1")
         result = criteria(action="complete", criterion_id="AC1", completed=False)
         assert result.action == "criterion_uncompleted"
-        assert result.summary.criteria_completed == 0
+        assert result.summary.overall_status == TaskStatus.NOT_STARTED
         # Verify it was actually marked incomplete by getting it
         get_result = criteria(action="get", criterion_id="AC1")
         assert get_result.criterion.completed is False
@@ -254,7 +259,7 @@ class TestSimpletaskCriteria:
         assert isinstance(result, SimpleTaskWriteResponse)
         assert result.success is True
         assert result.action == "criterion_removed"
-        assert result.summary.criteria_total == 1
+        assert result.summary.overall_status == TaskStatus.NOT_STARTED
 
     def test_remove_missing_criterion_id_raises(self, task_project):
         """Test that remove without criterion_id raises ValueError."""
@@ -365,8 +370,7 @@ class TestCriteriaRepair:
         result = criteria(action="add", description="New criterion")
 
         assert result.success is True
-        # Should have default AC1 + new AC2
-        assert result.summary.criteria_total == 2
+        assert result.summary.overall_status == TaskStatus.NOT_STARTED
 
         # Verify repair happened (default criterion was added) by reading file
         spec = parse_task_file(task_path)
@@ -450,7 +454,7 @@ class TestCriteriaRepair:
         result = criteria(action="add", description="New criterion")
 
         assert result.success is True
-        assert result.summary.criteria_total == 2  # Placeholder + new
+        assert result.summary.overall_status == TaskStatus.NOT_STARTED
 
         # Verify full repair
         spec = parse_task_file(task_path)
@@ -1051,3 +1055,146 @@ class TestTaskNewFields:
 
         error_msg = str(exc_info.value)
         assert "invalid_action" in error_msg or "action" in error_msg.lower()
+
+
+class TestCompactWriteResponseContract:
+    """Explicit contract tests: MCP write responses are compact (no full spec payload).
+
+    These tests exist specifically to guard against regression of issue #42.
+    They assert that task/criteria add/update responses:
+    - Are SimpleTaskWriteResponse instances (not SimpleTaskGetResponse or similar)
+    - Contain exactly the expected compact fields
+    - Use CompactStatusSummary (not the full StatusSummary with count fields)
+    - Do NOT embed full spec data (acceptance_criteria, tasks lists, etc.)
+    """
+
+    _EXPECTED_WRITE_RESPONSE_FIELDS = frozenset(
+        {"success", "action", "message", "file_path", "summary", "new_item_ids"}
+    )
+    _FIELDS_ABSENT_FROM_COMPACT_SUMMARY = frozenset(
+        {
+            "criteria_total",
+            "criteria_completed",
+            "tasks_total",
+            "tasks_completed",
+            "tasks_in_progress",
+            "tasks_not_started",
+            "tasks_blocked",
+            "tasks_paused",
+            "notes_total",
+            "iteration_summaries",
+        }
+    )
+
+    def _assert_compact_write_response(self, result: SimpleTaskWriteResponse) -> None:
+        """Assert that a write response conforms to the compact contract."""
+        # Must be a SimpleTaskWriteResponse (or subclass like SimpleTaskBatchResponse)
+        assert isinstance(result, SimpleTaskWriteResponse)
+
+        # Must contain exactly the expected top-level fields
+        response_fields = set(result.model_fields_set | set(result.__class__.model_fields.keys()))
+        for expected_field in self._EXPECTED_WRITE_RESPONSE_FIELDS:
+            assert expected_field in response_fields, (
+                f"Expected field '{expected_field}' missing from write response"
+            )
+
+        # Must NOT embed full spec or extra large fields at the top level
+        full_spec_fields = {"spec", "acceptance_criteria", "tasks", "quality_requirements"}
+        actual_keys = set(result.model_dump().keys())
+        for forbidden_field in full_spec_fields:
+            assert forbidden_field not in actual_keys, (
+                f"Write response must not contain '{forbidden_field}' (payload too large)"
+            )
+
+        # Summary must be CompactStatusSummary, not full StatusSummary
+        assert isinstance(result.summary, CompactStatusSummary), (
+            f"Write response summary should be CompactStatusSummary, got {type(result.summary)}"
+        )
+        assert not isinstance(result.summary, StatusSummary), (
+            "Write response summary must not be full StatusSummary (contains redundant count fields)"
+        )
+
+        # Compact summary must NOT have detailed count fields
+        summary_dict = result.summary.model_dump()
+        for absent_field in self._FIELDS_ABSENT_FROM_COMPACT_SUMMARY:
+            assert absent_field not in summary_dict, (
+                f"CompactStatusSummary must not contain '{absent_field}' (keeps response small)"
+            )
+
+        # Compact summary MUST have the three required minimal fields
+        assert "branch" in summary_dict
+        assert "title" in summary_dict
+        assert "overall_status" in summary_dict
+
+    def test_task_add_returns_compact_response(self, task_project):
+        """task(add) response must be a compact SimpleTaskWriteResponse."""
+        result = task(action="add", name="Compact Test Task", goal="Verify compact contract")
+        self._assert_compact_write_response(result)
+
+    def test_task_update_returns_compact_response(self, task_project):
+        """task(update) response must be a compact SimpleTaskWriteResponse."""
+        task(action="add", name="Task to Update")
+        result = task(action="update", task_id="T001", status="in_progress")
+        self._assert_compact_write_response(result)
+
+    def test_task_remove_returns_compact_response(self, task_project):
+        """task(remove) response must be a compact SimpleTaskWriteResponse."""
+        task(action="add", name="Task to Remove")
+        result = task(action="remove", task_id="T001")
+        self._assert_compact_write_response(result)
+
+    def test_task_batch_returns_compact_response(self, task_project):
+        """task(batch) response must be a compact SimpleTaskBatchResponse."""
+        result = task(
+            action="batch",
+            operations=[
+                {"op": "add", "name": "Batch Task 1"},
+                {"op": "add", "name": "Batch Task 2"},
+            ],
+        )
+        assert isinstance(result, SimpleTaskBatchResponse)
+        self._assert_compact_write_response(result)
+        assert result.new_item_ids == ["T001", "T002"]
+
+    def test_criteria_add_returns_compact_response(self, task_project):
+        """criteria(add) response must be a compact SimpleTaskWriteResponse."""
+        result = criteria(action="add", description="New compact criterion")
+        self._assert_compact_write_response(result)
+
+    def test_criteria_complete_returns_compact_response(self, task_project):
+        """criteria(complete) response must be a compact SimpleTaskWriteResponse."""
+        result = criteria(action="complete", criterion_id="AC1")
+        self._assert_compact_write_response(result)
+
+    def test_criteria_update_returns_compact_response(self, task_project):
+        """criteria(update) response must be a compact SimpleTaskWriteResponse."""
+        result = criteria(action="update", criterion_id="AC1", description="Updated description")
+        self._assert_compact_write_response(result)
+
+    def test_criteria_remove_returns_compact_response(self, task_project):
+        """criteria(remove) response must be a compact SimpleTaskWriteResponse."""
+        criteria(action="add", description="Criterion to remove")
+        result = criteria(action="remove", criterion_id="AC2")
+        self._assert_compact_write_response(result)
+
+    def test_new_task_file_returns_compact_response(self, temp_project):
+        """new() response must be a compact SimpleTaskWriteResponse."""
+        result = new(
+            branch="compact-new-test",
+            title="Compact New Test",
+            prompt="Test compact new response",
+        )
+        self._assert_compact_write_response(result)
+
+    def test_compact_summary_has_no_count_fields_at_all(self, task_project):
+        """Explicitly assert CompactStatusSummary model has no count fields defined."""
+        task(action="add", name="Count Check Task")
+        result = task(action="update", task_id="T001", status="completed")
+        assert isinstance(result.summary, CompactStatusSummary)
+
+        # model_fields contains ALL declared fields (not just set ones)
+        compact_field_names = set(result.summary.__class__.model_fields.keys())
+        for count_field in self._FIELDS_ABSENT_FROM_COMPACT_SUMMARY:
+            assert count_field not in compact_field_names, (
+                f"CompactStatusSummary model must not declare field '{count_field}'"
+            )

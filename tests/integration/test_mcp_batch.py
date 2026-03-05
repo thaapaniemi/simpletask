@@ -60,8 +60,11 @@ class TestMCPBatchValidOperations:
         assert result.success is True
         assert result.action == "batch_tasks_applied"
         assert result.new_item_ids == ["T001", "T002", "T003"]
-        assert result.summary.tasks_total == 3
-        assert result.summary.tasks_not_started == 3
+        assert result.summary.overall_status == TaskStatus.NOT_STARTED
+
+        state = get()
+        assert state.summary.tasks_total == 3
+        assert state.summary.tasks_not_started == 3
 
     def test_batch_remove_multiple_tasks(self, batch_project: Path):
         """Test batch removing multiple tasks."""
@@ -86,8 +89,11 @@ class TestMCPBatchValidOperations:
         )
 
         assert result.success is True
-        assert result.summary.tasks_total == 1
+        assert result.summary.overall_status == TaskStatus.NOT_STARTED
         assert result.new_item_ids == []
+
+        state = get()
+        assert state.summary.tasks_total == 1
 
     def test_batch_update_multiple_tasks(self, batch_project: Path):
         """Test batch updating multiple tasks."""
@@ -111,9 +117,12 @@ class TestMCPBatchValidOperations:
         )
 
         assert result.success is True
-        assert result.summary.tasks_in_progress == 1
-        assert result.summary.tasks_completed == 1
+        assert result.summary.overall_status == TaskStatus.IN_PROGRESS
         assert result.new_item_ids == []
+
+        state = get()
+        assert state.summary.tasks_in_progress == 1
+        assert state.summary.tasks_completed == 1
 
     def test_batch_mixed_operations(self, batch_project: Path):
         """Test batch with mixed operations (remove, add, update)."""
@@ -141,9 +150,12 @@ class TestMCPBatchValidOperations:
 
         assert result.success is True
         assert result.new_item_ids == ["T004", "T005"]
-        assert result.summary.tasks_total == 4  # 3 - 1 + 2 = 4
-        assert result.summary.tasks_completed == 1
-        assert result.summary.tasks_not_started == 3
+        assert result.summary.overall_status == TaskStatus.NOT_STARTED
+
+        state = get()
+        assert state.summary.tasks_total == 4  # 3 - 1 + 2 = 4
+        assert state.summary.tasks_completed == 1
+        assert state.summary.tasks_not_started == 3
 
 
 class TestMCPBatchInvalidOperations:
