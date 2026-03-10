@@ -2,6 +2,7 @@
 
 import typer
 
+from simpletask.commands.task.helpers import _parse_file_actions
 from simpletask.core.models import TaskStatus
 from simpletask.core.project import get_task_file_path
 from simpletask.core.task_ops import _UNSET, _UnsetType, update_implementation_task
@@ -19,6 +20,21 @@ def update_command(
     ),
     name: str | None = typer.Option(None, "--name", "-n", help="New task name"),
     goal: str | None = typer.Option(None, "--goal", "-g", help="New task goal"),
+    step: list[str] = typer.Option(  # noqa: B008
+        None, "--step", help="Replace implementation steps (repeatable)"
+    ),
+    done_when: list[str] = typer.Option(  # noqa: B008
+        None, "--done-when", help="Replace completion conditions (repeatable)"
+    ),
+    prerequisite: list[str] = typer.Option(  # noqa: B008
+        None, "--prerequisite", "--prereq", help="Replace prerequisite task IDs (repeatable)"
+    ),
+    file: list[str] = typer.Option(  # noqa: B008
+        None,
+        "--file",
+        help="Replace files in path:action format (repeatable). "
+        "code_examples are available via MCP only.",
+    ),
     iteration: int | None = typer.Option(
         None,
         "--iteration",
@@ -42,6 +58,9 @@ def update_command(
         simpletask task update T003 --iteration 2
         simpletask task update T003 --unassign-iteration
         simpletask task update T003 --status in_progress --branch feature-123
+        simpletask task update T001 --step "New step 1" --step "New step 2"
+        simpletask task update T001 --prerequisite T002 --prerequisite T003
+        simpletask task update T001 --file "src/core.py:modify"
 
     Raises:
         ValueError: If not in a git repository, branch cannot be determined,
@@ -75,6 +94,12 @@ def update_command(
         else:
             iteration_value = _UNSET
 
+        # Parse options
+        steps_value = step or None
+        done_when_value = done_when or None
+        prerequisites_value = prerequisite or None
+        file_actions = _parse_file_actions(file) if file else None
+
         file_path = get_task_file_path(branch)
         update_implementation_task(
             file_path,
@@ -82,6 +107,10 @@ def update_command(
             name=name,
             goal=goal,
             status=task_status,
+            steps=steps_value,
+            done_when=done_when_value,
+            prerequisites=prerequisites_value,
+            files=file_actions,
             iteration=iteration_value,
         )
 
