@@ -172,7 +172,7 @@ class TestMCPBatchInvalidOperations:
         )
 
         # Batch with missing task_id for remove
-        with pytest.raises(ValueError, match="task_id is required for remove operation"):
+        with pytest.raises(ValueError, match="task_id required for remove"):
             task(
                 action="batch",
                 operations=[
@@ -191,7 +191,7 @@ class TestMCPBatchInvalidOperations:
         )
 
         # Batch with missing name for add
-        with pytest.raises(ValueError, match="name is required for add operation"):
+        with pytest.raises(ValueError, match="name required for add operation"):
             task(
                 action="batch",
                 operations=[

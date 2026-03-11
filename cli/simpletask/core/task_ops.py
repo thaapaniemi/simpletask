@@ -1,5 +1,6 @@
 """Task operations for CRUD on implementation tasks in task files."""
 
+from collections.abc import Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Union
 
@@ -256,7 +257,7 @@ def remove_implementation_task(
 
 
 def batch_tasks(
-    file_path: Path, operations: list[Union[dict[str, Any], "BatchTaskOperation"]]
+    file_path: Path, operations: Sequence[Union[dict[str, Any], "BatchTaskOperation"]]
 ) -> tuple[list[str], SimpleTaskSpec]:
     """Perform multiple task operations atomically.
 
@@ -265,7 +266,7 @@ def batch_tasks(
 
     Args:
         file_path: Path to task YAML file
-        operations: List of BatchTaskOperation dicts or objects
+        operations: List of BatchTaskOperation objects or raw dicts
 
     Returns:
         Tuple of (list of newly created task IDs, updated SimpleTaskSpec in-memory)
@@ -288,8 +289,7 @@ def batch_tasks(
 
     # Convert all operations to dicts once upfront for efficiency
     ops_as_dicts: list[dict[str, Any]] = [
-        op if isinstance(op, dict) else op.model_dump(exclude_unset=True)  # type: ignore[union-attr]
-        for op in operations
+        op if isinstance(op, dict) else op.model_dump(exclude_unset=True) for op in operations
     ]
 
     # Validate all operations upfront (fail fast before making any changes)

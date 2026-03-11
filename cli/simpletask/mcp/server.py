@@ -7,7 +7,6 @@ import builtins  # noqa: I001
 from typing import Literal, cast
 
 from mcp.server.fastmcp import FastMCP
-from pydantic import ValidationError
 
 from ..core.constraint_ops import add_constraint, list_constraints, remove_constraint
 from ..core.context_ops import remove_context, set_context, show_context
@@ -258,7 +257,7 @@ def task(
     prerequisites: _list[str] | None = None,
     files: _list[dict] | None = None,
     code_examples: _list[dict] | None = None,
-    operations: _list[dict] | None = None,
+    operations: _list[BatchTaskOperation] | None = None,
     iteration: int | None = None,
     unassign_iteration: bool = False,
 ) -> SimpleTaskWriteResponse | SimpleTaskItemResponse | SimpleTaskBatchResponse:
@@ -277,7 +276,7 @@ def task(
         prerequisites: List of prerequisite task IDs (optional for add/update)
         files: List of FileAction dicts with path and action fields (optional for add/update)
         code_examples: List of CodeExample dicts with path and description fields (optional for add/update)
-        operations: List of BatchTaskOperation dicts (required for batch action)
+        operations: List of BatchTaskOperation objects (required for batch action)
         iteration: Iteration ID (int) to assign the task to (for add/update). Omit or pass None to
             preserve existing assignment. Use unassign_iteration=True to explicitly remove assignment.
         unassign_iteration: Set True to explicitly remove the task's iteration assignment (update only).
@@ -415,18 +414,10 @@ def task(
         case "batch":
             if not operations:
                 raise ValueError("'operations' is required for action='batch'")
-            # Validate and convert operations to BatchTaskOperation objects
-            try:
-                validated_ops = [BatchTaskOperation(**op) for op in operations]
-            except ValidationError as e:
-                # Convert Pydantic validation errors to user-friendly message
-                errors = []
-                for err in e.errors():
-                    loc = ".".join(str(x) for x in err["loc"])
-                    errors.append(f"{loc}: {err['msg']}")
-                raise ValueError(f"Invalid batch operations: {'; '.join(errors)}") from e
+            # FastMCP deserializes list[BatchTaskOperation] automatically; operations are
+            # already validated BatchTaskOperation instances at this point.
             # Execute batch operations atomically; returns (new_ids, updated spec)
-            new_task_ids, spec = batch_tasks(file_path, validated_ops)  # type: ignore[arg-type]
+            new_task_ids, spec = batch_tasks(file_path, operations)
             summary = compute_compact_status_summary(spec)
             return SimpleTaskBatchResponse(
                 success=True,
