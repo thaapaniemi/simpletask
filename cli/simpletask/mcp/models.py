@@ -6,7 +6,7 @@ including status summaries and validation results.
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from ..core.models import (
     AcceptanceCriterion,
@@ -62,9 +62,26 @@ class BatchTaskOperation(BaseModel):
     prerequisites: list[str] | None = Field(None, description="Task IDs that must complete first")
     files: list[FileAction] | None = Field(None, description="Files to create/modify/delete")
     code_examples: list[CodeExample] | None = Field(None, description="Code patterns to follow")
-    iteration: int | None = Field(
+    iteration: int | str | None = Field(
         None, description="Iteration ID to assign task to (for add/update)"
     )
+
+    @field_validator("iteration", mode="before")
+    @classmethod
+    def coerce_iteration_to_int(cls, v: Any) -> int | None:
+        """Coerce string integers to int.
+
+        Qwen CLI passes integer parameters as JSON strings (e.g. "3" instead of 3).
+        This validator accepts string integers and converts them, so the generated
+        JSON schema includes string as a valid type (satisfying Qwen's client-side
+        schema validation) while we store the correct int value.
+        """
+        if v is None:
+            return None
+        try:
+            return int(v)
+        except (ValueError, TypeError):
+            raise ValueError(f"'iteration' must be an integer, got: {v!r}") from None
 
     @model_validator(mode="after")
     def validate_required_fields(self) -> "BatchTaskOperation":

@@ -233,7 +233,7 @@ def task(
     files: _list[FileAction] | None = None,
     code_examples: _list[CodeExample] | None = None,
     operations: _list[BatchTaskOperation] | None = None,
-    iteration: int | None = None,
+    iteration: int | str | None = None,
     unassign_iteration: bool = False,
 ) -> SimpleTaskWriteResponse | SimpleTaskItemResponse | SimpleTaskBatchResponse:
     """Manage implementation tasks.
@@ -254,6 +254,7 @@ def task(
         operations: List of BatchTaskOperation objects (required for batch action)
         iteration: Iteration ID (int) to assign the task to (for add/update). Omit or pass None to
             preserve existing assignment. Use unassign_iteration=True to explicitly remove assignment.
+            String integers (e.g. "3") are accepted and coerced to int for compatibility with Qwen CLI.
         unassign_iteration: Set True to explicitly remove the task's iteration assignment (update only).
             Cannot be combined with an integer iteration value.
 
@@ -263,8 +264,18 @@ def task(
         SimpleTaskBatchResponse for batch operations.
 
     Raises:
-        ValueError: If required parameters missing or invalid values provided.
+         ValueError: If required parameters missing or invalid values provided.
     """
+    # Coerce string integers to int — Qwen CLI passes integers as strings (e.g. "3" instead of 3),
+    # which fails client-side JSON schema validation unless the schema accepts strings too.
+    # We accept int | str | None in the signature and coerce here before any logic uses the value.
+    iteration_int: int | None = None
+    if iteration is not None:
+        try:
+            iteration_int = int(iteration)
+        except (ValueError, TypeError):
+            raise ValueError(f"'iteration' must be an integer, got: {iteration!r}") from None
+
     file_path = get_current_task_file_path()
     summary: StatusSummary | CompactStatusSummary
 
@@ -302,7 +313,7 @@ def task(
                 prerequisites=prerequisites,
                 files=files,
                 code_examples=code_examples,
-                iteration=iteration,
+                iteration=iteration_int,
             )
             summary = compute_compact_status_summary(spec)
             return SimpleTaskWriteResponse(
@@ -336,8 +347,8 @@ def task(
             iteration_value: int | None | _TaskUnsetType = _TASK_UNSET
             if unassign_iteration:
                 iteration_value = None
-            elif iteration is not None:
-                iteration_value = iteration
+            elif iteration_int is not None:
+                iteration_value = iteration_int
 
             spec = update_implementation_task(
                 file_path,
@@ -1087,14 +1098,15 @@ def context(
 def iteration(
     action: Literal["add", "list", "get", "remove"],
     label: str | None = None,
-    iteration_id: int | None = None,
+    iteration_id: int | str | None = None,
 ) -> SimpleTaskIterationResponse | SimpleTaskWriteResponse:
     """Manage task iterations for semantic separation of development rounds.
 
     Args:
         action: Operation to perform ('add', 'list', 'get', 'remove')
         label: Human-readable label for the iteration (required for add)
-        iteration_id: Iteration ID (required for get/remove)
+        iteration_id: Iteration ID (required for get/remove).
+            String integers (e.g. "1") are accepted and coerced to int for compatibility with Qwen CLI.
 
     Returns:
         SimpleTaskIterationResponse for list/get actions.
@@ -1103,6 +1115,14 @@ def iteration(
     Raises:
         ValueError: If required parameters missing or iteration not found.
     """
+    # Coerce string integers to int — Qwen CLI passes integers as strings.
+    iteration_id_int: int | None = None
+    if iteration_id is not None:
+        try:
+            iteration_id_int = int(iteration_id)
+        except (ValueError, TypeError):
+            raise ValueError(f"'iteration_id' must be an integer, got: {iteration_id!r}") from None
+
     file_path = get_current_task_file_path()
     spec = parse_task_file(file_path)
     summary: StatusSummary | CompactStatusSummary
@@ -1119,9 +1139,9 @@ def iteration(
             )
 
         case "get":
-            if iteration_id is None:
+            if iteration_id_int is None:
                 raise ValueError("'iteration_id' is required for action='get'")
-            iter_obj = get_iteration_from_spec(spec, iteration_id)
+            iter_obj = get_iteration_from_spec(spec, iteration_id_int)
             summary = compute_status_summary(spec)
             return SimpleTaskIterationResponse(
                 action="iteration_get",
@@ -1146,15 +1166,15 @@ def iteration(
             )
 
         case "remove":
-            if iteration_id is None:
+            if iteration_id_int is None:
                 raise ValueError("'iteration_id' is required for action='remove'")
-            spec = remove_iteration_from_spec(spec, iteration_id)
+            spec = remove_iteration_from_spec(spec, iteration_id_int)
             write_task_file(file_path, spec)
             summary = compute_compact_status_summary(spec)
             return SimpleTaskWriteResponse(
                 success=True,
                 action="iteration_removed",
-                message=f"Removed iteration {iteration_id}",
+                message=f"Removed iteration {iteration_id_int}",
                 file_path=str(file_path),
                 summary=summary,
                 new_item_ids=[],

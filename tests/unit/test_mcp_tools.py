@@ -433,8 +433,60 @@ class TestMCPIterationTool:
         assert sprint_summary.tasks_not_started == 1
         assert sprint_summary.tasks_completed == 0
 
+    def test_task_update_iteration_as_string_coerced(self, tmp_project_with_task):
+        """Test that task update accepts iteration ID as a string (Qwen CLI compat).
 
-class TestMCPQuality:
+        Qwen CLI passes integer parameters as JSON strings (e.g. "3" instead of 3).
+        The MCP server must accept and coerce these string integers transparently.
+        """
+        _project_root, task_file = tmp_project_with_task
+        with patch("simpletask.mcp.server.get_current_task_file_path", return_value=task_file):
+            add_result = iteration(action="add", label="Sprint 1")
+            new_id = int(add_result.new_item_ids[0])
+            # Pass iteration as a string, as Qwen CLI would
+            result = task(action="update", task_id="T001", iteration=str(new_id))
+            get_result = get()
+        t001 = next(t for t in get_result.spec.tasks if t.id == "T001")
+        assert result.success is True
+        assert t001.iteration == new_id
+
+    def test_iteration_get_id_as_string_coerced(self, tmp_project_with_task):
+        """Test that iteration get accepts iteration_id as a string (Qwen CLI compat)."""
+        _project_root, task_file = tmp_project_with_task
+        with patch("simpletask.mcp.server.get_current_task_file_path", return_value=task_file):
+            add_result = iteration(action="add", label="Sprint 1")
+            new_id = add_result.new_item_ids[0]  # string form from new_item_ids
+            result = iteration(action="get", iteration_id=new_id)
+        assert result.action == "iteration_get"
+        assert result.iterations is not None
+        assert len(result.iterations) == 1
+        assert result.iterations[0].label == "Sprint 1"
+
+    def test_iteration_remove_id_as_string_coerced(self, tmp_project_with_task):
+        """Test that iteration remove accepts iteration_id as a string (Qwen CLI compat)."""
+        _project_root, task_file = tmp_project_with_task
+        with patch("simpletask.mcp.server.get_current_task_file_path", return_value=task_file):
+            add_result = iteration(action="add", label="To Delete")
+            new_id = add_result.new_item_ids[0]  # string form from new_item_ids
+            remove_result = iteration(action="remove", iteration_id=new_id)
+            list_result = iteration(action="list")
+        assert remove_result.success is True
+        assert list_result.iterations == [] or list_result.iterations is None
+
+    def test_iteration_invalid_string_id_raises(self, tmp_project_with_task):
+        """Test that a non-numeric string raises ValueError."""
+        _project_root, task_file = tmp_project_with_task
+        with patch("simpletask.mcp.server.get_current_task_file_path", return_value=task_file):
+            with pytest.raises(ValueError, match="iteration_id"):
+                iteration(action="get", iteration_id="not-a-number")
+
+    def test_task_update_invalid_iteration_string_raises(self, tmp_project_with_task):
+        """Test that a non-numeric string for iteration raises ValueError."""
+        _project_root, task_file = tmp_project_with_task
+        with patch("simpletask.mcp.server.get_current_task_file_path", return_value=task_file):
+            with pytest.raises(ValueError, match="iteration"):
+                task(action="update", task_id="T001", iteration="not-a-number")
+
     """Tests for quality() MCP tool filter flags."""
 
     def _make_mock_spec(self, tmp_project_with_task):

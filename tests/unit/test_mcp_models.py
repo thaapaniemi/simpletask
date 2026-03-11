@@ -228,3 +228,25 @@ class TestBatchTaskOperation:
                 name="Task",
                 invalid_field="value",
             )
+
+    def test_iteration_string_coerced_to_int(self):
+        """Test that string integers are coerced to int for Qwen CLI compatibility."""
+        op = BatchTaskOperation(op="update", task_id="T001", iteration="3")
+        assert op.iteration == 3
+        assert isinstance(op.iteration, int)
+
+    def test_iteration_int_unchanged(self):
+        """Test that integer iterations pass through unchanged."""
+        op = BatchTaskOperation(op="update", task_id="T001", iteration=3)
+        assert op.iteration == 3
+        assert isinstance(op.iteration, int)
+
+    def test_iteration_none_unchanged(self):
+        """Test that None iterations pass through unchanged."""
+        op = BatchTaskOperation(op="update", task_id="T001", iteration=None)
+        assert op.iteration is None
+
+    def test_iteration_invalid_string_raises(self):
+        """Test that non-numeric strings raise ValidationError."""
+        with pytest.raises(ValidationError):
+            BatchTaskOperation(op="update", task_id="T001", iteration="not-a-number")
