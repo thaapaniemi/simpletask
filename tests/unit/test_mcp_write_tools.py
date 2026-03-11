@@ -717,7 +717,140 @@ class TestTaskNewFields:
         assert task_obj.code_examples[0].description == "Example pattern"
         assert task_obj.code_examples[0].code == "def example(): pass"
 
-    def test_task_add_with_all_fields(self, temp_project):
+    def test_task_add_with_typed_file_action_objects(self, temp_project):
+        """Test task add with FileAction model instances (typed path, not raw dicts)."""
+        import subprocess
+
+        from simpletask.core.models import CodeExample, FileAction
+        from simpletask.core.project import get_task_file_path
+        from simpletask.core.yaml_parser import parse_task_file
+
+        new(branch="typed-fields-test", title="Test", prompt="Test", criteria=["AC1"])
+
+        subprocess.run(["git", "checkout", "-b", "typed-fields-test"], cwd=temp_project, check=True)
+
+        # Pass typed Pydantic model instances directly (new typed parameter path)
+        result = task(
+            action="add",
+            name="Typed Fields Task",
+            goal="Test typed parameters",
+            files=[
+                FileAction(path="src/typed.py", action="create"),
+                FileAction(path="tests/test_typed.py", action="create"),
+            ],
+            code_examples=[
+                CodeExample(
+                    language="python",
+                    description="Typed example",
+                    code="class TypedExample: pass",
+                ),
+            ],
+        )
+
+        assert result.success is True
+
+        # Verify typed models were serialized and saved correctly
+        task_path = get_task_file_path("typed-fields-test")
+        spec = parse_task_file(task_path)
+        assert spec.tasks is not None
+        task_obj = spec.tasks[0]
+        assert task_obj.files is not None
+        assert len(task_obj.files) == 2
+        assert task_obj.files[0].path == "src/typed.py"
+        assert task_obj.files[0].action == "create"
+        assert task_obj.files[1].path == "tests/test_typed.py"
+        assert task_obj.files[1].action == "create"
+        assert task_obj.code_examples is not None
+        assert len(task_obj.code_examples) == 1
+        assert task_obj.code_examples[0].language == "python"
+        assert task_obj.code_examples[0].description == "Typed example"
+        assert task_obj.code_examples[0].code == "class TypedExample: pass"
+
+    def test_task_update_with_typed_file_action_objects(self, temp_project):
+        """Test task update with FileAction/CodeExample model instances (typed path)."""
+        import subprocess
+
+        from simpletask.core.models import CodeExample, FileAction
+        from simpletask.core.project import get_task_file_path
+        from simpletask.core.yaml_parser import parse_task_file
+
+        new(branch="typed-update-test", title="Test", prompt="Test", criteria=["AC1"])
+
+        subprocess.run(["git", "checkout", "-b", "typed-update-test"], cwd=temp_project, check=True)
+
+        task(action="add", name="Initial Task")
+
+        # Update with typed model instances
+        result = task(
+            action="update",
+            task_id="T001",
+            files=[FileAction(path="src/updated.py", action="modify")],
+            code_examples=[
+                CodeExample(language="python", code="def updated(): pass"),
+            ],
+        )
+
+        assert result.success is True
+
+        task_path = get_task_file_path("typed-update-test")
+        spec = parse_task_file(task_path)
+        assert spec.tasks is not None
+        task_obj = spec.tasks[0]
+        assert task_obj.files is not None
+        assert task_obj.files[0] == FileAction(path="src/updated.py", action="modify")
+        assert task_obj.code_examples is not None
+        assert task_obj.code_examples[0].language == "python"
+        assert task_obj.code_examples[0].code == "def updated(): pass"
+
+    def test_batch_operation_with_typed_file_action_objects(self, temp_project):
+        """Test batch add with FileAction/CodeExample model instances in BatchTaskOperation."""
+        import subprocess
+
+        from simpletask.core.models import CodeExample, FileAction
+        from simpletask.core.project import get_task_file_path
+        from simpletask.core.yaml_parser import parse_task_file
+        from simpletask.mcp.models import BatchTaskOperation
+
+        new(branch="batch-typed-test", title="Test", prompt="Test", criteria=["AC1"])
+
+        subprocess.run(["git", "checkout", "-b", "batch-typed-test"], cwd=temp_project, check=True)
+
+        # Pass BatchTaskOperation instances with typed fields
+        result = task(
+            action="batch",
+            operations=[
+                BatchTaskOperation(
+                    op="add",
+                    name="Batch Typed Task",
+                    goal="Batch task with typed models",
+                    steps=["Step 1"],
+                    files=[FileAction(path="src/batch_typed.py", action="create")],
+                    code_examples=[
+                        CodeExample(
+                            language="python",
+                            description="Batch typed example",
+                            code="def batch_typed(): pass",
+                        )
+                    ],
+                ),
+            ],
+        )
+
+        assert result.success is True
+        assert len(result.new_item_ids) == 1
+
+        task_path = get_task_file_path("batch-typed-test")
+        spec = parse_task_file(task_path)
+        assert spec.tasks is not None
+        batch_task = spec.tasks[0]
+        assert batch_task.files is not None
+        assert len(batch_task.files) == 1
+        assert batch_task.files[0].path == "src/batch_typed.py"
+        assert batch_task.files[0].action == "create"
+        assert batch_task.code_examples is not None
+        assert len(batch_task.code_examples) == 1
+        assert batch_task.code_examples[0].language == "python"
+        assert batch_task.code_examples[0].code == "def batch_typed(): pass"
         """Test task add with all new parameters combined."""
         import subprocess
 

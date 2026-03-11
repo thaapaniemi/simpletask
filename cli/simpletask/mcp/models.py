@@ -10,7 +10,9 @@ from pydantic import BaseModel, Field, model_validator
 
 from ..core.models import (
     AcceptanceCriterion,
+    CodeExample,
     Design,
+    FileAction,
     Iteration,
     QualityCheckResult,
     QualityRequirements,
@@ -58,8 +60,8 @@ class BatchTaskOperation(BaseModel):
     steps: list[str] | None = Field(None, description="Task steps (for add)")
     done_when: list[str] | None = Field(None, description="Completion conditions")
     prerequisites: list[str] | None = Field(None, description="Task IDs that must complete first")
-    files: list[dict] | None = Field(None, description="Files to create/modify/delete")
-    code_examples: list[dict] | None = Field(None, description="Code patterns to follow")
+    files: list[FileAction] | None = Field(None, description="Files to create/modify/delete")
+    code_examples: list[CodeExample] | None = Field(None, description="Code patterns to follow")
     iteration: int | None = Field(
         None, description="Iteration ID to assign task to (for add/update)"
     )

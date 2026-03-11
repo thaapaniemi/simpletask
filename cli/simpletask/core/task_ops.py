@@ -193,9 +193,9 @@ def update_implementation_task(
     if prerequisites is not None:
         task.prerequisites = prerequisites
     if files is not None:
-        task.files = files
+        task.files = [FileAction(**f) if isinstance(f, dict) else f for f in files]
     if code_examples is not None:
-        task.code_examples = code_examples
+        task.code_examples = [CodeExample(**c) if isinstance(c, dict) else c for c in code_examples]
     if not isinstance(iteration, _UnsetType):
         task.iteration = iteration  # type: ignore[assignment]  # narrowed to int | None
 
@@ -391,13 +391,15 @@ def batch_tasks(
             if op_dict.get("prerequisites") is not None:
                 task.prerequisites = op_dict["prerequisites"]
 
-            # Update files field with conversion
+            # model_dump() converts FileAction/CodeExample back to raw dicts, so re-coerce
             if op_dict.get("files") is not None:
-                task.files = [FileAction(**f) for f in op_dict["files"]]
-
-            # Update code_examples field with conversion
+                task.files = [
+                    FileAction(**f) if isinstance(f, dict) else f for f in op_dict["files"]
+                ]
             if op_dict.get("code_examples") is not None:
-                task.code_examples = [CodeExample(**c) for c in op_dict["code_examples"]]
+                task.code_examples = [
+                    CodeExample(**c) if isinstance(c, dict) else c for c in op_dict["code_examples"]
+                ]
 
             # Update iteration field if provided (None means unassign)
             if "iteration" in op_dict:
@@ -443,17 +445,8 @@ def batch_tasks(
                         f"iteration does not exist. Available: {sorted(valid_iteration_ids)}"
                     )
 
-            # Convert files list[dict] to list[FileAction]
-            files = None
-            if op_dict.get("files"):
-                files = [FileAction(**f) for f in op_dict["files"]]
-
-            # Convert code_examples list[dict] to list[CodeExample]
-            code_examples = None
-            if op_dict.get("code_examples"):
-                code_examples = [CodeExample(**c) for c in op_dict["code_examples"]]
-
-            # Create new task
+            # model_dump() converts FileAction/CodeExample back to raw dicts; pass raw values
+            # to Task() constructor which coerces dicts to model instances via Pydantic validation.
             new_task = Task(
                 id=new_id,
                 name=op_dict["name"],
@@ -462,8 +455,8 @@ def batch_tasks(
                 steps=steps,
                 done_when=done_when,
                 prerequisites=prerequisites,
-                files=files,
-                code_examples=code_examples,
+                files=op_dict.get("files"),
+                code_examples=op_dict.get("code_examples"),
                 notes=None,
                 iteration=op_dict.get("iteration"),
             )

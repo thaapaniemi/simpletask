@@ -118,31 +118,6 @@ __all__ = [
 ]
 
 
-def _convert_task_field_dicts(
-    files: _list[dict] | None,
-    code_examples: _list[dict] | None,
-) -> tuple[_list[FileAction] | None, _list[CodeExample] | None]:
-    """Convert files and code_examples from dict form to Pydantic models.
-
-    Args:
-        files: List of file action dicts or None
-        code_examples: List of code example dicts or None
-
-    Returns:
-        Tuple of (files_converted, code_examples_converted) where each is
-        either a list of Pydantic models or None.
-    """
-    files_converted = None
-    if files:
-        files_converted = [FileAction(**f) for f in files]
-
-    code_examples_converted = None
-    if code_examples:
-        code_examples_converted = [CodeExample(**c) for c in code_examples]
-
-    return files_converted, code_examples_converted
-
-
 @mcp.tool()
 def get(
     validate: bool = False,
@@ -255,8 +230,8 @@ def task(
     steps: _list[str] | None = None,
     done_when: _list[str] | None = None,
     prerequisites: _list[str] | None = None,
-    files: _list[dict] | None = None,
-    code_examples: _list[dict] | None = None,
+    files: _list[FileAction] | None = None,
+    code_examples: _list[CodeExample] | None = None,
     operations: _list[BatchTaskOperation] | None = None,
     iteration: int | None = None,
     unassign_iteration: bool = False,
@@ -274,8 +249,8 @@ def task(
                Only applies to action='add'.
         done_when: List of completion verification conditions (optional for add/update)
         prerequisites: List of prerequisite task IDs (optional for add/update)
-        files: List of FileAction dicts with path and action fields (optional for add/update)
-        code_examples: List of CodeExample dicts with path and description fields (optional for add/update)
+        files: List of FileAction objects with path and action fields (optional for add/update)
+        code_examples: List of CodeExample objects with language, code, and description fields (optional for add/update)
         operations: List of BatchTaskOperation objects (required for batch action)
         iteration: Iteration ID (int) to assign the task to (for add/update). Omit or pass None to
             preserve existing assignment. Use unassign_iteration=True to explicitly remove assignment.
@@ -318,11 +293,6 @@ def task(
                 raise ValueError("'name' is required for action='add'")
             # Note: status param intentionally ignored for add - new tasks start as not_started
 
-            # Convert dicts to Pydantic models
-            files_converted, code_examples_converted = _convert_task_field_dicts(
-                files, code_examples
-            )
-
             new_id, spec = add_implementation_task(
                 file_path,
                 name,
@@ -330,8 +300,8 @@ def task(
                 steps=steps,
                 done_when=done_when,
                 prerequisites=prerequisites,
-                files=files_converted,
-                code_examples=code_examples_converted,
+                files=files,
+                code_examples=code_examples,
                 iteration=iteration,
             )
             summary = compute_compact_status_summary(spec)
@@ -354,11 +324,6 @@ def task(
                 except ValueError:
                     valid = [s.value for s in TaskStatus]
                     raise ValueError(f"Invalid status '{status}'. Valid: {valid}") from None
-
-            # Convert dicts to Pydantic models
-            files_converted, code_examples_converted = _convert_task_field_dicts(
-                files, code_examples
-            )
 
             # Resolve iteration sentinel — three distinct states over MCP JSON:
             #   unassign_iteration=True   → explicitly remove assignment (set to None)
@@ -383,8 +348,8 @@ def task(
                 steps,
                 done_when,
                 prerequisites,
-                files_converted,
-                code_examples_converted,
+                files,
+                code_examples,
                 iteration=iteration_value,
             )
             summary = compute_compact_status_summary(spec)
