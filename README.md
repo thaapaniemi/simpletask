@@ -1,18 +1,19 @@
 # simpletask
 
-CLI tool for managing AI-friendly task definitions in branch-based development workflows.
+Schema-enforced, branch-scoped task definitions that AI agents can query and execute — not markdown templates to interpret.
 
 ## Highlights
 
-- **Branch-aware task management** - Automatically links tasks to git branches
-- **YAML-based task files** - Human-readable, version-controllable task definitions
-- **AI-optimized format** - Structured schema designed for AI agent consumption
-- **Acceptance criteria tracking** - Track completion status of task requirements
-- **Schema validation** - JSON Schema validation ensures task file integrity
+- **Structured data, not prose** — YAML validated by JSON Schema and Pydantic v2; AI agents receive typed objects via MCP, not text to interpret
+- **Ephemeral by design** — task files are git-ignored and tied to the branch; they disappear when the branch merges, keeping the repo clean
+- **Quality gates in the spec** — linting, type checking, and test coverage thresholds are typed fields the AI can execute and verify, not external CI concerns
+- **Design guidance as typed constraints** — architectural patterns, security categories, and error-handling strategies are enumerated fields, not comments or prose
+- **Objective task atomicity** — `/simpletask.split` enforces measurable thresholds (≤2 steps, ≤1 file, ≤100-char goal) before execution begins
+- **Editor-agnostic MCP provider** — 11 typed tools with no orchestration coupling; switching AI editors doesn't invalidate your task definitions
 
 ## Table of Contents
 
-- [About](#about)
+- [Why simpletask?](#why-simpletask)
 - [Getting Started](#getting-started)
 - [Usage](#usage)
 - [Task File Format](#task-file-format)
@@ -22,16 +23,19 @@ CLI tool for managing AI-friendly task definitions in branch-based development w
 - [Development](#development)
 - [License](#license)
 
-## About
+## Why simpletask?
 
-simpletask provides a structured way to define development tasks that both humans and AI agents can understand. Each task is stored as a YAML file linked to a git branch, containing the original prompt, acceptance criteria, constraints, and implementation steps.
+**Structured data, not prose.** Task files are strictly validated YAML, governed by a JSON Schema and parsed through Pydantic v2 models with `extra="forbid"`. Every field — acceptance criteria, task status, prerequisites, quality thresholds, architectural patterns — is a typed entity. An AI agent reading a task file via MCP receives structured data objects, not paragraphs to interpret. This eliminates a class of hallucination risk where the agent misreads or misinterprets a requirement.
 
-This approach enables:
+**Ephemeral by design.** Task files live in `.tasks/`, which is git-ignored by default. They are linked to a branch by name (`feature/auth` → `.tasks/feature-auth.yml`) and disappear when the branch is deleted. No accumulation of stale task artifacts across dozens of feature branches. No risk of outdated task state misleading future agents or developers. If you need persistent task history across the project lifetime, simpletask is deliberately not for that — it is scoped to a single branch's implementation cycle.
 
-- Clear communication between developers and AI coding assistants
-- Trackable progress through acceptance criteria
-- Reproducible task definitions that can be version controlled
-- Consistent task structure across projects
+**Quality gates inside the spec.** Linting, type checking, test coverage thresholds, and security scans are first-class typed fields in the task spec itself. An AI agent can read them via `simpletask_quality(action="get")` and execute them via `simpletask_quality(action="check")`, receiving structured pass/fail results back into context. The spec describes not just *what* to build but *how to verify it was built correctly* — no manual CI handoff required.
+
+**Design guidance as typed constraints.** Architectural patterns come from an enumerated set (repository, service_layer, factory, mvc, hexagonal, dependency_injection, etc.). Security categories are enumerated (authentication, authorization, input_validation, etc.). Reference implementations point to specific files with a required reason. This means an AI agent receives design guidance as structured constraints it can reason about and validate against — not as prose it must extract and interpret.
+
+**Objective task atomicity.** The `/simpletask.split` command enforces measurable splitting criteria before execution begins. A task is split if it has more than 2 steps, more than 1 file, more than 3 done-when conditions, or more than 100 characters in the goal description. The result is a set of atomic tasks, each targeting 1–2 implementation steps, with all prerequisite chains updated. The purpose is to reduce each agent execution to a scope where completion can be verified unambiguously.
+
+**Editor-agnostic MCP provider.** simpletask exposes 11 typed CRUD tools via the Model Context Protocol and nothing else. It has no execution routing, no agent spawning, no workflow orchestration. The execution agent — whether OpenCode, Cursor, Claude Code, or any other MCP client — makes all decisions. Switching AI editors does not invalidate your task definitions.
 
 ### Built With
 
