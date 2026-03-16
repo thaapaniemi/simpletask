@@ -5,7 +5,7 @@ Schema-enforced, branch-scoped task definitions that AI agents can query and exe
 ## Highlights
 
 - **Structured data, not prose** — YAML validated by JSON Schema and Pydantic v2; AI agents receive typed objects via MCP, not text to interpret
-- **Ephemeral by design** — task files are git-ignored and tied to the branch; they disappear when the branch merges, keeping the repo clean
+- **Branch-scoped by design** — task files are tied to the branch by name and scoped to a single implementation cycle; whether they are committed to git is up to you
 - **Quality gates in the spec** — linting, type checking, and test coverage thresholds are typed fields the AI can execute and verify, not external CI concerns
 - **Design guidance as typed constraints** — architectural patterns, security categories, and error-handling strategies are enumerated fields, not comments or prose
 - **Objective task atomicity** — `/simpletask.split` enforces measurable thresholds (≤2 steps, ≤1 file, ≤100-char goal) before execution begins
@@ -27,7 +27,7 @@ Schema-enforced, branch-scoped task definitions that AI agents can query and exe
 
 **Structured data, not prose.** Task files are strictly validated YAML, governed by a JSON Schema and parsed through Pydantic v2 models with `extra="forbid"`. Every field — acceptance criteria, task status, prerequisites, quality thresholds, architectural patterns — is a typed entity. An AI agent reading a task file via MCP receives structured data objects, not paragraphs to interpret. This eliminates a class of hallucination risk where the agent misreads or misinterprets a requirement.
 
-**Ephemeral by design.** Task files live in `.tasks/`, which is git-ignored by default. They are linked to a branch by name (`feature/auth` → `.tasks/feature-auth.yml`) and disappear when the branch is deleted. No accumulation of stale task artifacts across dozens of feature branches. No risk of outdated task state misleading future agents or developers. If you need persistent task history across the project lifetime, simpletask is deliberately not for that — it is scoped to a single branch's implementation cycle.
+**Branch-scoped by design.** Task files live in `.tasks/` and are linked to a branch by name (`feature/auth` → `.tasks/feature-auth.yml`). Whether you commit them to git is your choice — add `.tasks/` to `.gitignore` to treat them as ephemeral local scratch space, or commit them to share task state with your team and preserve history. simpletask does not impose a policy either way.
 
 **Quality gates inside the spec.** Linting, type checking, test coverage thresholds, and security scans are first-class typed fields in the task spec itself. An AI agent can read them via `simpletask_quality(action="get")` and execute them via `simpletask_quality(action="check")`, receiving structured pass/fail results back into context. The spec describes not just *what* to build but *how to verify it was built correctly* — no manual CI handoff required.
 

@@ -31,15 +31,13 @@ The emerging SDD (Spec-Driven Development) stack is typically described as four 
 
 ---
 
-## 2. Ephemeral branch lifecycle
+## 2. Branch-scoped lifecycle
 
 **The comparison:** Taskmaster stores tasks in tracked JSON files committed to the repository. BMAD commits markdown specs. Agent OS maintains persistent project state. These approaches treat the task definition as a long-lived project artifact.
 
-**What simpletask does differently:** Task files live in `.tasks/` which is git-ignored by default. They are tied to a specific git branch by name (e.g. `feature/auth` → `.tasks/feature-auth.yml`). When the branch is merged and deleted, the task file disappears.
+**What simpletask does differently:** Task files live in `.tasks/` and are tied to a specific git branch by name (e.g. `feature/auth` → `.tasks/feature-auth.yml`). Whether they are committed to git is the user's choice — add `.tasks/` to `.gitignore` to treat them as ephemeral local scratch space, or commit them to share task state with collaborators and preserve history across the branch lifecycle.
 
-**The design intent:** simpletask treats task definitions as an ephemeral implementation scratchpad, not a permanent project record. The specification is only relevant while the branch exists. This keeps the repository clean — no accumulation of stale task artifacts across dozens of feature branches — and avoids the problem of stale task state misleading future agents or developers.
-
-**Trade-off to be aware of:** This is a deliberate constraint. If you want persistent task history across the project lifetime, simpletask is not the right tool. It is scoped to a single branch's implementation cycle.
+**The design intent:** simpletask treats task definitions as branch-scoped implementation context. The specification is relevant while the branch exists; what happens to it afterward is a project convention, not a tool constraint.
 
 ---
 
@@ -147,14 +145,14 @@ simpletask is a local, branch-scoped, schema-enforced task definition layer. It 
 | Dimension | simpletask | Taskmaster | cc-sdd | BMAD | SDD_Flow |
 |---|---|---|---|---|---|
 | **Storage format** | YAML (Pydantic-validated) | JSON | Markdown | YAML + Markdown | Markdown templates |
-| **Committed to git** | No (git-ignored) | Yes | Yes | Yes | Yes |
+| **Committed to git** | User's choice | Yes | Yes | Yes | Yes |
 | **Scope** | Branch | Project | Feature | Project | Project |
 | **MCP tools** | 11 tools | 36 tools | No (slash commands) | No | No |
 | **Schema validation** | Yes (JSON Schema + Pydantic) | Partial (internal) | No | No | No |
 | **Quality gates** | Typed, machine-executable | No | Manual approval checkpoints | Manual checklists | Manual review phases |
 | **Design guidance** | Typed structured fields | Free-form notes only | Prose templates | ADR templates + 12 agents | Design phase templates |
 | **Task atomicity enforcement** | Yes (`/simpletask.split`) | AI complexity scoring | Parallel wave labels | No | No |
-| **Ephemeral lifecycle** | Yes (dies with branch) | No | No | No | No |
+| **Branch-scoped lifecycle** | Yes | No | No | No | No |
 | **Editor support** | OpenCode, Qwen, Gemini | Cursor, Windsurf, Lovable, Roo, VS Code, Claude Code, Codex, Q Developer | OpenCode, Qwen, Gemini, Cursor, Codex, Copilot, Windsurf, Claude Code | Claude Code, Cursor, and others | Any LLM (copy-paste) |
 
 ---
@@ -167,7 +165,7 @@ simpletask is a local, branch-scoped, schema-enforced task definition layer. It 
 
 **Where Taskmaster goes further:** Taskmaster has a richer task prioritisation model (high/medium/low priority), AI-driven complexity scoring that recommends how many subtasks to generate, multi-model configuration (separate models for generation, research, and fallback), and a significantly larger MCP surface area (36 tools vs. 11). Its `parse_prd` tool can generate an initial task graph directly from a product requirements document.
 
-**Where simpletask differs:** Taskmaster's `tasks.json` is committed to git and scoped to the project — it accumulates state across all features and branches. simpletask's task files are git-ignored and die with the branch. This means simpletask produces no long-lived tracking artifacts in the repository, but also means there is no persistent task history. Taskmaster has no equivalent to simpletask's typed `quality_requirements` or `design` fields — implementation notes live in a free-form `details` string. Taskmaster does not enforce objective splitting criteria; the `expand_task` command uses AI judgment rather than measurable thresholds.
+**Where simpletask differs:** Taskmaster's `tasks.json` is committed to git and scoped to the project — it accumulates state across all features and branches. simpletask's task files are branch-scoped and whether they are committed to git is a project convention. This means simpletask produces no long-lived tracking artifacts in the repository by default, but teams can opt in to committing them. Taskmaster has no equivalent to simpletask's typed `quality_requirements` or `design` fields — implementation notes live in a free-form `details` string. Taskmaster does not enforce objective splitting criteria; the `expand_task` command uses AI judgment rather than measurable thresholds.
 
 ---
 
