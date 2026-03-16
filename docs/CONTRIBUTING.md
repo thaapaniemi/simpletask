@@ -3,7 +3,7 @@
 ## Quick Start
 
 ```sh
-git clone <repo-url>
+git clone https://github.com/thaapaniemi/simpletask.git
 cd simpletask
 pip install -e ".[dev]"
 ./scripts/install-hooks.sh
@@ -14,7 +14,7 @@ pytest  # Verify setup
 
 | Task | Command |
 |------|---------|
-| Format | `black .` |
+| Format | `ruff format .` |
 | Lint | `ruff check .` |
 | Type check | `mypy cli/simpletask` |
 | Test | `pytest` |
@@ -52,7 +52,7 @@ pytest  # Verify setup
 
 1. Create a feature branch from `main`
 2. Make changes following code standards above
-3. Ensure all checks pass: `pytest`, `black .`, `ruff check .`, `mypy cli/simpletask`
+3. Ensure all checks pass: `pytest`, `ruff format .`, `ruff check .`, `mypy cli/simpletask`
 4. Submit a pull request with a clear description of changes
 
 ## Boundaries

@@ -274,7 +274,7 @@ Then configure your AI editor to connect to the server. For detailed setup instr
 ### Setup
 
 ```sh
-git clone https://github.com/your-org/simpletask.git
+git clone https://github.com/thaapaniemi/simpletask.git
 cd simpletask
 pip install -e ".[dev]"
 ```
@@ -299,7 +299,7 @@ pytest
 ### Code quality
 
 ```sh
-black .           # Format code
+ruff format .      # Format code
 ruff check .      # Lint
 mypy cli/simpletask  # Type check
 ```
