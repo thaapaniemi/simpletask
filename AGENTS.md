@@ -1868,6 +1868,11 @@ The `.tasks/` directory contains task definition files used during development b
 
 - Run `pytest` before committing changes
 - Run `ruff format .` and `ruff check .` before committing
+- **Write commit messages in [Conventional Commits](https://conventionalcommits.org/) format** — see the [Conventional Commit Types](#conventional-commit-types) table and examples above. Rules:
+  - Format: `type(optional-scope): description` — e.g. `feat(cli): add --verbose flag`
+  - Use lowercase for both type and description (never start description with a capital letter)
+  - No trailing period on the subject line
+  - Valid types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`
 - **Version bumping strategy:**
   - **On feature branches:** Bump version ONCE at the end when feature is complete, just before final commit
   - **On main branch:** Bump version for each commit with code changes
