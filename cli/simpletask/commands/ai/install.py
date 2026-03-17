@@ -1,4 +1,4 @@
-"""Install OpenCode, Qwen, and Gemini CLI command templates and agents."""
+"""Install OpenCode, Qwen, Gemini, and Vibe CLI command templates and agents."""
 
 import typer
 
@@ -7,14 +7,17 @@ from simpletask.core.ai_templates import (
     get_global_commands_dir,
     get_global_gemini_commands_dir,
     get_global_qwen_commands_dir,
+    get_global_vibe_commands_dir,
     get_local_agents_dir,
     get_local_commands_dir,
     get_local_gemini_commands_dir,
     get_local_qwen_commands_dir,
+    get_local_vibe_commands_dir,
     install_agents,
     install_gemini_templates,
     install_qwen_templates,
     install_templates,
+    install_vibe_templates,
 )
 from simpletask.utils.console import error, info, success, warning
 
@@ -82,32 +85,39 @@ def install_command(
         "--gemini",
         help="Install Gemini CLI templates only",
     ),
+    vibe: bool = typer.Option(
+        False,
+        "--vibe",
+        help="Install Mistral Vibe skills only",
+    ),
 ) -> None:
-    """Install OpenCode, Qwen, and Gemini CLI command templates and agents.
+    """Install OpenCode, Qwen, Gemini, and Vibe CLI command templates and agents.
 
-    By default, installs ALL templates (OpenCode, Qwen, and Gemini CLI) globally. OpenCode
+    By default, installs ALL templates (OpenCode, Qwen, Gemini CLI, and Vibe) globally. OpenCode
     agents are installed alongside OpenCode command templates.
-    Use --opencode, --qwen, or --gemini to install only specific editor templates.
+    Use --opencode, --qwen, --gemini, or --vibe to install only specific editor templates.
 
     Examples:
-        simpletask ai install                 # Install all three editors globally
-        simpletask ai install --local         # Install all three editors locally
+        simpletask ai install                 # Install all four editors globally
+        simpletask ai install --local         # Install all four editors locally
         simpletask ai install --opencode      # Install OpenCode only
         simpletask ai install --qwen          # Install Qwen only
         simpletask ai install --gemini        # Install Gemini CLI only
-        simpletask ai install --opencode --qwen --gemini --local  # All three, locally
+        simpletask ai install --vibe          # Install Mistral Vibe only
+        simpletask ai install --opencode --qwen --gemini --vibe --local  # All four, locally
     """
-    # If no flags specified, install all three
-    none_specified = not opencode and not qwen and not gemini
+    # If no flags specified, install all four
+    none_specified = not opencode and not qwen and not gemini and not vibe
     install_opencode = opencode or none_specified
     install_qwen = qwen or none_specified
     install_gemini = gemini or none_specified
+    install_vibe = vibe or none_specified
 
     any_skipped = False
 
-    try:
-        # Install OpenCode templates
-        if install_opencode:
+    # Install OpenCode templates
+    if install_opencode:
+        try:
             target_dir = get_local_commands_dir() if local else get_global_commands_dir()
 
             info(f"Installing OpenCode commands to {target_dir}")
@@ -120,9 +130,14 @@ def install_command(
             any_skipped = (
                 _report_installation_results(installed, skipped, overwritten) or any_skipped
             )
+        except FileNotFoundError as e:
+            warning(f"Skipping OpenCode installation: {e}")
+        except Exception as e:
+            error(f"Unexpected error installing OpenCode: {e}")
 
-        # Install Qwen templates
-        if install_qwen:
+    # Install Qwen templates
+    if install_qwen:
+        try:
             target_dir = get_local_qwen_commands_dir() if local else get_global_qwen_commands_dir()
 
             info(f"Installing Qwen commands to {target_dir}")
@@ -135,9 +150,14 @@ def install_command(
             any_skipped = (
                 _report_installation_results(installed, skipped, overwritten) or any_skipped
             )
+        except FileNotFoundError as e:
+            warning(f"Skipping Qwen installation: {e}")
+        except Exception as e:
+            error(f"Unexpected error installing Qwen: {e}")
 
-        # Install Gemini CLI templates
-        if install_gemini:
+    # Install Gemini CLI templates
+    if install_gemini:
+        try:
             target_dir = (
                 get_local_gemini_commands_dir() if local else get_global_gemini_commands_dir()
             )
@@ -152,11 +172,30 @@ def install_command(
             any_skipped = (
                 _report_installation_results(installed, skipped, overwritten) or any_skipped
             )
+        except FileNotFoundError as e:
+            warning(f"Skipping Gemini installation: {e}")
+        except Exception as e:
+            error(f"Unexpected error installing Gemini: {e}")
 
-    except FileNotFoundError as e:
-        error(str(e))
-    except Exception as e:
-        error(f"Unexpected error: {e}")
+    # Install Vibe skills
+    if install_vibe:
+        try:
+            target_dir = get_local_vibe_commands_dir() if local else get_global_vibe_commands_dir()
+
+            info(f"Installing Mistral Vibe skills to {target_dir}")
+
+            installed, skipped, overwritten = install_vibe_templates(
+                target_dir=target_dir,
+                no_overwrite=no_overwrite,
+            )
+
+            any_skipped = (
+                _report_installation_results(installed, skipped, overwritten) or any_skipped
+            )
+        except FileNotFoundError as e:
+            warning(f"Skipping Vibe installation: {e}")
+        except Exception as e:
+            error(f"Unexpected error installing Vibe: {e}")
 
     # Install OpenCode agents separately with independent error handling
     if install_opencode:

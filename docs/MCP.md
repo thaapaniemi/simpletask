@@ -9,6 +9,7 @@ This guide covers how to integrate simpletask with AI editors using the Model Co
   - [OpenCode](#opencode)
   - [Qwen-CLI](#qwen-cli)
   - [Gemini CLI](#gemini-cli)
+  - [Mistral Vibe](#mistral-vibe)
   - [Other MCP Clients](#other-mcp-clients)
 - [Available Tools](#available-tools)
   - [get](#get)
@@ -197,6 +198,38 @@ Gemini CLI is a command-line AI assistant with MCP support.
 **Verify connection:**
 ```sh
 gemini "List available MCP tools"
+```
+
+### Mistral Vibe
+
+Mistral Vibe is a coding assistant that supports custom skills via SKILL.md files. simpletask integrates via skills rather than MCP — each workflow phase (plan, split, implement, review) is a separate skill that guides Vibe through the simpletask workflow.
+
+**Install simpletask skills:**
+
+```sh
+simpletask ai install --vibe
+```
+
+This installs skills to `~/.vibe/skills/`. For project-local installation:
+
+```sh
+simpletask ai install --vibe --local  # installs to .vibe/skills/
+```
+
+**Installed skills:**
+
+| Skill | Description |
+|-------|-------------|
+| `simpletask-plan` | Create task specification from feature description |
+| `simpletask-split` | Analyze codebase and split complex tasks into atomic subtasks |
+| `simpletask-implement` | Execute tasks step-by-step |
+| `simpletask-review` | Review implementation against acceptance criteria |
+
+**Note:** Vibe skills use the simpletask CLI (`simpletask serve` is not required for Vibe). Ensure `simpletask` is on your `PATH` before invoking a skill.
+
+**Verify installation:**
+```sh
+simpletask ai list
 ```
 
 ### Other MCP Clients
