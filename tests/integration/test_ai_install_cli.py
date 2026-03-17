@@ -393,3 +393,133 @@ class TestAiInstallAgentsCLI:
         # Verify existing agent was overwritten
         assert existing_agent.read_text() != old_content
         assert len(existing_agent.read_text()) > 0
+
+
+class TestAiInstallVibeCLI:
+    """Integration tests for Vibe skill installation via 'simpletask ai install' command."""
+
+    @patch("simpletask.commands.ai.install.get_global_vibe_commands_dir")
+    def test_vibe_flag_only(self, mock_vibe_dir, tmp_path: Path):
+        """Should install only Vibe skills with --vibe flag."""
+        vibe_dir = tmp_path / "vibe"
+        mock_vibe_dir.return_value = vibe_dir
+
+        result = runner.invoke(app, ["ai", "install", "--vibe"])
+
+        assert result.exit_code == 0
+        assert "Installing Mistral Vibe skills" in result.stdout
+        assert "Installing OpenCode commands" not in result.stdout
+        assert "Installing Qwen commands" not in result.stdout
+        assert "Installing Gemini CLI commands" not in result.stdout
+
+        # Verify skill directories were created with SKILL.md inside
+        assert (vibe_dir / "simpletask-plan").is_dir()
+        assert (vibe_dir / "simpletask-plan" / "SKILL.md").exists()
+        assert (vibe_dir / "simpletask-split").is_dir()
+        assert (vibe_dir / "simpletask-implement").is_dir()
+        assert (vibe_dir / "simpletask-review").is_dir()
+
+    @patch("simpletask.commands.ai.install.get_global_commands_dir")
+    @patch("simpletask.commands.ai.install.get_global_qwen_commands_dir")
+    @patch("simpletask.commands.ai.install.get_global_gemini_commands_dir")
+    @patch("simpletask.commands.ai.install.get_global_vibe_commands_dir")
+    @patch("simpletask.commands.ai.install.get_global_agents_dir")
+    def test_default_installs_all_four_editors(
+        self,
+        mock_agents_dir,
+        mock_vibe_dir,
+        mock_gemini_dir,
+        mock_qwen_dir,
+        mock_opencode_dir,
+        tmp_path: Path,
+    ):
+        """Should install all four editors (including Vibe) by default."""
+        opencode_dir = tmp_path / "opencode"
+        qwen_dir = tmp_path / "qwen"
+        gemini_dir = tmp_path / "gemini"
+        vibe_dir = tmp_path / "vibe"
+        agents_dir = tmp_path / "agents"
+        mock_opencode_dir.return_value = opencode_dir
+        mock_qwen_dir.return_value = qwen_dir
+        mock_gemini_dir.return_value = gemini_dir
+        mock_vibe_dir.return_value = vibe_dir
+        mock_agents_dir.return_value = agents_dir
+
+        result = runner.invoke(app, ["ai", "install"])
+
+        assert result.exit_code == 0
+        assert "Installing OpenCode commands" in result.stdout
+        assert "Installing Qwen commands" in result.stdout
+        assert "Installing Gemini CLI commands" in result.stdout
+        assert "Installing Mistral Vibe skills" in result.stdout
+
+        # Verify Vibe skill directories were created
+        assert (vibe_dir / "simpletask-plan").is_dir()
+        assert (vibe_dir / "simpletask-plan" / "SKILL.md").exists()
+
+    @patch("simpletask.commands.ai.install.get_local_vibe_commands_dir")
+    def test_vibe_local_flag(self, mock_vibe_dir, tmp_path: Path):
+        """Should install Vibe skills to local directory with --local flag."""
+        vibe_dir = tmp_path / "vibe_local"
+        mock_vibe_dir.return_value = vibe_dir
+
+        result = runner.invoke(app, ["ai", "install", "--vibe", "--local"])
+
+        assert result.exit_code == 0
+        assert "Installing Mistral Vibe skills" in result.stdout
+        assert str(vibe_dir) in result.stdout
+
+        # Verify skills were installed in local directory
+        assert (vibe_dir / "simpletask-plan").is_dir()
+        assert (vibe_dir / "simpletask-plan" / "SKILL.md").exists()
+
+    @patch("simpletask.commands.ai.install.get_global_vibe_commands_dir")
+    def test_vibe_no_overwrite_skips_existing(self, mock_vibe_dir, tmp_path: Path):
+        """Should skip existing Vibe skill directories when --no-overwrite is used."""
+        vibe_dir = tmp_path / "vibe"
+        vibe_dir.mkdir(parents=True)
+        mock_vibe_dir.return_value = vibe_dir
+
+        # Create existing skill directory
+        existing = vibe_dir / "simpletask-plan"
+        existing.mkdir()
+        (existing / "SKILL.md").write_text("old content")
+
+        result = runner.invoke(app, ["ai", "install", "--vibe", "--no-overwrite"])
+
+        assert result.exit_code == 0
+        assert "Skipped (already exists): simpletask-plan" in result.stdout
+
+        # Verify existing skill was not overwritten
+        assert (existing / "SKILL.md").read_text() == "old content"
+
+    @patch("simpletask.commands.ai.install.get_global_vibe_commands_dir")
+    def test_vibe_overwrite_default(self, mock_vibe_dir, tmp_path: Path):
+        """Should overwrite existing Vibe skill directories by default."""
+        vibe_dir = tmp_path / "vibe"
+        vibe_dir.mkdir(parents=True)
+        mock_vibe_dir.return_value = vibe_dir
+
+        # Create existing skill directory with old content
+        existing = vibe_dir / "simpletask-plan"
+        existing.mkdir()
+        (existing / "SKILL.md").write_text("old content")
+
+        result = runner.invoke(app, ["ai", "install", "--vibe"])
+
+        assert result.exit_code == 0
+        assert "Overwriting: simpletask-plan" in result.stdout
+
+        # Verify existing skill was overwritten
+        assert (existing / "SKILL.md").read_text() != "old content"
+
+    @patch("simpletask.commands.ai.install.get_global_vibe_commands_dir")
+    def test_vibe_does_not_install_agents(self, mock_vibe_dir, tmp_path: Path):
+        """Vibe-only install should NOT install OpenCode agents."""
+        vibe_dir = tmp_path / "vibe"
+        mock_vibe_dir.return_value = vibe_dir
+
+        result = runner.invoke(app, ["ai", "install", "--vibe"])
+
+        assert result.exit_code == 0
+        assert "Installing OpenCode agents" not in result.stdout

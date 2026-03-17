@@ -1,4 +1,4 @@
-"""List OpenCode, Qwen, and Gemini CLI command templates."""
+"""List OpenCode, Qwen, Gemini, and Vibe CLI command templates."""
 
 from pathlib import Path
 
@@ -11,17 +11,21 @@ from simpletask.core.ai_templates import (
     get_bundled_gemini_templates,
     get_bundled_qwen_templates,
     get_bundled_templates,
+    get_bundled_vibe_templates,
     get_gemini_installed_status,
     get_global_agents_dir,
     get_global_commands_dir,
     get_global_gemini_commands_dir,
     get_global_qwen_commands_dir,
+    get_global_vibe_commands_dir,
     get_installed_status,
     get_local_agents_dir,
     get_local_commands_dir,
     get_local_gemini_commands_dir,
     get_local_qwen_commands_dir,
+    get_local_vibe_commands_dir,
     get_qwen_installed_status,
+    get_vibe_installed_status,
 )
 from simpletask.utils.console import console, create_table
 
@@ -60,7 +64,7 @@ def _render_editor_table(
 
 
 def list_command() -> None:
-    """List available and installed OpenCode, Qwen, and Gemini CLI commands.
+    """List available and installed OpenCode, Qwen, Gemini, and Vibe CLI commands.
 
     Shows which command templates are bundled with simpletask
     and whether they are installed globally or locally.
@@ -85,11 +89,16 @@ def list_command() -> None:
         gemini_templates = get_bundled_gemini_templates()
         gemini_status = get_gemini_installed_status()
 
+        # Get Vibe skills
+        vibe_templates = get_bundled_vibe_templates()
+        vibe_status = get_vibe_installed_status()
+
         if (
             not opencode_templates
             and not opencode_agents
             and not qwen_templates
             and not gemini_templates
+            and not vibe_templates
         ):
             console.print("[dim]No templates or agents found[/dim]")
             return
@@ -146,6 +155,19 @@ def list_command() -> None:
             console.print(f"\n[bold]{EDITOR_CONFIGS['gemini'].display_name} Locations:[/bold]")
             console.print(f"  Global: {get_global_gemini_commands_dir()}")
             console.print(f"  Local:  {get_local_gemini_commands_dir()}\n")
+
+        # Vibe skills table
+        if vibe_templates:
+            _render_editor_table(
+                title="Mistral Vibe Skills",
+                editor_name=EDITOR_CONFIGS["vibe"].display_name,
+                templates=vibe_templates,
+                status=vibe_status,
+                name_label="Skill",
+            )
+            console.print(f"\n[bold]{EDITOR_CONFIGS['vibe'].display_name} Locations:[/bold]")
+            console.print(f"  Global: {get_global_vibe_commands_dir()}")
+            console.print(f"  Local:  {get_local_vibe_commands_dir()}\n")
 
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")

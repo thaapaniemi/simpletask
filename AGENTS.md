@@ -672,6 +672,28 @@ uv tool dir simpletask
 
 **Note:** For Qwen CLI and Gemini CLI configuration, see [docs/MCP.md](docs/MCP.md).
 
+#### Mistral Vibe Configuration
+
+Add to `~/.vibe/config.toml`:
+
+```toml
+[[mcp_servers]]
+name = "simpletask"
+transport = "stdio"
+command = "simpletask"
+args = ["serve"]
+```
+
+**Note:** If simpletask is installed in a virtualenv, use the full path to the executable:
+
+```toml
+[[mcp_servers]]
+name = "simpletask"
+transport = "stdio"
+command = "/path/to/venv/bin/simpletask"
+args = ["serve"]
+```
+
 ### Breaking Changes in v0.19.0
 
 #### `quality(action='check')` Raises `ValueError` When No Quality Requirements Configured
