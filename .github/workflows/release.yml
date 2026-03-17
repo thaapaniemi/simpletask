@@ -1,0 +1,140 @@
+name: Release
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    branches: [main]
+    types: [completed]
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  tag-and-release:
+    name: Tag & GitHub Release
+    runs-on: ubuntu-latest
+    if: github.event.workflow_run.conclusion == 'success'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Extract version from pyproject.toml
+        id: version
+        run: |
+          VERSION=$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")
+          if ! echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::Invalid or missing version in pyproject.toml: '$VERSION'"
+            exit 1
+          fi
+          MAJOR=$(echo "$VERSION" | cut -d. -f1)
+          if [ "$MAJOR" != "0" ]; then
+            echo "::error::Major version bump detected ($VERSION). Only minor and patch bumps are allowed per project convention."
+            exit 1
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=v${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Verify version consistency
+        env:
+          PYPROJECT_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          INIT_VERSION=$(python3 -c "
+          import ast, sys
+          tree = ast.parse(open('cli/simpletask/__init__.py').read())
+          for node in ast.walk(tree):
+              if isinstance(node, ast.Assign):
+                  for t in node.targets:
+                      if isinstance(t, ast.Name) and t.id == '__version__':
+                          print(ast.literal_eval(node.value))
+                          sys.exit(0)
+              elif isinstance(node, ast.AnnAssign):
+                  if isinstance(node.target, ast.Name) and node.target.id == '__version__' and node.value:
+                      print(ast.literal_eval(node.value))
+                      sys.exit(0)
+          sys.exit(1)
+          ")
+          if [ "$INIT_VERSION" != "$PYPROJECT_VERSION" ]; then
+            echo "::error::Version mismatch: pyproject.toml has '$PYPROJECT_VERSION' but __init__.py has '$INIT_VERSION'"
+            exit 1
+          fi
+          echo "Version check passed: both files report $PYPROJECT_VERSION"
+
+      - name: Check if tag and release already exist
+        id: tag_check
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if git ls-remote --tags origin "refs/tags/${TAG}" | grep -q .; then
+            echo "tag_exists=true" >> "$GITHUB_OUTPUT"
+            echo "Tag ${TAG} already exists."
+          else
+            echo "tag_exists=false" >> "$GITHUB_OUTPUT"
+            echo "Tag ${TAG} does not exist — will create."
+          fi
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            echo "release_exists=true" >> "$GITHUB_OUTPUT"
+            echo "Release ${TAG} already exists."
+          else
+            echo "release_exists=false" >> "$GITHUB_OUTPUT"
+            echo "Release ${TAG} does not exist — will create."
+          fi
+
+      - name: Create and push tag
+        if: steps.tag_check.outputs.tag_exists == 'false'
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "Release $TAG"
+          git push origin "$TAG"
+
+      - name: Create GitHub Release
+        if: steps.tag_check.outputs.release_exists == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          gh release create "$TAG" \
+            --title "Release $TAG" \
+            --generate-notes
+
+      - name: Write job summary
+        if: always()
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+          TAG_EXISTS: ${{ steps.tag_check.outputs.tag_exists }}
+          RELEASE_EXISTS: ${{ steps.tag_check.outputs.release_exists }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          if [ "$TAG_EXISTS" = "true" ] && [ "$RELEASE_EXISTS" = "true" ]; then
+            echo "### Release skipped" >> "$GITHUB_STEP_SUMMARY"
+            echo "Tag \`${TAG}\` and release already exist — nothing to do." >> "$GITHUB_STEP_SUMMARY"
+          elif [ "$TAG_EXISTS" = "true" ] && [ "$RELEASE_EXISTS" = "false" ]; then
+            echo "### Orphaned tag recovered" >> "$GITHUB_STEP_SUMMARY"
+            echo "Tag \`${TAG}\` existed without a release — GitHub Release created." >> "$GITHUB_STEP_SUMMARY"
+            echo "Commit: \`${HEAD_SHA}\`" >> "$GITHUB_STEP_SUMMARY"
+          elif [ "$TAG_EXISTS" = "false" ]; then
+            echo "### Released ${TAG}" >> "$GITHUB_STEP_SUMMARY"
+            echo "Tag \`${TAG}\` created and GitHub Release published." >> "$GITHUB_STEP_SUMMARY"
+            echo "Commit: \`${HEAD_SHA}\`" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "### Release did not run" >> "$GITHUB_STEP_SUMMARY"
+            echo "Version extraction or consistency check failed, or workflow was skipped." >> "$GITHUB_STEP_SUMMARY"
+            if [ -n "${HEAD_SHA}" ]; then
+              echo "Attempted commit: \`${HEAD_SHA}\`" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          fi
