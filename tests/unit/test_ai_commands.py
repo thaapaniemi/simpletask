@@ -9,22 +9,27 @@ from simpletask.core.ai_templates import (
     get_bundled_gemini_templates,
     get_bundled_qwen_templates,
     get_bundled_templates,
+    get_bundled_vibe_templates,
     get_gemini_installed_status,
     get_gemini_templates_dir,
     get_global_agents_dir,
     get_global_commands_dir,
     get_global_gemini_commands_dir,
     get_global_qwen_commands_dir,
+    get_global_vibe_commands_dir,
     get_installed_status,
     get_local_agents_dir,
     get_local_commands_dir,
     get_local_gemini_commands_dir,
     get_local_qwen_commands_dir,
+    get_local_vibe_commands_dir,
     get_qwen_installed_status,
+    get_vibe_installed_status,
     install_agents,
     install_gemini_templates,
     install_qwen_templates,
     install_templates,
+    install_vibe_templates,
 )
 
 
@@ -1639,3 +1644,521 @@ class TestAgentEditorRestrictions:
 
         result = _get_bundled_agents("gemini")
         assert result == []
+
+    def test_get_global_agents_dir_rejects_vibe(self):
+        """Should raise ValueError for Vibe editor."""
+        from simpletask.core.ai_templates import _get_global_agents_dir
+
+        with pytest.raises(ValueError, match="does not support agents"):
+            _get_global_agents_dir("vibe")
+
+    def test_get_local_agents_dir_rejects_vibe(self):
+        """Should raise ValueError for Vibe editor."""
+        from simpletask.core.ai_templates import _get_local_agents_dir
+
+        with pytest.raises(ValueError, match="does not support agents"):
+            _get_local_agents_dir("vibe")
+
+    def test_get_bundled_agents_vibe_returns_empty(self):
+        """Should return empty list for Vibe editor."""
+        from simpletask.core.ai_templates import _get_bundled_agents
+
+        result = _get_bundled_agents("vibe")
+        assert result == []
+
+
+class TestGetBundledVibeTemplates:
+    """Tests for get_bundled_vibe_templates function."""
+
+    def test_returns_list_of_paths(self):
+        """Should return a list of Path objects."""
+        templates = get_bundled_vibe_templates()
+        assert isinstance(templates, list)
+        for template in templates:
+            assert isinstance(template, Path)
+
+    def test_returns_directories_not_files(self):
+        """Should return directories (skill dirs), not files."""
+        templates = get_bundled_vibe_templates()
+        for template in templates:
+            assert template.is_dir(), f"{template.name} should be a directory"
+
+    def test_each_directory_contains_skill_md(self):
+        """Each skill directory should contain a SKILL.md file."""
+        templates = get_bundled_vibe_templates()
+        for template in templates:
+            skill_file = template / "SKILL.md"
+            assert skill_file.exists(), f"{template.name} missing SKILL.md"
+            assert skill_file.is_file()
+
+    def test_returns_expected_templates(self):
+        """Should return the four bundled Vibe skill directories."""
+        templates = get_bundled_vibe_templates()
+        template_names = {t.name for t in templates}
+
+        expected = {
+            "simpletask-plan",
+            "simpletask-split",
+            "simpletask-implement",
+            "simpletask-review",
+        }
+
+        assert template_names == expected
+
+
+class TestGetGlobalVibeCommandsDir:
+    """Tests for get_global_vibe_commands_dir function."""
+
+    def test_returns_path_object(self):
+        """Should return a Path object."""
+        result = get_global_vibe_commands_dir()
+        assert isinstance(result, Path)
+
+    def test_returns_expected_location(self):
+        """Should return ~/.vibe/skills/"""
+        result = get_global_vibe_commands_dir()
+        expected = Path.home() / ".vibe" / "skills"
+        assert result == expected
+
+
+class TestGetLocalVibeCommandsDir:
+    """Tests for get_local_vibe_commands_dir function."""
+
+    def test_returns_path_object(self):
+        """Should return a Path object."""
+        result = get_local_vibe_commands_dir()
+        assert isinstance(result, Path)
+
+    def test_returns_expected_location(self):
+        """Should return .vibe/skills/ in current directory."""
+        result = get_local_vibe_commands_dir()
+        expected = Path.cwd() / ".vibe" / "skills"
+        assert result == expected
+
+
+class TestInstallVibeTemplates:
+    """Tests for install_vibe_templates function."""
+
+    def test_install_to_empty_directory(self, tmp_path: Path):
+        """Should successfully install all Vibe skill directories to empty directory."""
+        target_dir = tmp_path / "skills"
+
+        installed, skipped, overwritten = install_vibe_templates(target_dir, no_overwrite=False)
+
+        # Should create target directory
+        assert target_dir.exists()
+
+        # Should install all four skill directories
+        assert len(installed) == 4
+        assert len(skipped) == 0
+        assert len(overwritten) == 0
+
+        # All skill directories should exist in target with SKILL.md inside
+        for name in installed:
+            skill_dir = target_dir / name
+            assert skill_dir.exists()
+            assert skill_dir.is_dir()
+            assert (skill_dir / "SKILL.md").exists()
+
+    def test_overwrite_existing_directories(self, tmp_path: Path):
+        """Should overwrite existing directories when no_overwrite=False."""
+        target_dir = tmp_path / "skills"
+        target_dir.mkdir(parents=True)
+
+        # Create existing skill directory with old content
+        existing_dir = target_dir / "simpletask-plan"
+        existing_dir.mkdir()
+        (existing_dir / "SKILL.md").write_text("old content")
+
+        installed, _skipped, overwritten = install_vibe_templates(target_dir, no_overwrite=False)
+
+        # Should report one overwrite
+        assert "simpletask-plan" in overwritten
+        assert len(overwritten) == 1
+
+        # Should not report overwritten dirs as newly installed
+        assert "simpletask-plan" not in installed
+
+        # Should install the other three
+        assert len(installed) == 3
+
+        # Directory should have new content (not "old content")
+        assert (existing_dir / "SKILL.md").read_text() != "old content"
+        assert len((existing_dir / "SKILL.md").read_text()) > 0
+
+    def test_no_overwrite_skips_existing(self, tmp_path: Path):
+        """Should skip existing directories when no_overwrite=True."""
+        target_dir = tmp_path / "skills"
+        target_dir.mkdir(parents=True)
+
+        # Create existing skill directory
+        existing_dir = target_dir / "simpletask-plan"
+        existing_dir.mkdir()
+        old_content = "old content"
+        (existing_dir / "SKILL.md").write_text(old_content)
+
+        installed, skipped, overwritten = install_vibe_templates(target_dir, no_overwrite=True)
+
+        # Should report one skip
+        assert "simpletask-plan" in skipped
+        assert len(skipped) == 1
+
+        # Should not report as overwritten
+        assert len(overwritten) == 0
+
+        # Should install the other three
+        assert len(installed) == 3
+
+        # Original content should be unchanged
+        assert (existing_dir / "SKILL.md").read_text() == old_content
+
+    def test_creates_target_directory(self, tmp_path: Path):
+        """Should create target directory if it doesn't exist."""
+        target_dir = tmp_path / "nested" / "path" / "skills"
+
+        assert not target_dir.exists()
+
+        install_vibe_templates(target_dir, no_overwrite=False)
+
+        assert target_dir.exists()
+        assert target_dir.is_dir()
+
+
+class TestGetVibeInstalledStatus:
+    """Tests for get_vibe_installed_status function."""
+
+    def test_no_installations(self, tmp_path: Path, monkeypatch):
+        """Should report nothing installed when directories don't exist."""
+        fake_global = tmp_path / "global"
+        fake_local = tmp_path / "local"
+
+        monkeypatch.setattr(
+            "simpletask.core.ai_templates._get_global_commands_dir",
+            lambda editor: fake_global,
+        )
+        monkeypatch.setattr(
+            "simpletask.core.ai_templates._get_local_commands_dir",
+            lambda editor: fake_local,
+        )
+
+        status = get_vibe_installed_status()
+
+        # All skills should report not installed
+        for _skill_name, locations in status.items():
+            assert locations["global"] is False
+            assert locations["local"] is False
+
+    def test_global_only(self, tmp_path: Path, monkeypatch):
+        """Should detect Vibe skills in global directory only."""
+        fake_global = tmp_path / "global"
+        fake_global.mkdir(parents=True)
+        fake_local = tmp_path / "local"
+
+        # Install to global
+        install_vibe_templates(fake_global, no_overwrite=False)
+
+        monkeypatch.setattr(
+            "simpletask.core.ai_templates._get_global_commands_dir",
+            lambda editor: fake_global,
+        )
+        monkeypatch.setattr(
+            "simpletask.core.ai_templates._get_local_commands_dir",
+            lambda editor: fake_local,
+        )
+
+        status = get_vibe_installed_status()
+
+        # All skills should be in global, none in local
+        for _skill_name, locations in status.items():
+            assert locations["global"] is True
+            assert locations["local"] is False
+
+    def test_local_only(self, tmp_path: Path, monkeypatch):
+        """Should detect Vibe skills in local directory only."""
+        fake_global = tmp_path / "global"
+        fake_local = tmp_path / "local"
+        fake_local.mkdir(parents=True)
+
+        # Install to local
+        install_vibe_templates(fake_local, no_overwrite=False)
+
+        monkeypatch.setattr(
+            "simpletask.core.ai_templates._get_global_commands_dir",
+            lambda editor: fake_global,
+        )
+        monkeypatch.setattr(
+            "simpletask.core.ai_templates._get_local_commands_dir",
+            lambda editor: fake_local,
+        )
+
+        status = get_vibe_installed_status()
+
+        # All skills should be in local, none in global
+        for _skill_name, locations in status.items():
+            assert locations["global"] is False
+            assert locations["local"] is True
+
+    def test_both_locations(self, tmp_path: Path, monkeypatch):
+        """Should detect Vibe skills in both directories."""
+        fake_global = tmp_path / "global"
+        fake_global.mkdir(parents=True)
+        fake_local = tmp_path / "local"
+        fake_local.mkdir(parents=True)
+
+        # Install to both
+        install_vibe_templates(fake_global, no_overwrite=False)
+        install_vibe_templates(fake_local, no_overwrite=False)
+
+        monkeypatch.setattr(
+            "simpletask.core.ai_templates._get_global_commands_dir",
+            lambda editor: fake_global,
+        )
+        monkeypatch.setattr(
+            "simpletask.core.ai_templates._get_local_commands_dir",
+            lambda editor: fake_local,
+        )
+
+        status = get_vibe_installed_status()
+
+        # All skills should be in both locations
+        for _skill_name, locations in status.items():
+            assert locations["global"] is True
+            assert locations["local"] is True
+
+
+class TestVibeSkillContent:
+    """Validate Vibe SKILL.md template content structure."""
+
+    def test_all_skills_have_agent_skills_frontmatter(self):
+        """Each Vibe SKILL.md should have Agent Skills frontmatter."""
+        templates = get_bundled_vibe_templates()
+        for template in templates:
+            content = (template / "SKILL.md").read_text()
+            assert content.startswith("---\n"), f"{template.name} missing frontmatter opening"
+            assert "\n---\n" in content, f"{template.name} missing frontmatter closing"
+            assert "name:" in content, f"{template.name} missing name field"
+            assert "description:" in content, f"{template.name} missing description field"
+            assert "user-invocable: true" in content, (
+                f"{template.name} missing user-invocable: true"
+            )
+
+    def test_skill_names_match_directory_names(self):
+        """Frontmatter name field should match the directory name."""
+        templates = get_bundled_vibe_templates()
+        for template in templates:
+            content = (template / "SKILL.md").read_text()
+            # Parse frontmatter name
+            for line in content.split("\n"):
+                if line.startswith("name:"):
+                    name_value = line.split(":", 1)[1].strip()
+                    assert name_value == template.name, (
+                        f"Directory {template.name} has mismatched name: {name_value}"
+                    )
+                    break
+
+    def test_split_skill_has_splitting_criteria(self):
+        """Vibe split skill should define splitting criteria."""
+        templates = get_bundled_vibe_templates()
+        split_template = next((t for t in templates if t.name == "simpletask-split"), None)
+        assert split_template is not None
+
+        content = (split_template / "SKILL.md").read_text()
+
+        splitting_criteria = [">2 steps", ">1 file", ">3 conditions", ">100 characters"]
+        for criterion in splitting_criteria:
+            assert criterion in content, f"Missing splitting criterion: {criterion}"
+
+    def test_implement_skill_references_mcp_tools(self):
+        """Vibe implement skill should reference core MCP tools."""
+        templates = get_bundled_vibe_templates()
+        impl_template = next((t for t in templates if t.name == "simpletask-implement"), None)
+        assert impl_template is not None
+
+        content = (impl_template / "SKILL.md").read_text()
+
+        core_mcp_tools = [
+            "simpletask_get",
+            "simpletask_task",
+            "simpletask_criteria",
+            "simpletask_note",
+            "simpletask_quality",
+        ]
+
+        for tool in core_mcp_tools:
+            assert tool in content, f"Missing MCP tool reference: {tool}"
+
+    def test_no_branch_parameter_in_any_skill(self):
+        """No Vibe skill should contain deprecated branch=None."""
+        templates = get_bundled_vibe_templates()
+        for template in templates:
+            content = (template / "SKILL.md").read_text()
+            assert "branch=None" not in content, f"{template.name} has deprecated branch=None"
+
+    def test_skill_size_under_500_lines(self):
+        """Each Vibe SKILL.md should be under 500 lines for token efficiency."""
+        templates = get_bundled_vibe_templates()
+        for template in templates:
+            content = (template / "SKILL.md").read_text()
+            line_count = len(content.splitlines())
+            assert line_count < 500, (
+                f"{template.name}/SKILL.md is {line_count} lines, should be <500"
+            )
+
+
+class TestVibeAndOtherEditorConsistency:
+    """Verify Vibe templates are consistent with other editors."""
+
+    def test_vibe_has_same_template_count(self):
+        """Vibe should have the same number of templates as other editors."""
+        opencode_count = len(get_bundled_templates())
+        qwen_count = len(get_bundled_qwen_templates())
+        gemini_count = len(get_bundled_gemini_templates())
+        vibe_count = len(get_bundled_vibe_templates())
+
+        assert vibe_count == opencode_count == qwen_count == gemini_count
+
+    def test_vibe_has_matching_base_names(self):
+        """Vibe skill directory names should match other editors' template base names.
+
+        Vibe uses hyphen naming (simpletask-plan) while others use dot naming
+        (simpletask.plan), so we normalize by replacing dots with hyphens.
+        """
+        opencode_templates = get_bundled_templates()
+        vibe_templates = get_bundled_vibe_templates()
+
+        # OpenCode base names: simpletask.plan -> simpletask-plan (normalize dots to hyphens)
+        opencode_bases = sorted([t.stem.replace(".", "-") for t in opencode_templates])
+        vibe_bases = sorted([t.name for t in vibe_templates])
+
+        assert opencode_bases == vibe_bases, (
+            "Vibe and OpenCode should have matching template names (after normalization)"
+        )
+
+    def test_all_split_templates_have_splitting_criteria_including_vibe(self):
+        """All editors including Vibe should define the same splitting criteria."""
+        vibe_templates = get_bundled_vibe_templates()
+        vibe_split = next((t for t in vibe_templates if t.name == "simpletask-split"), None)
+        assert vibe_split is not None
+
+        vibe_content = (vibe_split / "SKILL.md").read_text()
+
+        splitting_criteria = [">2 steps", ">1 file", ">3 conditions", ">100 characters"]
+        for criterion in splitting_criteria:
+            assert criterion in vibe_content, f"Vibe missing splitting criterion: {criterion}"
+
+
+class TestInstallSkillDirs:
+    """Tests for _install_skill_dirs internal function."""
+
+    def test_install_to_empty_directory(self, tmp_path: Path):
+        """Should copy skill directories to target."""
+        from simpletask.core.ai_templates import _install_skill_dirs
+
+        # Create source skill directories
+        source_dir = tmp_path / "source"
+        skill_a = source_dir / "skill-a"
+        skill_a.mkdir(parents=True)
+        (skill_a / "SKILL.md").write_text("# Skill A")
+
+        skill_b = source_dir / "skill-b"
+        skill_b.mkdir(parents=True)
+        (skill_b / "SKILL.md").write_text("# Skill B")
+
+        target_dir = tmp_path / "target"
+
+        installed, skipped, overwritten = _install_skill_dirs(
+            [skill_a, skill_b], target_dir, no_overwrite=False
+        )
+
+        assert len(installed) == 2
+        assert len(skipped) == 0
+        assert len(overwritten) == 0
+        assert (target_dir / "skill-a" / "SKILL.md").read_text() == "# Skill A"
+        assert (target_dir / "skill-b" / "SKILL.md").read_text() == "# Skill B"
+
+    def test_overwrite_existing_skill_dir(self, tmp_path: Path):
+        """Should overwrite existing skill directory when no_overwrite=False."""
+        from simpletask.core.ai_templates import _install_skill_dirs
+
+        # Create source
+        source_dir = tmp_path / "source" / "skill-a"
+        source_dir.mkdir(parents=True)
+        (source_dir / "SKILL.md").write_text("new content")
+
+        # Create existing target
+        target_dir = tmp_path / "target"
+        existing = target_dir / "skill-a"
+        existing.mkdir(parents=True)
+        (existing / "SKILL.md").write_text("old content")
+
+        installed, _skipped, overwritten = _install_skill_dirs(
+            [source_dir], target_dir, no_overwrite=False
+        )
+
+        assert len(installed) == 0
+        assert len(overwritten) == 1
+        assert "skill-a" in overwritten
+        assert (target_dir / "skill-a" / "SKILL.md").read_text() == "new content"
+
+    def test_no_overwrite_skips_existing_skill_dir(self, tmp_path: Path):
+        """Should skip existing skill directory when no_overwrite=True."""
+        from simpletask.core.ai_templates import _install_skill_dirs
+
+        # Create source
+        source_dir = tmp_path / "source" / "skill-a"
+        source_dir.mkdir(parents=True)
+        (source_dir / "SKILL.md").write_text("new content")
+
+        # Create existing target
+        target_dir = tmp_path / "target"
+        existing = target_dir / "skill-a"
+        existing.mkdir(parents=True)
+        (existing / "SKILL.md").write_text("old content")
+
+        installed, skipped, overwritten = _install_skill_dirs(
+            [source_dir], target_dir, no_overwrite=True
+        )
+
+        assert len(installed) == 0
+        assert len(skipped) == 1
+        assert "skill-a" in skipped
+        assert len(overwritten) == 0
+        # Original should be preserved
+        assert (target_dir / "skill-a" / "SKILL.md").read_text() == "old content"
+
+
+class TestEditorConfigVibeEntry:
+    """Tests for Vibe entry in EDITOR_CONFIGS."""
+
+    def test_vibe_config_exists(self):
+        """Vibe should have an entry in EDITOR_CONFIGS."""
+        from simpletask.core.ai_templates import EDITOR_CONFIGS
+
+        assert "vibe" in EDITOR_CONFIGS
+
+    def test_vibe_is_directory_based(self):
+        """Vibe config should be marked as directory-based."""
+        from simpletask.core.ai_templates import EDITOR_CONFIGS
+
+        assert EDITOR_CONFIGS["vibe"].is_directory_based is True
+
+    def test_other_editors_are_not_directory_based(self):
+        """OpenCode, Qwen, Gemini should NOT be directory-based."""
+        from simpletask.core.ai_templates import EDITOR_CONFIGS
+
+        assert EDITOR_CONFIGS["opencode"].is_directory_based is False
+        assert EDITOR_CONFIGS["qwen"].is_directory_based is False
+        assert EDITOR_CONFIGS["gemini"].is_directory_based is False
+
+    def test_vibe_display_name(self):
+        """Vibe should have correct display name."""
+        from simpletask.core.ai_templates import EDITOR_CONFIGS
+
+        assert EDITOR_CONFIGS["vibe"].display_name == "Mistral Vibe"
+
+    def test_vibe_has_no_agent_support(self):
+        """Vibe should not have agent directories configured."""
+        from simpletask.core.ai_templates import EDITOR_CONFIGS
+
+        assert EDITOR_CONFIGS["vibe"].global_agents_dir is None
+        assert EDITOR_CONFIGS["vibe"].local_agents_dir is None

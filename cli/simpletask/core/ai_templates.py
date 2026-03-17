@@ -1,4 +1,4 @@
-"""AI template management for OpenCode, Qwen, and Gemini CLI command files."""
+"""AI template management for OpenCode, Qwen, Gemini, and Vibe CLI command files."""
 
 import importlib.resources
 import shutil
@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-EditorType = Literal["opencode", "qwen", "gemini"]
+EditorType = Literal["opencode", "qwen", "gemini", "vibe"]
 
 
 @dataclass(frozen=True)
@@ -20,6 +20,7 @@ class EditorConfig:
     local_config_dir: tuple[str, ...]
     global_agents_dir: tuple[str, ...] | None = None
     local_agents_dir: tuple[str, ...] | None = None
+    is_directory_based: bool = False
 
 
 EDITOR_CONFIGS: dict[EditorType, EditorConfig] = {
@@ -45,6 +46,14 @@ EDITOR_CONFIGS: dict[EditorType, EditorConfig] = {
         file_extension=".toml",
         global_config_dir=(".gemini", "commands"),
         local_config_dir=(".gemini", "commands"),
+    ),
+    "vibe": EditorConfig(
+        display_name="Mistral Vibe",
+        template_subdir="vibe",
+        file_extension=".md",
+        global_config_dir=(".vibe", "skills"),
+        local_config_dir=(".vibe", "skills"),
+        is_directory_based=True,
     ),
 }
 
@@ -73,18 +82,27 @@ def _get_templates_dir(editor: EditorType) -> Path:
 
 
 def _get_bundled_templates(editor: EditorType) -> list[Path]:
-    """Get list of template files bundled with the package for an editor.
+    """Get list of template files or skill directories bundled with the package.
+
+    For flat-file editors (OpenCode, Qwen, Gemini), returns file paths matching
+    the editor's file extension. For directory-based editors (Vibe), returns
+    skill directory paths (each containing a SKILL.md).
 
     Args:
-        editor: Editor type ("opencode", "qwen", or "gemini")
+        editor: Editor type ("opencode", "qwen", "gemini", or "vibe")
 
     Returns:
-        List of Path objects for each template file.
+        List of Path objects for each template file or skill directory.
     """
     config = EDITOR_CONFIGS[editor]
     templates_dir = _get_templates_dir(editor)
     if not templates_dir.exists():
         return []
+
+    if config.is_directory_based:
+        return sorted(
+            p for p in templates_dir.iterdir() if p.is_dir() and not p.name.startswith(".")
+        )
 
     return sorted(templates_dir.glob(f"*{config.file_extension}"))
 
@@ -157,6 +175,48 @@ def _install_files(
     return installed, skipped, overwritten
 
 
+def _install_skill_dirs(
+    skill_dirs: list[Path],
+    target_dir: Path,
+    no_overwrite: bool = False,
+) -> tuple[list[str], list[str], list[str]]:
+    """Install skill directories to target directory.
+
+    For directory-based editors (like Vibe), each skill is a directory
+    containing a SKILL.md file. This copies entire directories instead
+    of individual files.
+
+    Args:
+        skill_dirs: List of source skill directory Path objects to install
+        target_dir: Directory to install skill directories into
+        no_overwrite: If True, skip existing directories instead of overwriting
+
+    Returns:
+        Tuple of (installed, skipped, overwritten) directory names.
+    """
+    target_dir.mkdir(parents=True, exist_ok=True)
+
+    installed = []
+    skipped = []
+    overwritten = []
+
+    for source_dir in skill_dirs:
+        target_path = target_dir / source_dir.name
+
+        if target_path.exists():
+            if no_overwrite:
+                skipped.append(source_dir.name)
+                continue
+            else:
+                overwritten.append(source_dir.name)
+        else:
+            installed.append(source_dir.name)
+
+        shutil.copytree(source_dir, target_path, dirs_exist_ok=True)
+
+    return installed, skipped, overwritten
+
+
 def _install_templates(
     editor: EditorType,
     target_dir: Path,
@@ -164,13 +224,16 @@ def _install_templates(
 ) -> tuple[list[str], list[str], list[str]]:
     """Install templates to target directory for an editor.
 
+    Dispatches to _install_files() for flat-file editors or
+    _install_skill_dirs() for directory-based editors.
+
     Args:
-        editor: Editor type ("opencode", "qwen", or "gemini")
+        editor: Editor type ("opencode", "qwen", "gemini", or "vibe")
         target_dir: Directory to install templates into
-        no_overwrite: If True, skip existing files instead of overwriting
+        no_overwrite: If True, skip existing files/directories instead of overwriting
 
     Returns:
-        Tuple of (installed, skipped, overwritten) file names.
+        Tuple of (installed, skipped, overwritten) names.
 
     Raises:
         FileNotFoundError: If templates directory doesn't exist
@@ -181,14 +244,20 @@ def _install_templates(
     if not templates:
         raise FileNotFoundError(f"No {config.display_name} templates found in package")
 
+    if config.is_directory_based:
+        return _install_skill_dirs(templates, target_dir, no_overwrite)
+
     return _install_files(templates, target_dir, no_overwrite)
 
 
 def _get_installed_status(editor: EditorType) -> dict[str, dict[str, bool]]:
     """Get installation status of each template for an editor.
 
+    For directory-based editors, checks for directory existence instead of
+    file existence.
+
     Args:
-        editor: Editor type ("opencode", "qwen", or "gemini")
+        editor: Editor type ("opencode", "qwen", "gemini", or "vibe")
 
     Returns:
         Dict mapping template name to {"global": bool, "local": bool}
@@ -568,3 +637,67 @@ def get_agents_installed_status() -> dict[str, dict[str, bool]]:
         Dict mapping agent name to {"global": bool, "local": bool}
     """
     return _get_agents_installed_status("opencode")
+
+
+def get_vibe_templates_dir() -> Path:
+    """Get path to bundled Vibe templates directory.
+
+    Returns:
+        Path to the templates/vibe directory within the package.
+    """
+    return _get_templates_dir("vibe")
+
+
+def get_bundled_vibe_templates() -> list[Path]:
+    """Get list of Vibe skill directories bundled with the package.
+
+    Returns:
+        List of Path objects for each skill directory.
+    """
+    return _get_bundled_templates("vibe")
+
+
+def get_global_vibe_commands_dir() -> Path:
+    """Get global Vibe skills directory.
+
+    Returns:
+        Path to ~/.vibe/skills/
+    """
+    return _get_global_commands_dir("vibe")
+
+
+def get_local_vibe_commands_dir() -> Path:
+    """Get local Vibe skills directory.
+
+    Returns:
+        Path to .vibe/skills/ in current directory.
+    """
+    return _get_local_commands_dir("vibe")
+
+
+def install_vibe_templates(
+    target_dir: Path,
+    no_overwrite: bool = False,
+) -> tuple[list[str], list[str], list[str]]:
+    """Install Vibe skill directories to target directory.
+
+    Args:
+        target_dir: Directory to install skills into
+        no_overwrite: If True, skip existing directories instead of overwriting
+
+    Returns:
+        Tuple of (installed, skipped, overwritten) directory names.
+
+    Raises:
+        FileNotFoundError: If templates directory doesn't exist
+    """
+    return _install_templates("vibe", target_dir, no_overwrite)
+
+
+def get_vibe_installed_status() -> dict[str, dict[str, bool]]:
+    """Get installation status of each Vibe skill.
+
+    Returns:
+        Dict mapping skill directory name to {"global": bool, "local": bool}
+    """
+    return _get_installed_status("vibe")
