@@ -2,6 +2,16 @@
 
 All notable changes to simpletask are documented here.
 
+## [0.29.0] - 2026-03-23
+
+### Added
+
+- Mistral Vibe CLI template support as a fourth AI editor target
+  - Four workflow skills: `simpletask-plan`, `simpletask-split`, `simpletask-implement`, `simpletask-review`
+  - Skills installed to `~/.vibe/skills/` (global) or `.vibe/skills/` (local)
+  - `simpletask ai install --vibe` flag to install Vibe skills only
+  - Default `simpletask ai install` now installs all four editors (OpenCode, Qwen, Gemini, Vibe)
+
 ## [0.28.0] - 2026-03-16
 
 Initial public release on GitHub.

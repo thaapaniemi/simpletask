@@ -100,16 +100,17 @@ The recommended workflow uses slash commands in supported AI editors. These guid
 
 **Supported AI tools:**
 
-- **[OpenCode](https://opencode.ai)**, **[Qwen](https://github.com/QwenLM/qwen-code)**, and **[Gemini CLI](https://github.com/google-gemini/gemini-cli)** - Install workflow commands:
+- **[OpenCode](https://opencode.ai)**, **[Qwen](https://github.com/QwenLM/qwen-code)**, **[Gemini CLI](https://github.com/google-gemini/gemini-cli)**, and **[Mistral Vibe](https://mistral.ai/news/vibe-coding)** - Install workflow commands:
   ```sh
-  simpletask ai install              # All three editors
+  simpletask ai install              # All four editors
   simpletask ai install --opencode   # OpenCode only
   simpletask ai install --qwen       # Qwen only
   simpletask ai install --gemini     # Gemini CLI only
+  simpletask ai install --vibe       # Mistral Vibe only
   simpletask ai install --local      # Project-local installation
   ```
 
-The three workflow commands are:
+The workflow commands are:
 - `/simpletask.plan` - Create specification and implementation plan
 - `/simpletask.split` - Split complex tasks into atomic subtasks (optional)
 - `/simpletask.implement` - Execute tasks from the plan
@@ -252,7 +253,7 @@ ajv validate -s schema/simpletask.schema.json -d .tasks/my-task.yml --spec=draft
 
 ### MCP Server for AI Editors
 
-simpletask includes a Model Context Protocol (MCP) server for integration with AI editors like OpenCode, Qwen-CLI, and Gemini CLI. The MCP server exposes task file operations as structured tools that AI assistants can use to read task definitions, check status, and understand project context.
+simpletask includes a Model Context Protocol (MCP) server for integration with AI editors like OpenCode, Qwen-CLI, Gemini CLI, and Mistral Vibe. The MCP server exposes task file operations as structured tools that AI assistants can use to read task definitions, check status, and understand project context.
 
 **Benefits:**
 - **Structured responses**: AI gets typed JSON instead of parsing CLI output
