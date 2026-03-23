@@ -136,7 +136,61 @@ Look for:
    - Are changes focused on the feature or scattered across unrelated areas? (Scope creep signal)
    - Do any modified files look unrelated to the original prompt? Flag these.
 
-**Step 6: Generate Scoped, Actionable Feedback**
+**Step 6: Cross-Cutting Design Notes**
+
+Scope: only the git diff for this branch. This step is **informational only** — design notes do NOT block merge, do NOT create fix tasks, and do NOT repeat issues already reported as blocking.
+
+Ask these 4 adversarial questions against the diff:
+
+| # | Question | What to look for |
+|---|----------|-----------------|
+| 1 | **Data flow across files** | Does data mutate or transform as it crosses file boundaries in ways that could silently lose information or introduce inconsistency? |
+| 2 | **Robustness under unexpected inputs** | Are there input shapes, edge values, or missing keys that could cause silent failures, wrong results, or unhandled exceptions in the new code? |
+| 3 | **Error semantics** | Do error paths in the diff propagate enough context? Could callers misinterpret a returned error or exception as success? |
+| 4 | **Test fidelity** | Do the new/changed tests actually exercise the behavior described in the acceptance criteria, or do they only test the happy path? |
+
+Produce **zero to 5 design notes**. Zero is the correct number if no observation is well-supported by the diff — do not manufacture notes to fill a quota. Each note **must**:
+- Be prefixed with one of these category tags:
+  - `[DATA_FLOW]` — cross-file data transformation issues
+  - `[ROBUSTNESS]` — unexpected input handling
+  - `[ERROR_SEM]` — error path semantics
+  - `[TEST_FIDELITY]` — test coverage gaps
+- Reference a specific `file:line` from the diff
+- Be 1-2 sentences describing the observation
+- Be informational — no fix required
+
+Format: `[CATEGORY] file:line — observation`
+
+**Do NOT flag:** naming conventions, code style, abstraction choices, architectural preferences, or anything already listed as a blocking issue.
+
+**Re-run safety:** Before persisting notes, clear any prior auto-generated design notes to avoid duplicates on repeated review runs:
+
+```
+simpletask_note(action="remove", all=True)
+```
+
+Then persist each design note via MCP tool:
+
+```
+Use simpletask_note() MCP tool to persist each note:
+- Call simpletask_note(action="add", content="[CATEGORY] file:line — [observation]")
+- Repeat for each design note (max 5)
+```
+
+```bash
+# CLI equivalent
+simpletask note add "[ROBUSTNESS] server.py:42 — branch parameter is not validated before normalization"
+```
+
+**Pattern detection:** If 3 or more design notes share the same category tag (e.g., 3 `[ROBUSTNESS]` notes), append this line to the review summary:
+
+```
+CRITERIA GAP DETECTED: [N]/[total] design notes concern [CATEGORY]. Consider adding a robustness/data-flow/error-semantics/test-fidelity acceptance criterion in future plans for this area.
+```
+
+This is informational only — it does not block merge or create tasks.
+
+**Step 7: Generate Scoped, Actionable Feedback**
 
 Only report issues that:
 - Prevent an acceptance criterion from being met, OR
@@ -161,7 +215,7 @@ Fix: [Specific, actionable remediation]
 
 Medium/Low severity observations (style, naming, minor inefficiencies) are noted in the summary but do NOT trigger fix tasks.
 
-**Step 7: Determine PR Readiness**
+**Step 8: Determine PR Readiness**
 
 Evaluate and report one of:
 
@@ -181,7 +235,7 @@ Evaluate and report one of:
 - Acceptance criteria remain with `completed: false`
 - Critical flaws prevent the feature from working as specified
 
-**Step 8: Display Review Summary**
+**Step 9: Display Review Summary**
 
 ```
 ╭─────────────────────────────────────────────────────────────╮
@@ -233,7 +287,11 @@ BLOCKING ISSUES (require fix tasks)
   [Critical/High] CORRECTNESS (X issues)
     - file.py:101 - [issue description]
 
-OBSERVATIONS (informational only — no tasks created)
+DESIGN NOTES (cross-cutting analysis — informational, no tasks created)
+  - [DATA_FLOW] file.py:42 — [design note 1]
+  - [ROBUSTNESS] other.py:17 — [design note 2]
+
+OBSERVATIONS (minor issues in diff — informational, no tasks created)
   - [Low/Medium severity notes about the diff, if any]
 
 ───────────────────────────────────────────────────────────────
@@ -243,7 +301,7 @@ PR READINESS: [READY TO MERGE | NEEDS CHANGES | NOT READY]
 ───────────────────────────────────────────────────────────────
 ```
 
-**Step 9: Auto-Inject Fix Tasks (blocking issues only)**
+**Step 10: Auto-Inject Fix Tasks (blocking issues only)**
 
 Only auto-inject fix tasks if there are **Critical or High severity** issues that prevent acceptance criteria from being met or introduce regressions/security vulnerabilities in the diff. Do NOT create tasks for Medium/Low/Observations.
 

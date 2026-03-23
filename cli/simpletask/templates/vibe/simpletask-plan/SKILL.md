@@ -93,11 +93,24 @@ Use simpletask_criteria() MCP tool to add each criterion:
 - Repeat for each criterion (typically 3-6 criteria)
 ```
 
-Guidelines for acceptance criteria:
-- Must be testable (can verify if met)
-- Specific and unambiguous
-- Focus on user-visible outcomes
-- Include quality checks (tests, coverage, etc.)
+**Write correctness invariants, not implementation descriptions.** Ask: "If this criterion is satisfied, can I be confident the feature is correct?" Weak criteria describe what code does; strong criteria describe what must remain true.
+
+**Weak vs. strong examples:**
+
+| Weak (avoid) | Strong (prefer) |
+|---|---|
+| "Posts to the endpoint" | "Constructed URL resolves to a valid endpoint given the configured base URL" |
+| "Maps priority values" | "All priority values, including unknown ones, are handled without unhandled exceptions" |
+| "Skips API call if record exists" | "Idempotency holds even when input text varies between runs for the same logical record" |
+| "Config file is parsed" | "All required keys are present and have valid types; missing or malformed keys produce a descriptive error naming the offending key" |
+
+**Required by feature type:**
+- **Multi-file features with behavior crossing component boundaries**: At least one cross-component criterion describing the correctness invariant at the boundary between components. Not required for trivial multi-file edits like renames or config changes.
+- **Features processing external input**: At least one robustness criterion for malformed, missing, or unexpected input values
+
+Include one quality criterion (tests pass, schema validates, etc.). At least one criterion must describe the externally observable effect of the feature from the user's perspective.
+
+**Self-check:** Before proceeding, verify: (1) multi-file feature with cross-component behavior has a boundary criterion (skip for trivial renames), (2) external input has a robustness criterion, (3) no criterion restates a task name, (4) at least one criterion describes the externally observable effect on users. Fix any gaps before Step 5.
 
 **Step 5: Plan Implementation Tasks**
 

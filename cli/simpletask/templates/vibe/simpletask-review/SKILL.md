@@ -77,7 +77,38 @@ git diff --name-only main..HEAD | head -20
 
 Analyze: commits on branch, files modified, lines changed, scope focus vs scatter.
 
-**Step 6: Generate Scoped, Actionable Feedback**
+**Step 6: Cross-Cutting Design Notes**
+
+Scope: only the git diff. **Informational only** — do NOT block merge, create fix tasks, or repeat blocking issues.
+
+Ask 4 adversarial questions against the diff:
+
+| # | Question | What to look for |
+|---|----------|-----------------|
+| 1 | **Data flow across files** | Does data mutate or transform as it crosses file boundaries in ways that could silently lose information or introduce inconsistency? |
+| 2 | **Robustness under unexpected inputs** | Are there input shapes, edge values, or missing keys that could cause silent failures, wrong results, or unhandled exceptions in the new code? |
+| 3 | **Error semantics** | Do error paths in the diff propagate enough context? Could callers misinterpret a returned error or exception as success? |
+| 4 | **Test fidelity** | Do the new/changed tests actually exercise the behavior described in the acceptance criteria, or do they only test the happy path? |
+
+Produce **zero to 5 notes**. Zero is correct if nothing non-obvious is found. Prefix each with `[DATA_FLOW]`, `[ROBUSTNESS]`, `[ERROR_SEM]`, or `[TEST_FIDELITY]`, referencing `file:line` from the diff.
+
+**Re-run safety:** Clear prior auto-generated notes before persisting new ones:
+
+```
+simpletask_note(action="remove", all=True)
+```
+
+Then persist:
+
+```
+simpletask_note(action="add", content="[ROBUSTNESS] server.py:42 — None branch crashes normalize_branch_name()")
+```
+
+If 3+ notes share a category, add to summary: `CRITERIA GAP DETECTED: [N] notes concern [CATEGORY]. Consider adding that criterion type in future plans.`
+
+**Do NOT flag:** naming, style, abstractions, architectural preferences, or anything already blocking.
+
+**Step 7: Generate Scoped, Actionable Feedback**
 
 Only report issues that:
 - Prevent an acceptance criterion from being met, OR
@@ -89,17 +120,17 @@ Only report issues that:
 3. **CORRECTNESS** - Logic errors preventing feature from working
 4. **SCOPE CREEP** - Changes beyond original prompt (informational)
 
-**Step 7: Determine PR Readiness**
+**Step 8: Determine PR Readiness**
 
 - **READY TO MERGE**: All tasks completed, all criteria met, no blocking issues
 - **NEEDS CHANGES**: All done but has Critical/High severity issues
 - **NOT READY**: Tasks incomplete, criteria unmet, or critical flaws
 
-**Step 8: Display Review Summary**
+**Step 9: Display Review Summary**
 
-Show: original prompt, task completion stats, criteria status, git changes, blocking issues, observations, and PR readiness determination.
+Show: original prompt, task completion stats, criteria status, git changes, blocking issues, design notes (cross-cutting analysis, with category tags), observations, and PR readiness determination.
 
-**Step 9: Auto-Inject Fix Tasks (blocking issues only)**
+**Step 10: Auto-Inject Fix Tasks (blocking issues only)**
 
 If Critical/High severity blocking issues exist:
 
