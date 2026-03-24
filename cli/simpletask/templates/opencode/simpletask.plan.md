@@ -126,17 +126,39 @@ Use simpletask_criteria() MCP tool to add each criterion:
 - Repeat for each criterion (typically 3-6 criteria)
 ```
 
-Guidelines for acceptance criteria:
-- Must be testable (can verify if met)
-- Specific and unambiguous
-- Focus on user-visible outcomes
-- Include quality checks (tests, coverage, etc.)
+**Write correctness invariants, not implementation descriptions.**
 
-Example acceptance criteria:
-- AC1: "Feature X renders correctly in the UI"
-- AC2: "API endpoint returns correct response format"
-- AC3: "All existing tests pass"
-- AC4: "New functionality is covered by unit tests"
+Criteria should describe *what must remain true* in the system after the feature lands — not *what the code does*. Ask: "If this criterion is satisfied, can I be confident the feature is correct?" If the answer is "not really", the criterion is too weak.
+
+**Weak vs. strong criteria examples:**
+
+| Weak (avoid) | Strong (prefer) |
+|---|---|
+| "Posts to the endpoint" | "Constructed URL resolves to a valid endpoint given the configured base URL" |
+| "Maps priority values" | "All priority values, including unknown ones, are handled without unhandled exceptions" |
+| "Skips API call if record exists" | "Idempotency holds even when input text varies between runs for the same logical record" |
+| "Config file is parsed" | "All required keys are present and have valid types; missing or malformed keys produce a descriptive error naming the offending key" |
+
+**Required criteria by feature type:**
+
+- **Multi-file features with behavior crossing component boundaries**: At least one cross-component criterion — describe the correctness invariant *at the boundary* between components (e.g., "data passed from module A to module B preserves X property"). Not required for trivial multi-file edits like renames or config changes.
+- **Features processing external input**: At least one robustness criterion — describe correct behavior under malformed, missing, or unexpected input values
+
+**Additional guidelines:**
+- At least one criterion must describe the externally observable effect of the feature from the user's perspective
+- Must be independently verifiable (can you write a test or manual check for it?)
+- Specific and unambiguous — no "works correctly" or "behaves as expected"
+- Include one quality criterion (tests pass, coverage threshold met, schema validates)
+
+**Self-check before proceeding:**
+
+Re-read the criteria you just wrote and verify:
+1. **Multi-file feature with cross-component behavior?** At least one criterion references the correctness invariant at a cross-component boundary. If missing, add one. (Skip for trivial multi-file edits like renames.)
+2. **External input?** At least one criterion describes behavior under malformed, missing, or unexpected values. If missing, add one.
+3. **No restatements?** No criterion simply restates a task name or implementation step. If found, rewrite it as a correctness invariant.
+4. **User outcome?** At least one criterion describes the externally observable effect of the feature from the user's perspective. If missing, add one.
+
+Do NOT proceed to Step 5 until all four checks pass.
 
 **Step 5: Plan Implementation Tasks**
 
