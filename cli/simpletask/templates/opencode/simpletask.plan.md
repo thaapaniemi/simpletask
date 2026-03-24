@@ -113,6 +113,32 @@ git checkout -b [branch-name]
 
 2. If task file exists but is minimal, you can update it by adding criteria and tasks in subsequent steps.
 
+**Step 3.5: Project Defaults**
+
+Check whether project-level defaults exist and inform the user:
+
+```bash
+# Check if defaults file exists
+ls .tasks/defaults.yml 2>/dev/null && echo "exists" || echo "missing"
+```
+
+- **If `.tasks/defaults.yml` exists:** Inform the user that project defaults (design patterns, quality requirements, constraints, context) were automatically merged into the new task file. No action needed.
+
+- **If `.tasks/defaults.yml` does NOT exist:** Ask the user if they want to run codebase analysis now to set up project-level defaults. These defaults are written once and automatically applied to every future task file.
+
+  If user says **yes**:
+  1. Run the codebase analysis from `/simpletask.split` Step 1.5 (find references, patterns, constraints, security, error handling, quality preset) — but write results to **defaults** using `target="defaults"`:
+     ```
+     simpletask_design(action="set", field="pattern", value="...", target="defaults")
+     simpletask_design(action="set", field="constraint", value="...", target="defaults")
+     simpletask_quality(action="preset", preset_name="python", target="defaults")
+     # etc.
+     ```
+  2. After saving to defaults, also copy the same values into the current task file (call the same tools without `target="defaults"`).
+  3. Inform the user: "Project defaults saved to `.tasks/defaults.yml`. All future task files will inherit these settings automatically."
+
+  If user says **no**: Skip — the user can set up defaults later with `simpletask defaults`.
+
 **Step 4: Add Acceptance Criteria**
 
 Add testable, specific acceptance criteria using simpletask_criteria() MCP tool:

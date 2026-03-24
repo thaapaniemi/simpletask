@@ -16,7 +16,8 @@ from ..core.criteria_ops import (
     remove_acceptance_criterion,
     update_acceptance_criterion,
 )
-from ..core.design_ops import remove_design_field
+from ..core.defaults import DEFAULTS_FILENAME, load_defaults, save_defaults
+from ..core.design_ops import remove_design_field, remove_from_design
 from ..core.iteration_ops import (
     add_iteration_to_spec,
     get_iteration_from_spec,
@@ -29,6 +30,7 @@ from ..core.models import (
     DesignReference,
     ErrorHandlingStrategy,
     FileAction,
+    ProjectDefaults,
     SecurityCategory,
     SecurityRequirement,
     TaskStatus,
@@ -40,6 +42,7 @@ from ..core.quality_ops import (
     apply_quality_preset,
     run_quality_checks,
     update_quality_config,
+    update_quality_requirements,
 )
 from ..core.task_file_ops import create_task_file
 from ..core.task_ops import (
@@ -99,6 +102,44 @@ from .models import (
 # Preserve reference to built-in list type before defining list() function
 # This allows type hints to use list[T] even after list() function is defined
 _list = builtins.list
+
+# TargetType for tools that support operating on defaults.yml vs branch task file
+TargetType = Literal["branch", "defaults"]
+
+
+# ---------------------------------------------------------------------------
+# Private helpers for defaults-target operations
+# ---------------------------------------------------------------------------
+
+
+def _load_defaults_for_write() -> tuple[ProjectDefaults, str]:
+    """Load ProjectDefaults from defaults.yml, creating empty one if missing.
+
+    Used by write operations (set/add/remove) when target='defaults'.
+
+    Returns:
+        Tuple of (ProjectDefaults, str path to defaults file)
+    """
+    project = ensure_project()
+    path = project.tasks_dir / DEFAULTS_FILENAME
+    defaults = load_defaults(project) or ProjectDefaults()
+    return defaults, str(path)
+
+
+def _commit_defaults(defaults: ProjectDefaults) -> str:
+    """Save ProjectDefaults back to defaults.yml and return the path as str."""
+    project = ensure_project()
+    return str(save_defaults(project, defaults))
+
+
+def _defaults_compact_summary(_path: object = None) -> CompactStatusSummary:
+    """Return a dummy CompactStatusSummary for defaults target responses."""
+    return CompactStatusSummary(
+        branch="defaults",
+        title="Project Defaults",
+        overall_status=TaskStatus.NOT_STARTED,
+    )
+
 
 # Initialize FastMCP server
 mcp = FastMCP("simpletask")
@@ -525,6 +566,7 @@ def quality(
     test_only: bool = False,
     type_only: bool = False,
     security_only: bool = False,
+    target: TargetType = "branch",
 ) -> SimpleTaskQualityResponse | SimpleTaskWriteResponse:
     """Manage quality requirements and run quality checks.
 
@@ -545,10 +587,13 @@ def quality(
             ValueError if combined with a non-check action or another filter flag.
         security_only: Only run security check (for 'check' action). Raises
             ValueError if combined with a non-check action or another filter flag.
+        target: Whether to operate on the current branch task file ('branch', default)
+            or the project defaults file ('defaults').
 
     Note:
         lint_only, test_only, type_only, and security_only are mutually exclusive.
         Pass at most one. They are only valid with action='check'.
+        The 'check' action is not supported when target='defaults'.
 
     Returns:
         SimpleTaskQualityResponse for check/get actions.
@@ -559,8 +604,6 @@ def quality(
             or filter flags (lint_only, test_only, type_only, security_only)
             are used with a non-check action or combined together.
     """
-    file_path = get_current_task_file_path()
-    spec = parse_task_file(file_path)
     summary: StatusSummary | CompactStatusSummary
 
     # Validate that filter flags are only used with action='check'
@@ -568,6 +611,13 @@ def quality(
         raise ValueError(
             "Filter flags (lint_only, test_only, type_only, security_only) "
             "are only valid with action='check'"
+        )
+
+    # 'check' action is not meaningful for defaults
+    if action == "check" and target == "defaults":
+        raise ValueError(
+            "Quality checks can only run against branch task files, not defaults. "
+            "Use target='branch' for action='check'."
         )
 
     # Parse args if provided
@@ -583,6 +633,81 @@ def quality(
         except ValueError:
             valid_tools = ", ".join([t.value for t in ToolName])
             raise ValueError(f"Invalid tool '{tool}'. Valid tools: {valid_tools}") from None
+
+    # ------------------------------------------------------------------ #
+    # Defaults target path
+    # ------------------------------------------------------------------ #
+    if target == "defaults":
+        match action:
+            case "get":
+                project = ensure_project()
+                defaults = load_defaults(project) or ProjectDefaults()
+                defaults_path = project.tasks_dir / DEFAULTS_FILENAME
+                return SimpleTaskQualityResponse(
+                    action="quality_get",
+                    quality_requirements=defaults.quality_requirements,
+                    check_results=None,
+                    all_passed=None,
+                    applied_fields=None,
+                    file_path=str(defaults_path),
+                    summary=_defaults_compact_summary(defaults_path),
+                )
+
+            case "set":
+                if not config_type:
+                    raise ValueError("'config_type' is required for action='set'")
+                if config_type not in ["linting", "type-checking", "testing", "security"]:
+                    raise ValueError(
+                        f"Invalid config_type '{config_type}'. "
+                        "Valid options: linting, type-checking, testing, security"
+                    )
+                if min_coverage is not None and config_type != "testing":
+                    raise ValueError("min_coverage can only be used with 'testing' config type")
+
+                validated_config_type = cast(
+                    Literal["linting", "type-checking", "testing", "security"], config_type
+                )
+                defaults, _path = _load_defaults_for_write()
+                defaults.quality_requirements = update_quality_requirements(
+                    existing=defaults.quality_requirements,
+                    config_type=validated_config_type,
+                    tool=tool_enum,
+                    args=args_list if args_list else None,
+                    enabled=enabled,
+                    min_coverage=min_coverage,
+                    timeout=timeout,
+                )
+                set_defaults_path: str = _commit_defaults(defaults)
+                return SimpleTaskWriteResponse(
+                    success=True,
+                    action="quality_set",
+                    message=f"Updated quality configuration for {config_type} in project defaults",
+                    file_path=set_defaults_path,
+                    summary=_defaults_compact_summary(set_defaults_path),
+                    new_item_ids=[],
+                )
+
+            case "preset":
+                if not preset_name:
+                    raise ValueError("'preset_name' is required for action='preset'")
+                defaults, _path = _load_defaults_for_write()
+                merged, _applied = apply_quality_preset(defaults.quality_requirements, preset_name)
+                defaults.quality_requirements = merged
+                preset_defaults_path: str = _commit_defaults(defaults)
+                return SimpleTaskWriteResponse(
+                    success=True,
+                    action="quality_preset_applied",
+                    message=f"Applied preset '{preset_name}' (filled gaps only) to project defaults",
+                    file_path=preset_defaults_path,
+                    summary=_defaults_compact_summary(preset_defaults_path),
+                    new_item_ids=[],
+                )
+
+    # ------------------------------------------------------------------ #
+    # Branch target path (existing behaviour)
+    # ------------------------------------------------------------------ #
+    file_path = get_current_task_file_path()
+    spec = parse_task_file(file_path)
 
     match action:
         case "get":
@@ -697,6 +822,7 @@ def design(
     category: str | None = None,
     index: int | None = None,
     all: bool = False,
+    target: TargetType = "branch",
 ) -> SimpleTaskDesignResponse | SimpleTaskWriteResponse:
     """Manage design guidance and architectural context.
 
@@ -708,6 +834,8 @@ def design(
         category: Security category (required when field='security')
         index: Index of item to remove (for list fields in 'remove' action)
         all: Remove all items from field or entire design section (for 'remove' action)
+        target: Whether to operate on the current branch task file ('branch', default)
+            or the project defaults file ('defaults').
 
     Returns:
         SimpleTaskDesignResponse for get action.
@@ -716,9 +844,136 @@ def design(
     Raises:
         ValueError: If required parameters missing or invalid values provided.
     """
+    summary: StatusSummary | CompactStatusSummary
+
+    # ------------------------------------------------------------------ #
+    # Defaults target path
+    # ------------------------------------------------------------------ #
+    if target == "defaults":
+        project = ensure_project()
+        defaults_path = project.tasks_dir / DEFAULTS_FILENAME
+
+        match action:
+            case "get":
+                defaults = load_defaults(project) or ProjectDefaults()
+                return SimpleTaskDesignResponse(
+                    action="design_get",
+                    design=defaults.design,
+                    file_path=str(defaults_path),
+                    summary=_defaults_compact_summary(defaults_path),
+                )
+
+            case "set":
+                if not field:
+                    raise ValueError("'field' is required for action='set'")
+                if not value:
+                    raise ValueError("'value' is required for action='set'")
+
+                defaults = load_defaults(project) or ProjectDefaults()
+                if not defaults.design:
+                    defaults.design = Design(
+                        patterns=None,
+                        reference_implementations=None,
+                        architectural_constraints=None,
+                        security=None,
+                        error_handling=None,
+                    )
+
+                if field == "pattern":
+                    try:
+                        pattern = ArchitecturalPattern(value)
+                    except ValueError:
+                        valid_patterns = ", ".join([p.value for p in ArchitecturalPattern])
+                        raise ValueError(
+                            f"Invalid pattern: {value}. Valid patterns: {valid_patterns}"
+                        ) from None
+                    if not defaults.design.patterns:
+                        defaults.design.patterns = []
+                    defaults.design.patterns.append(pattern)
+                    message = f"Added pattern: {pattern.value}"
+
+                elif field == "reference":
+                    if not reason:
+                        raise ValueError("'reason' is required when field='reference'")
+                    if not defaults.design.reference_implementations:
+                        defaults.design.reference_implementations = []
+                    ref = DesignReference(path=value, reason=reason)
+                    defaults.design.reference_implementations.append(ref)
+                    message = f"Added reference: {value}"
+
+                elif field == "constraint":
+                    if not defaults.design.architectural_constraints:
+                        defaults.design.architectural_constraints = []
+                    defaults.design.architectural_constraints.append(value)
+                    message = "Added constraint"
+
+                elif field == "security":
+                    if not category:
+                        raise ValueError("'category' is required when field='security'")
+                    try:
+                        cat = SecurityCategory(category)
+                    except ValueError:
+                        valid_categories = ", ".join([c.value for c in SecurityCategory])
+                        raise ValueError(
+                            f"Invalid category: {category}. Valid categories: {valid_categories}"
+                        ) from None
+                    if not defaults.design.security:
+                        defaults.design.security = []
+                    req = SecurityRequirement(category=cat, description=value)
+                    defaults.design.security.append(req)
+                    message = f"Added security requirement: {cat.value}"
+
+                elif field == "error-handling":
+                    try:
+                        strategy = ErrorHandlingStrategy(value)
+                    except ValueError:
+                        valid_strategies = ", ".join([s.value for s in ErrorHandlingStrategy])
+                        raise ValueError(
+                            f"Invalid strategy: {value}. Valid strategies: {valid_strategies}"
+                        ) from None
+                    defaults.design.error_handling = strategy
+                    message = f"Set error handling strategy: {strategy.value}"
+
+                else:
+                    raise ValueError(
+                        f"Invalid field: {field}. "
+                        "Valid options: pattern, reference, constraint, security, error-handling"
+                    )
+
+                save_defaults(project, defaults)
+                return SimpleTaskWriteResponse(
+                    success=True,
+                    action="design_set",
+                    message=message,
+                    file_path=str(defaults_path),
+                    summary=_defaults_compact_summary(defaults_path),
+                    new_item_ids=[],
+                )
+
+            case "remove":
+                if not field:
+                    raise ValueError("'field' is required for action='remove'")
+
+                defaults = load_defaults(project) or ProjectDefaults()
+                updated_design, message = remove_from_design(
+                    defaults.design, field, index=index, all_items=all
+                )
+                defaults.design = updated_design
+                save_defaults(project, defaults)
+                return SimpleTaskWriteResponse(
+                    success=True,
+                    action="design_remove",
+                    message=message,
+                    file_path=str(defaults_path),
+                    summary=_defaults_compact_summary(defaults_path),
+                    new_item_ids=[],
+                )
+
+    # ------------------------------------------------------------------ #
+    # Branch target path (existing behaviour)
+    # ------------------------------------------------------------------ #
     file_path = get_current_task_file_path()
     spec = parse_task_file(file_path)
-    summary: StatusSummary | CompactStatusSummary
 
     match action:
         case "get":
@@ -948,6 +1203,7 @@ def constraint(
     value: str | None = None,
     index: int | None = None,
     all: bool = False,
+    target: TargetType = "branch",
 ) -> SimpleTaskWriteResponse | SimpleTaskConstraintResponse:
     """Manage implementation constraints.
 
@@ -956,6 +1212,8 @@ def constraint(
         value: Constraint text (required for add)
         index: Constraint index to remove (0-based, required for remove unless all=True)
         all: Remove all constraints (for remove action)
+        target: Whether to operate on the current branch task file ('branch', default)
+            or the project defaults file ('defaults').
 
     Returns:
         SimpleTaskWriteResponse for write operations (add/remove).
@@ -964,18 +1222,82 @@ def constraint(
     Raises:
         ValueError: If required parameters missing or invalid index.
     """
-    file_path = get_current_task_file_path()
     summary: StatusSummary | CompactStatusSummary
+
+    # ------------------------------------------------------------------ #
+    # Defaults target path
+    # ------------------------------------------------------------------ #
+    if target == "defaults":
+        project = ensure_project()
+        defaults_path = project.tasks_dir / DEFAULTS_FILENAME
+
+        match action:
+            case "list":
+                defaults = load_defaults(project) or ProjectDefaults()
+                return SimpleTaskConstraintResponse(
+                    action="constraint_list",
+                    constraints=defaults.constraints,
+                    file_path=str(defaults_path),
+                    summary=_defaults_compact_summary(defaults_path),
+                )
+
+            case "add":
+                if value is None:
+                    raise ValueError("'value' is required for action='add'")
+                defaults = load_defaults(project) or ProjectDefaults()
+                if defaults.constraints is None:
+                    defaults.constraints = []
+                defaults.constraints.append(value)
+                save_defaults(project, defaults)
+                return SimpleTaskWriteResponse(
+                    success=True,
+                    action="constraint_added",
+                    message="Added constraint to project defaults",
+                    file_path=str(defaults_path),
+                    summary=_defaults_compact_summary(defaults_path),
+                    new_item_ids=[],
+                )
+
+            case "remove":
+                if not all and index is None:
+                    raise ValueError("Either 'index' or 'all=True' is required for action='remove'")
+                defaults = load_defaults(project) or ProjectDefaults()
+                constraints = defaults.constraints or []
+                if all:
+                    defaults.constraints = None
+                    message = "Removed all constraints from project defaults"
+                else:
+                    if index is None or index < 0 or index >= len(constraints):
+                        raise ValueError(
+                            f"Invalid index {index}. Valid range: 0-{len(constraints) - 1}"
+                        )
+                    constraints.pop(index)
+                    defaults.constraints = constraints if constraints else None
+                    message = f"Removed constraint {index} from project defaults"
+                save_defaults(project, defaults)
+                return SimpleTaskWriteResponse(
+                    success=True,
+                    action="constraint_removed",
+                    message=message,
+                    file_path=str(defaults_path),
+                    summary=_defaults_compact_summary(defaults_path),
+                    new_item_ids=[],
+                )
+
+    # ------------------------------------------------------------------ #
+    # Branch target path (existing behaviour)
+    # ------------------------------------------------------------------ #
+    file_path = get_current_task_file_path()
 
     match action:
         case "list":
             spec = parse_task_file(file_path)
-            constraints = list_constraints(spec=spec)
+            branch_constraints = list_constraints(spec=spec)
             summary = compute_status_summary(spec)
 
             return SimpleTaskConstraintResponse(
                 action="constraint_list",
-                constraints=constraints,
+                constraints=branch_constraints,
                 file_path=str(file_path),
                 summary=summary,
             )
@@ -1023,6 +1345,7 @@ def context(
     key: str | None = None,
     value: str | None = None,
     all: bool = False,
+    target: TargetType = "branch",
 ) -> SimpleTaskWriteResponse | SimpleTaskContextResponse:
     """Manage context key-value pairs.
 
@@ -1031,6 +1354,8 @@ def context(
         key: Context key (required for set/remove)
         value: Context value (required for set)
         all: Remove all context entries (for remove action)
+        target: Whether to operate on the current branch task file ('branch', default)
+            or the project defaults file ('defaults').
 
     Returns:
         SimpleTaskWriteResponse for write operations (set/remove).
@@ -1039,8 +1364,72 @@ def context(
     Raises:
         ValueError: If required parameters missing or invalid key.
     """
-    file_path = get_current_task_file_path()
     summary: StatusSummary | CompactStatusSummary
+
+    # ------------------------------------------------------------------ #
+    # Defaults target path
+    # ------------------------------------------------------------------ #
+    if target == "defaults":
+        project = ensure_project()
+        defaults_path = project.tasks_dir / DEFAULTS_FILENAME
+
+        match action:
+            case "show":
+                defaults = load_defaults(project) or ProjectDefaults()
+                return SimpleTaskContextResponse(
+                    action="context_show",
+                    context=defaults.context,
+                    file_path=str(defaults_path),
+                    summary=_defaults_compact_summary(defaults_path),
+                )
+
+            case "set":
+                if not key:
+                    raise ValueError("'key' is required for action='set'")
+                if value is None:
+                    raise ValueError("'value' is required for action='set'")
+                defaults = load_defaults(project) or ProjectDefaults()
+                if defaults.context is None:
+                    defaults.context = {}
+                defaults.context[key] = value
+                save_defaults(project, defaults)
+                return SimpleTaskWriteResponse(
+                    success=True,
+                    action="context_set",
+                    message=f"Set context key '{key}' in project defaults",
+                    file_path=str(defaults_path),
+                    summary=_defaults_compact_summary(defaults_path),
+                    new_item_ids=[],
+                )
+
+            case "remove":
+                if not all and not key:
+                    raise ValueError("Either 'key' or 'all=True' is required for action='remove'")
+                defaults = load_defaults(project) or ProjectDefaults()
+                ctx = defaults.context or {}
+                if all:
+                    defaults.context = None
+                    message = "Removed all context entries from project defaults"
+                else:
+                    if key not in ctx:
+                        raise ValueError(f"Context key '{key}' not found in project defaults")
+                    del ctx[key]
+                    defaults.context = ctx if ctx else None
+                    message = f"Removed context key '{key}' from project defaults"
+                save_defaults(project, defaults)
+                return SimpleTaskWriteResponse(
+                    success=True,
+                    action="context_removed",
+                    message=message,
+                    file_path=str(defaults_path),
+                    summary=_defaults_compact_summary(defaults_path),
+                    new_item_ids=[],
+                )
+
+    # ------------------------------------------------------------------ #
+    # Branch target path (existing behaviour)
+    # ------------------------------------------------------------------ #
+    file_path = get_current_task_file_path()
 
     match action:
         case "show":

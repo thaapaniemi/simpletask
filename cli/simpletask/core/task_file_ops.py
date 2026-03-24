@@ -2,6 +2,7 @@
 
 from datetime import UTC, datetime
 
+from .defaults import load_defaults, merge_defaults_into_spec
 from .models import AcceptanceCriterion, SimpleTaskSpec
 from .project import Project
 from .yaml_parser import write_task_file
@@ -63,6 +64,11 @@ def create_task_file(
         context=None,
         tasks=None,
     )
+
+    # Merge project-level defaults (fill-gaps-only) before writing
+    defaults = load_defaults(project)
+    if defaults is not None:
+        spec = merge_defaults_into_spec(spec, defaults)
 
     project.ensure_tasks_dir()
     task_file = project.get_task_file(branch)

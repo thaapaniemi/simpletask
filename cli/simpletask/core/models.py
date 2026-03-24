@@ -482,6 +482,34 @@ class QualityCheckResult(BaseModel):
     stderr: str = Field(default="", description="Standard error from command")
 
 
+class ProjectDefaults(BaseModel):
+    """Project-level defaults stored in .tasks/defaults.yml.
+
+    These defaults are automatically merged (fill-gaps-only) into new task files
+    at creation time. All fields are optional; unset fields have no effect on
+    task file creation.
+    """
+
+    model_config = {"extra": "forbid"}
+
+    design: Design | None = Field(
+        default=None,
+        description="Default design guidance (patterns, constraints, references, security)",
+    )
+    quality_requirements: QualityRequirements | None = Field(
+        default=None,
+        description="Default quality requirements (linting, type-checking, testing, security)",
+    )
+    constraints: list[str] | None = Field(
+        default=None,
+        description="Default implementation constraints applied to every new task file",
+    )
+    context: dict[str, Any] | None = Field(
+        default=None,
+        description="Default context key-value pairs applied to every new task file",
+    )
+
+
 # Export all models
 __all__ = [
     "AcceptanceCriterion",
@@ -491,6 +519,7 @@ __all__ = [
     "FileAction",
     "Iteration",
     "LintingConfig",
+    "ProjectDefaults",
     "QualityCheckResult",
     "QualityRequirements",
     "SecurityCheckConfig",
