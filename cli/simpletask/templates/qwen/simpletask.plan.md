@@ -113,9 +113,9 @@ git checkout -b [branch-name]
 
 2. If task file exists but is minimal, you can update it by adding criteria and tasks in subsequent steps.
 
-**Step 3.5: Project Defaults**
+**Step 3.5: Project Defaults — MANDATORY — DO NOT SKIP**
 
-Check whether project-level defaults exist and inform the user:
+Check whether project-level defaults exist:
 
 ```bash
 # Check if defaults file exists
@@ -124,7 +124,13 @@ ls .tasks/defaults.yml 2>/dev/null && echo "exists" || echo "missing"
 
 - **If `.tasks/defaults.yml` exists:** Inform the user that project defaults (design patterns, quality requirements, constraints, context) were automatically merged into the new task file. No action needed.
 
-- **If `.tasks/defaults.yml` does NOT exist:** Ask the user if they want to run codebase analysis now to set up project-level defaults. These defaults are written once and automatically applied to every future task file.
+- **If `.tasks/defaults.yml` does NOT exist:** You MUST present the following question to the user and wait for their explicit answer. Do NOT assume, infer, reason around, or skip this step based on project familiarity or available documentation.
+
+  Present this exact question:
+
+  > "No project defaults found (`.tasks/defaults.yml` is missing). Would you like to run a codebase analysis now to set up project-level defaults? They are written once and automatically applied to every future task file. (yes / no)"
+
+  **Wait for the user's response before continuing.**
 
   If user says **yes**:
   1. Run the codebase analysis from `/simpletask.split` Step 1.5 (find references, patterns, constraints, security, error handling, quality preset) — but write results to **defaults** using `target="defaults"`:
