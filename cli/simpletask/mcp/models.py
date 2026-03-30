@@ -50,7 +50,7 @@ class BatchTaskOperation(BaseModel):
 
     model_config = {"extra": "forbid"}
 
-    op: Literal["add", "remove", "update"] = Field(
+    action: Literal["add", "remove", "update"] = Field(
         ..., description="Operation type: 'add', 'remove', or 'update'"
     )
     task_id: str | None = Field(None, description="Task ID (required for remove/update)")
@@ -86,9 +86,9 @@ class BatchTaskOperation(BaseModel):
     @model_validator(mode="after")
     def validate_required_fields(self) -> "BatchTaskOperation":
         """Validate that required fields are present based on operation type."""
-        if self.op in ("remove", "update") and not self.task_id:
-            raise ValueError(f"task_id is required for {self.op} operation")
-        if self.op == "add" and not self.name:
+        if self.action in ("remove", "update") and not self.task_id:
+            raise ValueError(f"task_id is required for {self.action} operation")
+        if self.action == "add" and not self.name:
             raise ValueError("name is required for add operation")
         return self
 
@@ -194,8 +194,9 @@ class SimpleTaskWriteResponse(BaseModel):
 class SimpleTaskBatchResponse(SimpleTaskWriteResponse):
     """Response model for batch task operations.
 
-    Extends SimpleTaskWriteResponse with new_item_ids for tracking multiple
-    created items from batch add operations.
+    Nominal subtype of SimpleTaskWriteResponse that allows callers to distinguish
+    batch-operation responses via isinstance() checks without adding new fields.
+    All fields (including new_item_ids) are inherited from SimpleTaskWriteResponse.
     """
 
 
@@ -352,6 +353,30 @@ def _increment_status_counts(counts: dict[str, int], status: TaskStatus) -> None
             counts["tasks_paused"] += 1
 
 
+def _derive_overall_status(global_counts: dict[str, int], tasks_total: int) -> TaskStatus:
+    """Derive the overall task status from per-status counts.
+
+    Priority chain: blocked > paused > in_progress > completed > not_started.
+
+    Args:
+        global_counts: Dict with keys tasks_blocked, tasks_paused, tasks_in_progress,
+            tasks_completed, tasks_not_started.
+        tasks_total: Total number of tasks (0 means no tasks defined yet).
+
+    Returns:
+        The computed overall TaskStatus.
+    """
+    if global_counts["tasks_blocked"] > 0:
+        return TaskStatus.BLOCKED
+    if global_counts["tasks_paused"] > 0:
+        return TaskStatus.PAUSED
+    if global_counts["tasks_in_progress"] > 0:
+        return TaskStatus.IN_PROGRESS
+    if tasks_total > 0 and global_counts["tasks_completed"] == tasks_total:
+        return TaskStatus.COMPLETED
+    return TaskStatus.NOT_STARTED
+
+
 def compute_status_summary(spec: SimpleTaskSpec) -> StatusSummary:
     """Compute status summary from a task specification.
 
@@ -380,18 +405,8 @@ def compute_status_summary(spec: SimpleTaskSpec) -> StatusSummary:
         for task in spec.tasks:
             _increment_status_counts(global_counts, task.status)
 
-    # Derive overall status
-    # Priority: blocked > paused > in_progress > completed > not_started
-    if global_counts["tasks_blocked"] > 0:
-        overall_status = TaskStatus.BLOCKED
-    elif global_counts["tasks_paused"] > 0:
-        overall_status = TaskStatus.PAUSED
-    elif global_counts["tasks_in_progress"] > 0:
-        overall_status = TaskStatus.IN_PROGRESS
-    elif tasks_total > 0 and global_counts["tasks_completed"] == tasks_total:
-        overall_status = TaskStatus.COMPLETED
-    else:
-        overall_status = TaskStatus.NOT_STARTED
+    # Derive overall status from per-status counts
+    overall_status = _derive_overall_status(global_counts, tasks_total)
 
     # Count total notes (root + task-level)
     notes_total = 0
@@ -469,18 +484,8 @@ def compute_compact_status_summary(spec: SimpleTaskSpec) -> CompactStatusSummary
         for task in spec.tasks:
             _increment_status_counts(global_counts, task.status)
 
-    # Derive overall status
-    # Priority: blocked > paused > in_progress > completed > not_started
-    if global_counts["tasks_blocked"] > 0:
-        overall_status = TaskStatus.BLOCKED
-    elif global_counts["tasks_paused"] > 0:
-        overall_status = TaskStatus.PAUSED
-    elif global_counts["tasks_in_progress"] > 0:
-        overall_status = TaskStatus.IN_PROGRESS
-    elif tasks_total > 0 and global_counts["tasks_completed"] == tasks_total:
-        overall_status = TaskStatus.COMPLETED
-    else:
-        overall_status = TaskStatus.NOT_STARTED
+    # Derive overall status from per-status counts
+    overall_status = _derive_overall_status(global_counts, tasks_total)
 
     return CompactStatusSummary(
         branch=spec.branch,

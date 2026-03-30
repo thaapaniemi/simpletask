@@ -287,20 +287,41 @@ def batch_tasks(
     if spec.tasks is None:
         spec.tasks = []
 
-    # Convert all operations to dicts once upfront for efficiency
-    ops_as_dicts: list[dict[str, Any]] = [
-        op if isinstance(op, dict) else op.model_dump(exclude_unset=True) for op in operations
-    ]
+    # Import here to avoid circular imports (mcp.models imports core.models)
+    from ..mcp.models import BatchTaskOperation
+
+    # Coerce all raw dicts to BatchTaskOperation typed objects so Pydantic is the
+    # single source of truth for required-field validation and field naming.
+    # This catches unknown keys (extra='forbid'), missing required fields, and
+    # type coercions (e.g. string iteration IDs) in one place.
+    typed_ops: list[BatchTaskOperation] = []
+    for i, op in enumerate(operations):
+        if isinstance(op, dict):
+            try:
+                typed_ops.append(BatchTaskOperation(**op))
+            except Exception as exc:
+                raise ValueError(f"Operation {i}: invalid operation dict — {exc}") from exc
+        else:
+            typed_ops.append(op)
+
+    # Convert typed objects to dicts once for uniform downstream access
+    ops_as_dicts: list[dict[str, Any]] = [op.model_dump(exclude_unset=True) for op in typed_ops]
 
     # Validate all operations upfront (fail fast before making any changes)
     existing_task_ids = {t.id for t in spec.tasks}
     remove_ids = {
-        op_dict.get("task_id") for op_dict in ops_as_dicts if op_dict.get("op") == "remove"
+        op_dict.get("task_id") for op_dict in ops_as_dicts if op_dict.get("action") == "remove"
     }
 
     for i, op_dict in enumerate(ops_as_dicts):
-        op_type = op_dict.get("op")
+        op_type = op_dict.get("action")
         task_id = op_dict.get("task_id")
+
+        # Guard against unknown action values slipping through raw dict callers
+        if op_type not in ("add", "remove", "update"):
+            raise ValueError(
+                f"Operation {i}: unknown action {op_type!r}, expected 'add', 'remove', or 'update'"
+            )
 
         # Validate remove/update operations have existing task_id
         if op_type in ("remove", "update"):
@@ -319,11 +340,6 @@ def batch_tasks(
                     f"Operation {i}: Cannot update task {task_id} - "
                     f"it is being removed in the same batch"
                 )
-
-        # Validate add operations have name
-        if op_type == "add":
-            if not op_dict.get("name"):
-                raise ValueError(f"Operation {i}: name required for add operation")
 
         # Validate prerequisites for update operations
         if op_type == "update" and op_dict.get("prerequisites") is not None:
@@ -367,7 +383,7 @@ def batch_tasks(
 
     # Process update operations
     for op_dict in ops_as_dicts:
-        if op_dict.get("op") == "update":
+        if op_dict.get("action") == "update":
             task_id = op_dict["task_id"]
             # Find task
             task_maybe = next((t for t in spec.tasks if t.id == task_id), None)
@@ -405,12 +421,37 @@ def batch_tasks(
             if "iteration" in op_dict:
                 task.iteration = op_dict["iteration"]
 
+    # Pre-allocate IDs for all add operations so that forward prerequisite references
+    # within the same batch are valid.  We simulate get_next_task_id() sequentially
+    # against a scratch task list that starts from spec.tasks (removes already applied).
+    scratch_tasks = list(spec.tasks)
+    add_op_ids: list[str] = []
+    for op_dict in ops_as_dicts:
+        if op_dict.get("action") == "add":
+            next_id = get_next_task_id(scratch_tasks)
+            add_op_ids.append(next_id)
+            # Append a placeholder so subsequent calls increment correctly
+            scratch_tasks.append(
+                Task(
+                    id=next_id,
+                    name="__placeholder__",
+                    goal="",
+                    steps=[""],
+                    status=TaskStatus.NOT_STARTED,
+                )
+            )
+
+    # Full set of valid task IDs after the batch completes
+    # (existing tasks after removes, plus all newly allocated IDs)
+    post_batch_task_ids = {t.id for t in spec.tasks} | set(add_op_ids)
+
     # Process add operations
     new_task_ids: list[str] = []
+    add_op_index = 0
     for i, op_dict in enumerate(ops_as_dicts):
-        if op_dict.get("op") == "add":
-            # Generate new task ID
-            new_id = get_next_task_id(spec.tasks)
+        if op_dict.get("action") == "add":
+            new_id = add_op_ids[add_op_index]
+            add_op_index += 1
 
             # Default goal to name if not provided
             goal = op_dict.get("goal") or op_dict["name"]
@@ -424,15 +465,14 @@ def batch_tasks(
             done_when = op_dict.get("done_when")
             prerequisites = op_dict.get("prerequisites")
 
-            # Validate prerequisites reference existing or newly-added task IDs
+            # Validate prerequisites reference the full post-batch valid ID set
+            # (includes forward references to tasks added later in this batch)
             if prerequisites:
-                # Build set of all valid task IDs: existing + already added in this batch
-                valid_task_ids = existing_task_ids | (set(new_task_ids) - remove_ids)
                 for prereq_id in prerequisites:
-                    if prereq_id not in valid_task_ids:
+                    if prereq_id not in post_batch_task_ids:
                         raise ValueError(
                             f"Operation {i}: Invalid prerequisite '{prereq_id}' - "
-                            f"task does not exist. Available: {sorted(valid_task_ids)}"
+                            f"task does not exist. Available: {sorted(post_batch_task_ids)}"
                         )
 
             # Validate iteration ID for add operations

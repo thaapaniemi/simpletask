@@ -507,7 +507,7 @@ result = simpletask_task(
     action="batch",
     operations=[
         {
-            "op": "add",
+            "action": "add",
             "name": "Setup database",
             "goal": "Configure database connection",
             "steps": ["Install dependencies", "Configure settings"],
@@ -515,14 +515,14 @@ result = simpletask_task(
             "files": [{"path": "config/db.py", "action": "create"}],
         },
         {
-            "op": "add",
+            "action": "add",
             "name": "Create models",
             "goal": "Define data models",
             "prerequisites": ["T001"],  # Depends on first task
             "files": [{"path": "models/user.py", "action": "create"}],
         },
         {
-            "op": "update",
+            "action": "update",
             "task_id": "T003",
             "status": "completed",
         },

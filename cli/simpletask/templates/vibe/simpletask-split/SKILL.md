@@ -168,12 +168,12 @@ operations = []
 
 # Remove complex tasks
 for task in complex_tasks:
-    operations.append({"op": "remove", "task_id": task.id})
+    operations.append({"action": "remove", "task_id": task.id})
 
 # Add subtasks
 for subtask in generated_subtasks:
     operations.append({
-        "op": "add",
+        "action": "add",
         "name": subtask.name,
         "goal": subtask.goal,
         "steps": subtask.steps
@@ -187,12 +187,15 @@ result = simpletask_task(action="batch", operations=operations)
 
 ## Step 5: Renumber Task IDs Sequentially
 
-Renumber ALL tasks to sequential IDs (T001, T002, T003...) and update prerequisites.
+Task IDs are already sequential after a batch operation. If further renumbering is needed
+(e.g. to close gaps), use additional batch operations via MCP — never edit `.tasks/` YAML
+directly, as that bypasses schema validation and can corrupt the task file.
 
 1. Load updated task file with `simpletask_get()`
-2. Create ID mapping: old_id -> new_id
-3. Edit `.tasks/[branch].yml` directly to update IDs and prerequisite references
-4. Verify all IDs sequential, all prerequisite references valid
+2. Identify any ID gaps or out-of-order IDs
+3. Use `simpletask_task(action='batch', operations=[...])` with update operations to
+   rename tasks and fix prerequisite references
+4. Validate the result: `simpletask_get(validate=True)`
 
 ---
 

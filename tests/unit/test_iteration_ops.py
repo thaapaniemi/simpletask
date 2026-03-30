@@ -514,7 +514,7 @@ tasks:
         with pytest.raises(ValueError, match=r"Invalid iteration '99' - iteration does not exist"):
             batch_tasks(
                 tmp_task_file,
-                [{"op": "add", "name": "Task with bad iter", "goal": "X", "iteration": 99}],
+                [{"action": "add", "name": "Task with bad iter", "goal": "X", "iteration": 99}],
             )
 
     def test_iteration_zero_is_rejected(self):

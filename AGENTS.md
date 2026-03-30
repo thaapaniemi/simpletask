@@ -995,11 +995,11 @@ result = task(
 result = task(
     action="batch",
     operations=[
-        {"op": "remove", "task_id": "T001"},
-        {"op": "remove", "task_id": "T002"},
-        {"op": "add", "name": "New Task 1", "goal": "First atomic task", "steps": ["Step 1"]},
-        {"op": "add", "name": "New Task 2", "goal": "Second atomic task", "steps": ["Step 1"]},
-        {"op": "update", "task_id": "T003", "status": "completed"},
+        {"action": "remove", "task_id": "T001"},
+        {"action": "remove", "task_id": "T002"},
+        {"action": "add", "name": "New Task 1", "goal": "First atomic task", "steps": ["Step 1"]},
+        {"action": "add", "name": "New Task 2", "goal": "Second atomic task", "steps": ["Step 1"]},
+        {"action": "update", "task_id": "T003", "status": "completed"},
     ]
 )
 # Returns SimpleTaskBatchResponse with new_item_ids: ["T003", "T004"] for the two added tasks
@@ -1012,7 +1012,7 @@ The `batch` action provides atomic task operations. All operations in a batch ei
 **BatchTaskOperation Structure:**
 ```python
 {
-  "op": str,  # Operation type: "add", "update", or "remove"
+  "action": str,  # Operation type: "add", "update", or "remove"
   
   # For "add" operations:
   "name": str,  # Task name (required)

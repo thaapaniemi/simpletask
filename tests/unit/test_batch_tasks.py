@@ -65,7 +65,9 @@ class TestBatchAddOperations:
 
     def test_batch_add_single_task(self, task_file: Path):
         """Test adding a single task via batch."""
-        operations = [{"op": "add", "name": "New Task", "goal": "New goal", "steps": ["Step 1"]}]
+        operations = [
+            {"action": "add", "name": "New Task", "goal": "New goal", "steps": ["Step 1"]}
+        ]
 
         new_ids, _ = batch_tasks(task_file, operations)
 
@@ -84,9 +86,9 @@ class TestBatchAddOperations:
     def test_batch_add_multiple_tasks(self, task_file: Path):
         """Test adding multiple tasks in one batch."""
         operations = [
-            {"op": "add", "name": "Task A", "goal": "Goal A"},
-            {"op": "add", "name": "Task B", "goal": "Goal B"},
-            {"op": "add", "name": "Task C", "goal": "Goal C"},
+            {"action": "add", "name": "Task A", "goal": "Goal A"},
+            {"action": "add", "name": "Task B", "goal": "Goal B"},
+            {"action": "add", "name": "Task C", "goal": "Goal C"},
         ]
 
         new_ids, _ = batch_tasks(task_file, operations)
@@ -99,17 +101,18 @@ class TestBatchAddOperations:
 
     def test_batch_add_without_goal_defaults_to_name(self, task_file: Path):
         """Test that goal defaults to name when not provided."""
-        operations = [{"op": "add", "name": "Task Name Only"}]
+        operations = [{"action": "add", "name": "Task Name Only"}]
 
-        _new_ids = batch_tasks(task_file, operations)
+        new_ids, _ = batch_tasks(task_file, operations)
 
+        assert len(new_ids) == 1
         spec = parse_task_file(task_file)
         new_task = spec.tasks[-1]
         assert new_task.goal == "Task Name Only"
 
     def test_batch_add_without_steps_adds_placeholder(self, task_file: Path):
         """Test that steps defaults to placeholder when not provided."""
-        operations = [{"op": "add", "name": "Task Without Steps", "goal": "Goal"}]
+        operations = [{"action": "add", "name": "Task Without Steps", "goal": "Goal"}]
 
         batch_tasks(task_file, operations)
 
@@ -123,7 +126,7 @@ class TestBatchRemoveOperations:
 
     def test_batch_remove_single_task(self, task_file: Path):
         """Test removing a single task via batch."""
-        operations = [{"op": "remove", "task_id": "T002"}]
+        operations = [{"action": "remove", "task_id": "T002"}]
 
         batch_tasks(task_file, operations)
 
@@ -137,8 +140,8 @@ class TestBatchRemoveOperations:
     def test_batch_remove_multiple_tasks(self, task_file: Path):
         """Test removing multiple tasks in one batch."""
         operations = [
-            {"op": "remove", "task_id": "T001"},
-            {"op": "remove", "task_id": "T002"},
+            {"action": "remove", "task_id": "T001"},
+            {"action": "remove", "task_id": "T002"},
         ]
 
         batch_tasks(task_file, operations)
@@ -150,7 +153,7 @@ class TestBatchRemoveOperations:
     def test_batch_remove_cleans_prerequisites(self, task_file: Path):
         """Test that removing a task cleans up prerequisite references."""
         # T003 has T001 as prerequisite
-        operations = [{"op": "remove", "task_id": "T001"}]
+        operations = [{"action": "remove", "task_id": "T001"}]
 
         batch_tasks(task_file, operations)
 
@@ -164,7 +167,7 @@ class TestBatchUpdateOperations:
 
     def test_batch_update_task_status(self, task_file: Path):
         """Test updating task status via batch."""
-        operations = [{"op": "update", "task_id": "T001", "status": "completed"}]
+        operations = [{"action": "update", "task_id": "T001", "status": "completed"}]
 
         batch_tasks(task_file, operations)
 
@@ -175,7 +178,7 @@ class TestBatchUpdateOperations:
     def test_batch_update_task_name_and_goal(self, task_file: Path):
         """Test updating task name and goal via batch."""
         operations = [
-            {"op": "update", "task_id": "T002", "name": "Updated Name", "goal": "Updated Goal"}
+            {"action": "update", "task_id": "T002", "name": "Updated Name", "goal": "Updated Goal"}
         ]
 
         batch_tasks(task_file, operations)
@@ -188,9 +191,9 @@ class TestBatchUpdateOperations:
     def test_batch_update_multiple_tasks(self, task_file: Path):
         """Test updating multiple tasks in one batch."""
         operations = [
-            {"op": "update", "task_id": "T001", "status": "completed"},
-            {"op": "update", "task_id": "T002", "status": "in_progress"},
-            {"op": "update", "task_id": "T003", "status": "blocked"},
+            {"action": "update", "task_id": "T001", "status": "completed"},
+            {"action": "update", "task_id": "T002", "status": "in_progress"},
+            {"action": "update", "task_id": "T003", "status": "blocked"},
         ]
 
         batch_tasks(task_file, operations)
@@ -207,9 +210,14 @@ class TestBatchMixedOperations:
     def test_batch_mixed_operations(self, task_file: Path):
         """Test a batch with add, remove, and update operations."""
         operations = [
-            {"op": "remove", "task_id": "T002"},
-            {"op": "update", "task_id": "T001", "status": "completed"},
-            {"op": "add", "name": "New Task", "goal": "Added after remove", "steps": ["Step 1"]},
+            {"action": "remove", "task_id": "T002"},
+            {"action": "update", "task_id": "T001", "status": "completed"},
+            {
+                "action": "add",
+                "name": "New Task",
+                "goal": "Added after remove",
+                "steps": ["Step 1"],
+            },
         ]
 
         new_ids, _ = batch_tasks(task_file, operations)
@@ -242,9 +250,9 @@ class TestBatchAtomicity:
         original_task_count = len(original_spec.tasks)
 
         operations = [
-            {"op": "update", "task_id": "T001", "status": "completed"},
-            {"op": "remove", "task_id": "T999"},  # Invalid - doesn't exist
-            {"op": "add", "name": "New Task"},
+            {"action": "update", "task_id": "T001", "status": "completed"},
+            {"action": "remove", "task_id": "T999"},  # Invalid - doesn't exist
+            {"action": "add", "name": "New Task"},
         ]
 
         with pytest.raises(ValueError, match="task T999 not found"):
@@ -263,21 +271,21 @@ class TestBatchValidation:
 
     def test_batch_missing_task_id_for_remove(self, task_file: Path):
         """Test that remove without task_id raises error."""
-        operations = [{"op": "remove"}]
+        operations = [{"action": "remove"}]
 
-        with pytest.raises(ValueError, match="task_id required for remove"):
+        with pytest.raises(ValueError, match="task_id is required for remove"):
             batch_tasks(task_file, operations)
 
     def test_batch_missing_name_for_add(self, task_file: Path):
         """Test that add without name raises error."""
-        operations = [{"op": "add", "goal": "Goal without name"}]
+        operations = [{"action": "add", "goal": "Goal without name"}]
 
-        with pytest.raises(ValueError, match="name required for add"):
+        with pytest.raises(ValueError, match="name is required for add"):
             batch_tasks(task_file, operations)
 
     def test_batch_invalid_task_id_for_update(self, task_file: Path):
         """Test that update with non-existent task_id raises error."""
-        operations = [{"op": "update", "task_id": "T999", "status": "completed"}]
+        operations = [{"action": "update", "task_id": "T999", "status": "completed"}]
 
         with pytest.raises(ValueError, match="task T999 not found"):
             batch_tasks(task_file, operations)
@@ -285,8 +293,8 @@ class TestBatchValidation:
     def test_batch_remove_update_conflict(self, task_file: Path):
         """Test that batch with remove+update on same task_id raises error."""
         operations = [
-            {"op": "remove", "task_id": "T001"},
-            {"op": "update", "task_id": "T001", "status": "completed"},
+            {"action": "remove", "task_id": "T001"},
+            {"action": "update", "task_id": "T001", "status": "completed"},
         ]
 
         with pytest.raises(
@@ -301,7 +309,7 @@ class TestBatchValidation:
 
     def test_batch_invalid_status_value(self, task_file: Path):
         """Test that invalid status value raises error during validation."""
-        operations = [{"op": "update", "task_id": "T001", "status": "invalid_status"}]
+        operations = [{"action": "update", "task_id": "T001", "status": "invalid_status"}]
 
         with pytest.raises(ValueError, match="Invalid status 'invalid_status'"):
             batch_tasks(task_file, operations)
@@ -310,8 +318,108 @@ class TestBatchValidation:
         spec = parse_task_file(task_file)
         assert spec.tasks[0].status == TaskStatus.NOT_STARTED  # Unchanged
 
+    def test_batch_unknown_action_key_raises_value_error(self, task_file: Path):
+        """Test that an unknown action key raises ValueError, not a silent no-op.
 
-class TestBatchIterationOperations:
+        Regression test for AC6: passing the old 'op' key (or any unknown key)
+        must raise ValueError — not silently skip the operation.
+        """
+        operations = [{"op": "remove", "task_id": "T001"}]
+
+        with pytest.raises(ValueError):
+            batch_tasks(task_file, operations)
+
+        # Verify no changes were made (atomicity preserved)
+        spec = parse_task_file(task_file)
+        assert len(spec.tasks) == 3
+        assert any(t.id == "T001" for t in spec.tasks)
+
+    def test_batch_none_action_raises_value_error(self, task_file: Path):
+        """Test that a None/missing action value raises ValueError."""
+        operations = [{"task_id": "T001"}]
+
+        with pytest.raises(ValueError):
+            batch_tasks(task_file, operations)
+
+
+class TestBatchForwardPrerequisites:
+    """Tests for intra-batch forward prerequisite reference resolution (AC7)."""
+
+    def test_batch_forward_prereq_reference_succeeds(self, task_file: Path):
+        """An add op can reference a task ID created by a later add op in the same batch.
+
+        Previously, prerequisite validation only saw IDs already added in the batch,
+        so forward references silently failed. Now IDs are pre-allocated before validation.
+        """
+        # T004 references T005 which is added later in the same batch
+        operations = [
+            {"action": "add", "name": "Task A", "goal": "First", "prerequisites": ["T005"]},
+            {"action": "add", "name": "Task B", "goal": "Second"},
+        ]
+
+        new_ids, _ = batch_tasks(task_file, operations)
+
+        assert len(new_ids) == 2
+        assert new_ids[0] == "T004"
+        assert new_ids[1] == "T005"
+
+        spec = parse_task_file(task_file)
+        task_a = next(t for t in spec.tasks if t.name == "Task A")
+        assert task_a.prerequisites == ["T005"]
+
+    def test_batch_invalid_prereq_still_raises(self, task_file: Path):
+        """An add op with a prerequisite for a nonexistent task still raises."""
+        operations = [
+            {"action": "add", "name": "Task X", "prerequisites": ["T999"]},
+        ]
+
+        with pytest.raises(ValueError, match="Invalid prerequisite 'T999'"):
+            batch_tasks(task_file, operations)
+
+
+class TestGetNextTaskId:
+    """Unit tests for get_next_task_id() — explicit contract for ID generation behavior."""
+
+    def test_empty_list_returns_t001(self):
+        """Given no tasks, get_next_task_id returns T001."""
+        from simpletask.core.task_ops import get_next_task_id
+
+        result = get_next_task_id([])
+        assert result == "T001"
+
+    def test_sequential_tasks_returns_next(self):
+        """Given T001 and T002, returns T003."""
+        from simpletask.core.task_ops import get_next_task_id
+
+        tasks = [
+            Task(id="T001", name="T1", goal="g", steps=["s"], status=TaskStatus.NOT_STARTED),
+            Task(id="T002", name="T2", goal="g", steps=["s"], status=TaskStatus.NOT_STARTED),
+        ]
+        assert get_next_task_id(tasks) == "T003"
+
+    def test_after_removals_continues_from_max_no_recycling(self, task_file: Path):
+        """After removing T001 and T002, next ID is T004 (max+1), not T001 (no recycling)."""
+        from simpletask.core.task_ops import get_next_task_id
+
+        # Remove T001 and T002 — only T003 remains
+        batch_tasks(
+            task_file,
+            [
+                {"action": "remove", "task_id": "T001"},
+                {"action": "remove", "task_id": "T002"},
+            ],
+        )
+
+        from simpletask.core.yaml_parser import parse_task_file as _parse
+
+        spec = _parse(task_file)
+        assert len(spec.tasks) == 1
+        assert spec.tasks[0].id == "T003"
+
+        # Next ID must be T004, not T001 (no ID recycling)
+        next_id = get_next_task_id(spec.tasks)
+        assert next_id == "T004"
+
     """Tests for iteration field handling in batch_tasks."""
 
     @pytest.fixture
@@ -353,7 +461,7 @@ class TestBatchIterationOperations:
     def test_batch_add_with_iteration_assigns_field(self, iter_task_file: Path) -> None:
         """Batch add operation sets iteration field on new task."""
         operations = [
-            {"op": "add", "name": "New Task", "goal": "Goal", "steps": ["S"], "iteration": 1},
+            {"action": "add", "name": "New Task", "goal": "Goal", "steps": ["S"], "iteration": 1},
         ]
         batch_tasks(iter_task_file, operations)
         spec = parse_task_file(iter_task_file)
@@ -362,7 +470,7 @@ class TestBatchIterationOperations:
 
     def test_batch_update_assigns_iteration(self, iter_task_file: Path) -> None:
         """Batch update operation assigns a task to an iteration."""
-        operations = [{"op": "update", "task_id": "T001", "iteration": 1}]
+        operations = [{"action": "update", "task_id": "T001", "iteration": 1}]
         batch_tasks(iter_task_file, operations)
         spec = parse_task_file(iter_task_file)
         t001 = next(t for t in spec.tasks if t.id == "T001")
@@ -371,9 +479,9 @@ class TestBatchIterationOperations:
     def test_batch_update_unassigns_iteration(self, iter_task_file: Path) -> None:
         """Batch update with iteration=None unassigns a task from its iteration."""
         # First assign
-        batch_tasks(iter_task_file, [{"op": "update", "task_id": "T001", "iteration": 1}])
+        batch_tasks(iter_task_file, [{"action": "update", "task_id": "T001", "iteration": 1}])
         # Then unassign
-        batch_tasks(iter_task_file, [{"op": "update", "task_id": "T001", "iteration": None}])
+        batch_tasks(iter_task_file, [{"action": "update", "task_id": "T001", "iteration": None}])
         spec = parse_task_file(iter_task_file)
         t001 = next(t for t in spec.tasks if t.id == "T001")
         assert t001.iteration is None
@@ -383,9 +491,11 @@ class TestBatchIterationOperations:
     ) -> None:
         """Batch update that omits the iteration key does not change the iteration assignment."""
         # Assign iteration first
-        batch_tasks(iter_task_file, [{"op": "update", "task_id": "T001", "iteration": 1}])
+        batch_tasks(iter_task_file, [{"action": "update", "task_id": "T001", "iteration": 1}])
         # Update something else without touching iteration
-        batch_tasks(iter_task_file, [{"op": "update", "task_id": "T001", "status": "completed"}])
+        batch_tasks(
+            iter_task_file, [{"action": "update", "task_id": "T001", "status": "completed"}]
+        )
         spec = parse_task_file(iter_task_file)
         t001 = next(t for t in spec.tasks if t.id == "T001")
         assert t001.iteration == 1  # Unchanged
