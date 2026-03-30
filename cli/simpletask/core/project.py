@@ -13,6 +13,10 @@ from .git import current_branch, is_git_repo
 TASK_FILE_EXTENSION = ".yml"
 _DOUBLEDOT_MARKER = "\x00DOUBLEDOT\x00"  # Internal: security marker during normalization
 
+# Filename of the project-level defaults file (must be imported lazily to avoid circular imports
+# — use this constant directly rather than importing DEFAULTS_FILENAME from defaults.py)
+_DEFAULTS_FILENAME = "defaults.yml"
+
 
 def normalize_branch_name(branch: str, max_length: int = 200) -> str:
     """Normalize branch name to a safe filename.
@@ -137,6 +141,9 @@ class Project:
         tasks = []
         for item in sorted(self.tasks_dir.iterdir()):
             if item.is_file() and item.suffix == TASK_FILE_EXTENSION:
+                # Explicitly skip defaults.yml by filename before any parsing
+                if item.name == _DEFAULTS_FILENAME:
+                    continue
                 try:
                     # Lightweight parsing: only extract branch field
                     content = item.read_text(encoding="utf-8")
@@ -169,6 +176,9 @@ class Project:
         tasks = []
         for item in self.tasks_dir.iterdir():
             if item.is_file() and item.suffix == TASK_FILE_EXTENSION:
+                # Explicitly skip defaults.yml by filename before any parsing
+                if item.name == _DEFAULTS_FILENAME:
+                    continue
                 try:
                     # Lightweight parsing: only extract branch field
                     content = item.read_text(encoding="utf-8")

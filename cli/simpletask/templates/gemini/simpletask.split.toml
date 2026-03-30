@@ -23,9 +23,10 @@ If task file not found: Report "No task file found. Run /simpletask.plan first."
 
 ## Step 1.5: Codebase Analysis & Design (Conditional)
 
-**SKIP this step if:**
+**SKIP this step if ANY of the following are true:**
 - `simpletask_get()` shows `spec.design` is already populated (has patterns, constraints, or references)
 - `simpletask_get()` shows `spec.quality_requirements` already configured
+- `.tasks/defaults.yml` exists AND contains design patterns or quality requirements (they were already auto-merged into the task file at creation time — no need to repeat analysis)
 
 **If design section is empty or missing, execute this mandatory codebase analysis:**
 
@@ -169,6 +170,19 @@ Use simpletask_quality() MCP tool to apply preset:
 ```
 
 **Available presets:** python, typescript, node, go, rust, java-maven, java-gradle
+
+**Save analysis results to project defaults (recommended):**
+
+If `.tasks/defaults.yml` does not yet exist, save the analysis results there too so future task files inherit them automatically:
+
+```
+simpletask_design(action="set", field="pattern", value="...", target="defaults")
+simpletask_design(action="set", field="constraint", value="...", target="defaults")
+simpletask_quality(action="preset", preset_name="python", target="defaults")
+# Repeat for all findings above
+```
+
+This is a one-time investment — future `/simpletask.plan` runs will skip this entire Step 1.5.
 
 **After completing Step 1.5, reload the task file:**
 ```

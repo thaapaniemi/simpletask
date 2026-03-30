@@ -103,6 +103,18 @@ git checkout -b [branch-name]
 
 2. If task file exists but is minimal, you can update it by adding criteria and tasks in subsequent steps.
 
+**Step 3.5: Project Defaults Check**
+
+(Non-interactive: agent cannot prompt the user. Apply silently.)
+
+```bash
+# Check if defaults file exists
+ls .tasks/defaults.yml 2>/dev/null && echo "exists" || echo "missing"
+```
+
+- **If `.tasks/defaults.yml` exists:** Defaults are automatically merged by `simpletask_new` — no action needed. Note this in the structured summary.
+- **If `.tasks/defaults.yml` does NOT exist:** Skip silently. Do NOT attempt to run codebase analysis. The user can set up defaults later with `simpletask defaults` or via `/simpletask.plan`.
+
 **Step 4: Add Acceptance Criteria**
 
 Add testable, specific acceptance criteria using simpletask_criteria() MCP tool:

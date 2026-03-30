@@ -3,10 +3,12 @@
 from typing import Any, Literal
 
 from simpletask.core.models import (
+    LintingConfig,
     QualityCheckResult,
     QualityRequirements,
     SecurityCheckConfig,
     SimpleTaskSpec,
+    TestingConfig,
     ToolName,
     TypeCheckConfig,
 )
@@ -160,6 +162,122 @@ def update_quality_config(
     spec = spec.model_copy(update={"quality_requirements": quality_reqs})
 
     return spec
+
+
+def update_quality_requirements(
+    existing: QualityRequirements | None,
+    config_type: Literal["linting", "type-checking", "testing", "security"],
+    tool: ToolName | None = None,
+    args: list[str] | None = None,
+    enabled: bool | None = None,
+    min_coverage: int | None = None,
+    timeout: int | None = None,
+) -> QualityRequirements:
+    """Update quality requirements without wrapping in a SimpleTaskSpec.
+
+    Equivalent to update_quality_config but operates directly on QualityRequirements.
+    Used by operations that manage quality outside a task file context (e.g. defaults.yml).
+
+    Args:
+        existing: Existing quality requirements. When None, only 'linting' and 'testing'
+            config_types are accepted; 'type-checking' and 'security' require an existing
+            QualityRequirements (apply a preset first) to avoid creating phantom placeholder
+            linting/testing entries that would block future fill-gaps-only preset merges.
+        config_type: Type of configuration to update
+        tool: Tool to use (optional)
+        args: Tool arguments (optional)
+        enabled: Enable/disable status (optional)
+        min_coverage: Minimum coverage for testing (optional)
+        timeout: Timeout in seconds (optional)
+
+    Returns:
+        Updated QualityRequirements
+
+    Raises:
+        ValueError: If invalid configuration provided, or existing is None and config_type
+            is 'type-checking' or 'security'.
+    """
+    if (
+        tool is None
+        and args is None
+        and enabled is None
+        and min_coverage is None
+        and timeout is None
+    ):
+        raise ValueError(
+            "At least one option must be provided: tool, args, enabled, min_coverage, or timeout"
+        )
+
+    if min_coverage is not None and config_type != "testing":
+        raise ValueError("min_coverage can only be used with 'testing' config type")
+
+    quality_reqs = existing
+    if quality_reqs is None:
+        if config_type in ("type-checking", "security"):
+            raise ValueError(
+                f"Cannot configure '{config_type}' when no quality_requirements exist yet. "
+                "Apply a preset first (e.g. simpletask defaults quality preset python) "
+                "or configure linting/testing before adding type-checking or security."
+            )
+        # For linting/testing, auto-initialise with minimal placeholders so the
+        # caller can configure just that section without needing a preset first.
+        quality_reqs = QualityRequirements(
+            linting=LintingConfig(enabled=False, tool=ToolName.RUFF, args=[]),
+            testing=TestingConfig(enabled=False, tool=ToolName.PYTEST, args=[], min_coverage=0),
+        )
+
+    updates: dict[str, Any] = {}
+    if tool is not None:
+        updates["tool"] = tool
+    if args is not None:
+        updates["args"] = args
+    if enabled is not None:
+        updates["enabled"] = enabled
+    if min_coverage is not None:
+        updates["min_coverage"] = min_coverage
+    if timeout is not None:
+        updates["timeout"] = timeout
+
+    if config_type == "linting":
+        quality_reqs = quality_reqs.model_copy(
+            update={"linting": quality_reqs.linting.model_copy(update=updates)}
+        )
+    elif config_type == "type-checking":
+        if quality_reqs.type_checking is None:
+            if tool is None:
+                raise ValueError("tool is required when creating a new type-checking configuration")
+            quality_reqs = quality_reqs.model_copy(
+                update={
+                    "type_checking": TypeCheckConfig(
+                        enabled=True, tool=tool, args=args if args else []
+                    )
+                }
+            )
+        else:
+            quality_reqs = quality_reqs.model_copy(
+                update={"type_checking": quality_reqs.type_checking.model_copy(update=updates)}
+            )
+    elif config_type == "testing":
+        quality_reqs = quality_reqs.model_copy(
+            update={"testing": quality_reqs.testing.model_copy(update=updates)}
+        )
+    elif config_type == "security":
+        if quality_reqs.security_check is None:
+            if tool is None:
+                raise ValueError("tool is required when creating a new security configuration")
+            quality_reqs = quality_reqs.model_copy(
+                update={
+                    "security_check": SecurityCheckConfig(
+                        enabled=True, tool=tool, args=args if args else []
+                    )
+                }
+            )
+        else:
+            quality_reqs = quality_reqs.model_copy(
+                update={"security_check": quality_reqs.security_check.model_copy(update=updates)}
+            )
+
+    return quality_reqs
 
 
 def apply_quality_preset(

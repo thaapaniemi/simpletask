@@ -238,7 +238,9 @@ class SimpleTaskQualityResponse(BaseModel):
         None, description="Fields applied from preset (for 'preset' action)"
     )
     file_path: str = Field(..., description="Path to task file")
-    summary: StatusSummary = Field(..., description="Pre-computed status summary")
+    summary: StatusSummary | CompactStatusSummary = Field(
+        ..., description="Pre-computed status summary"
+    )
 
 
 class SimpleTaskDesignResponse(BaseModel):
@@ -252,7 +254,9 @@ class SimpleTaskDesignResponse(BaseModel):
     action: str = Field(..., description="Action performed (e.g., 'design_get')")
     design: Design | None = Field(None, description="Current design section")
     file_path: str = Field(..., description="Path to task file")
-    summary: StatusSummary = Field(..., description="Pre-computed status summary")
+    summary: StatusSummary | CompactStatusSummary = Field(
+        ..., description="Pre-computed status summary"
+    )
 
 
 class SimpleTaskNoteResponse(BaseModel):
