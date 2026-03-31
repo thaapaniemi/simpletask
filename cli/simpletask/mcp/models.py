@@ -164,6 +164,14 @@ class SimpleTaskGetResponse(BaseModel):
     validation: ValidationResult | None = Field(
         None, description="Validation result (only when validate=true)"
     )
+    filters_applied: dict[str, Any] | None = Field(
+        None,
+        description=(
+            "Active filters applied to response (None when full=True or no filtering). "
+            "Contains keys: include_completed, include_design, include_quality, "
+            "tasks_returned, tasks_excluded."
+        ),
+    )
 
 
 class SimpleTaskWriteResponse(BaseModel):

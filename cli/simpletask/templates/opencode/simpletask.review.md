@@ -19,7 +19,7 @@ This review is strictly scoped to the original prompt and acceptance criteria de
    
    ```
    Use simpletask_get() MCP tool to retrieve task data:
-   - Call simpletask_get() to use current git branch (auto-detected)
+   - Call simpletask_get(include_completed=True) to use current git branch (auto-detected)
    - Returns SimpleTaskGetResponse with spec, file_path, and summary
    - If error occurs, task file does not exist — abort and inform the user
    ```
@@ -42,6 +42,9 @@ This review is strictly scoped to the original prompt and acceptance criteria de
    - Filter spec.tasks where status == "not_started" (incomplete)
    - Filter spec.tasks where status == "blocked" (need attention)
    - Filter spec.tasks where status == "paused" (intentionally deferred)
+   ```
+   
+   Note: use get(include_completed=True) so completed tasks appear in spec.tasks for review.
    ```
    
    ```bash
@@ -68,6 +71,9 @@ This review is strictly scoped to the original prompt and acceptance criteria de
    From the response:
    - Filter spec.acceptance_criteria where completed == True (marked complete)
    - Filter spec.acceptance_criteria where completed == False (remain incomplete)
+   ```
+   
+   Note: acceptance_criteria are always returned regardless of filtering.
    ```
    
    # List acceptance criteria status
@@ -349,7 +355,7 @@ If blocking issues exist:
    
    ```
    Use simpletask_get() MCP tool with validation:
-   - Call simpletask_get(validate=True)
+   - Call simpletask_get(validate=True, full=True)
    - Check validation.valid in response
    ```
    
@@ -384,9 +390,9 @@ If no blocking issues exist: report "No fix tasks needed." Do NOT create an iter
 ### View Task Information
 
 ```
-Use simpletask_get() MCP tool to retrieve complete task data:
+Use simpletask_get(include_completed=True) MCP tool to retrieve complete task data:
 - Returns SimpleTaskGetResponse with spec and summary
-- spec.tasks: array of all tasks with full details
+- spec.tasks: array of all tasks with full details (including completed)
 - spec.acceptance_criteria: array of all criteria
 - summary: pre-computed status counts
 
@@ -435,7 +441,7 @@ simpletask task add "Fix: [description]" -g "[goal]" -i <iter_id>
 Use simpletask_get() MCP tool with validation:
 
 # Validate task file
-simpletask_get(validate=True)
+simpletask_get(validate=True, full=True)
 # Check validation.valid and validation.errors in response
 ```
 

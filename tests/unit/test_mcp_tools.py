@@ -8,6 +8,7 @@ from simpletask.core.models import (
     LintingConfig,
     QualityRequirements,
     SimpleTaskSpec,
+    TaskStatus,
     TestingConfig,
     ToolName,
 )
@@ -639,6 +640,258 @@ class TestMCPIterationTool:
             with patch("simpletask.mcp.server.parse_task_file", return_value=mock_spec):
                 with pytest.raises(ValueError, match="mutually exclusive"):
                     quality(action="check", lint_only=True, test_only=True)
+
+
+class TestSimpletaskGetFiltering:
+    """Tests for get() tool response filtering behavior."""
+
+    def _mock_get(self, sample_spec_filterable, **kwargs):
+        """Helper: call get() with parse_task_file mocked to return sample_spec_filterable."""
+        with patch("simpletask.mcp.server.get_current_task_file_path") as mock_path:
+            mock_path.return_value = "/fake/.tasks/test-filterable.yml"
+            with patch(
+                "simpletask.mcp.server.parse_task_file", return_value=sample_spec_filterable
+            ):
+                # validate_task_file is only called when validate=True, so no mock needed by default
+                return get(**kwargs)
+
+    # ------------------------------------------------------------------
+    # Default behavior (no parameters)
+    # ------------------------------------------------------------------
+
+    def test_get_default_excludes_completed_tasks(self, sample_spec_filterable):
+        """Default get() must exclude completed tasks from spec.tasks."""
+        response = self._mock_get(sample_spec_filterable)
+        assert response.spec.tasks is not None
+        statuses = [t.status for t in response.spec.tasks]
+        assert TaskStatus.COMPLETED not in statuses
+
+    def test_get_default_excludes_design(self, sample_spec_filterable):
+        """Default get() must set spec.design to None."""
+        response = self._mock_get(sample_spec_filterable)
+        assert response.spec.design is None
+
+    def test_get_default_excludes_quality_requirements(self, sample_spec_filterable):
+        """Default get() must set spec.quality_requirements to None."""
+        response = self._mock_get(sample_spec_filterable)
+        assert response.spec.quality_requirements is None
+
+    def test_get_default_non_completed_task_count(self, sample_spec_filterable):
+        """Default get() returns 6 non-completed tasks (9 total minus 3 completed)."""
+        response = self._mock_get(sample_spec_filterable)
+        # sample_spec_filterable has 3 completed (T001, T002, T004); 6 non-completed
+        assert response.spec.tasks is not None
+        assert len(response.spec.tasks) == 6
+
+    # ------------------------------------------------------------------
+    # full=True escape hatch
+    # ------------------------------------------------------------------
+
+    def test_get_full_returns_all_tasks(self, sample_spec_filterable):
+        """get(full=True) must return all tasks including completed ones."""
+        response = self._mock_get(sample_spec_filterable, full=True)
+        assert response.spec.tasks is not None
+        statuses = [t.status for t in response.spec.tasks]
+        assert TaskStatus.COMPLETED in statuses
+        assert len(response.spec.tasks) == 9  # all 9 tasks
+
+    def test_get_full_returns_design(self, sample_spec_filterable):
+        """get(full=True) must return the design section."""
+        response = self._mock_get(sample_spec_filterable, full=True)
+        assert response.spec.design is not None
+        assert response.spec.design.patterns is not None
+
+    def test_get_full_returns_quality_requirements(self, sample_spec_filterable):
+        """get(full=True) must return quality_requirements."""
+        response = self._mock_get(sample_spec_filterable, full=True)
+        assert response.spec.quality_requirements is not None
+
+    def test_get_full_has_filters_applied_none(self, sample_spec_filterable):
+        """get(full=True) must set filters_applied to None."""
+        response = self._mock_get(sample_spec_filterable, full=True)
+        assert response.filters_applied is None
+
+    # ------------------------------------------------------------------
+    # Individual filter parameters
+    # ------------------------------------------------------------------
+
+    def test_get_include_completed_returns_completed(self, sample_spec_filterable):
+        """get(include_completed=True) must include completed tasks."""
+        response = self._mock_get(sample_spec_filterable, include_completed=True)
+        statuses = [t.status for t in response.spec.tasks]
+        assert TaskStatus.COMPLETED in statuses
+
+    def test_get_include_design_returns_design(self, sample_spec_filterable):
+        """get(include_design=True) must include the design section."""
+        response = self._mock_get(sample_spec_filterable, include_design=True)
+        assert response.spec.design is not None
+
+    def test_get_include_quality_returns_quality(self, sample_spec_filterable):
+        """get(include_quality=True) must include quality_requirements."""
+        response = self._mock_get(sample_spec_filterable, include_quality=True)
+        assert response.spec.quality_requirements is not None
+
+    def test_get_status_filter_in_progress(self, sample_spec_filterable):
+        """get(status='in_progress') returns only in_progress tasks."""
+        response = self._mock_get(sample_spec_filterable, status="in_progress")
+        assert response.spec.tasks is not None
+        assert all(t.status == TaskStatus.IN_PROGRESS for t in response.spec.tasks)
+        # sample_spec_filterable has 2 in_progress tasks (T003, T006)
+        assert len(response.spec.tasks) == 2
+
+    def test_get_status_filter_not_started(self, sample_spec_filterable):
+        """get(status='not_started') returns only not_started tasks."""
+        response = self._mock_get(sample_spec_filterable, status="not_started")
+        assert response.spec.tasks is not None
+        assert all(t.status == TaskStatus.NOT_STARTED for t in response.spec.tasks)
+        # sample_spec_filterable has 2 not_started tasks (T007, T009)
+        assert len(response.spec.tasks) == 2
+
+    def test_get_status_filter_completed_with_include(self, sample_spec_filterable):
+        """get(status='completed', include_completed=True) returns only completed tasks."""
+        response = self._mock_get(
+            sample_spec_filterable, status="completed", include_completed=True
+        )
+        assert response.spec.tasks is not None
+        assert all(t.status == TaskStatus.COMPLETED for t in response.spec.tasks)
+        assert len(response.spec.tasks) == 3  # T001, T002, T004
+
+    def test_get_iteration_filter(self, sample_spec_filterable):
+        """get(iteration=1) returns only tasks assigned to iteration 1 (non-completed)."""
+        response = self._mock_get(sample_spec_filterable, iteration=1)
+        assert response.spec.tasks is not None
+        # Iteration 1: T001 (completed, excluded), T002 (completed, excluded), T003 (in_progress)
+        assert len(response.spec.tasks) == 1
+        assert response.spec.tasks[0].id == "T003"
+
+    def test_get_iteration_filter_with_include_completed(self, sample_spec_filterable):
+        """get(iteration=1, include_completed=True) returns all tasks in iteration 1."""
+        response = self._mock_get(sample_spec_filterable, iteration=1, include_completed=True)
+        assert response.spec.tasks is not None
+        # Iteration 1 has T001, T002, T003
+        assert len(response.spec.tasks) == 3
+        assert {t.id for t in response.spec.tasks} == {"T001", "T002", "T003"}
+
+    def test_get_iteration_string_coerced_to_int(self, sample_spec_filterable):
+        """get(iteration='2') coerces string to int (Qwen CLI compat)."""
+        response = self._mock_get(sample_spec_filterable, iteration="2")
+        # Iteration 2 has T004 (completed, excluded), T005 (blocked), T006 (in_progress)
+        assert response.spec.tasks is not None
+        task_ids = {t.id for t in response.spec.tasks}
+        assert "T005" in task_ids
+        assert "T006" in task_ids
+        assert "T004" not in task_ids  # completed
+
+    # ------------------------------------------------------------------
+    # Filter combinations
+    # ------------------------------------------------------------------
+
+    def test_get_iteration_and_status_combined(self, sample_spec_filterable):
+        """get(iteration=2, status='blocked') returns only blocked tasks in iteration 2."""
+        response = self._mock_get(sample_spec_filterable, iteration=2, status="blocked")
+        assert response.spec.tasks is not None
+        assert len(response.spec.tasks) == 1
+        assert response.spec.tasks[0].id == "T005"
+        assert response.spec.tasks[0].status == TaskStatus.BLOCKED
+
+    def test_get_status_completed_without_include_returns_empty(self, sample_spec_filterable):
+        """get(status='completed') with default include_completed=False returns no tasks.
+
+        Since include_completed=False is applied first (removing completed), then
+        status='completed' filter finds nothing. Result: empty list.
+        """
+        response = self._mock_get(sample_spec_filterable, status="completed")
+        # First exclude completed (none left for status filter), then filter by completed status
+        assert response.spec.tasks is not None
+        assert len(response.spec.tasks) == 0
+
+    # ------------------------------------------------------------------
+    # Summary integrity — always unfiltered
+    # ------------------------------------------------------------------
+
+    def test_get_summary_always_reflects_full_spec(self, sample_spec_filterable):
+        """Summary counts must reflect the full unfiltered spec regardless of filters."""
+        # With heavy filtering
+        response = self._mock_get(sample_spec_filterable, iteration=1, status="in_progress")
+        # Summary should still show all 9 tasks
+        assert response.summary.tasks_total == 9
+        assert response.summary.tasks_completed == 3
+        assert response.summary.tasks_in_progress == 2
+        assert response.summary.tasks_not_started == 2
+        assert response.summary.tasks_blocked == 1
+        assert response.summary.tasks_paused == 1
+
+    def test_get_full_summary_matches_default_summary(self, sample_spec_filterable):
+        """get(full=True) and get() must produce identical summaries."""
+        full_response = self._mock_get(sample_spec_filterable, full=True)
+        default_response = self._mock_get(sample_spec_filterable)
+        assert full_response.summary.tasks_total == default_response.summary.tasks_total
+        assert full_response.summary.tasks_completed == default_response.summary.tasks_completed
+
+    # ------------------------------------------------------------------
+    # filters_applied dict correctness
+    # ------------------------------------------------------------------
+
+    def test_get_filters_applied_contains_required_keys(self, sample_spec_filterable):
+        """filters_applied dict must contain all 5 required keys."""
+        response = self._mock_get(sample_spec_filterable)
+        assert response.filters_applied is not None
+        required_keys = {
+            "include_completed",
+            "include_design",
+            "include_quality",
+            "tasks_returned",
+            "tasks_excluded",
+        }
+        assert required_keys.issubset(response.filters_applied.keys())
+
+    def test_get_filters_applied_task_counts_are_correct(self, sample_spec_filterable):
+        """filters_applied tasks_returned + tasks_excluded must equal total tasks in spec."""
+        response = self._mock_get(sample_spec_filterable)
+        assert response.filters_applied is not None
+        total = (
+            response.filters_applied["tasks_returned"] + response.filters_applied["tasks_excluded"]
+        )
+        assert total == 9  # sample_spec_filterable has 9 tasks total
+
+    def test_get_filters_applied_default_values(self, sample_spec_filterable):
+        """filters_applied default flag values match the parameter defaults."""
+        response = self._mock_get(sample_spec_filterable)
+        assert response.filters_applied is not None
+        assert response.filters_applied["include_completed"] is False
+        assert response.filters_applied["include_design"] is False
+        assert response.filters_applied["include_quality"] is False
+
+    def test_get_filters_applied_none_when_full(self, sample_spec_filterable):
+        """filters_applied is None when full=True."""
+        response = self._mock_get(sample_spec_filterable, full=True)
+        assert response.filters_applied is None
+
+    # ------------------------------------------------------------------
+    # Error handling
+    # ------------------------------------------------------------------
+
+    def test_get_invalid_status_raises_valueerror(self, sample_spec_filterable):
+        """get(status='invalid') must raise ValueError with descriptive message."""
+        with pytest.raises(ValueError, match="Invalid status"):
+            self._mock_get(sample_spec_filterable, status="invalid_value")
+
+    def test_get_invalid_iteration_raises_valueerror(self, sample_spec_filterable):
+        """get(iteration=999) must raise ValueError for non-existent iteration."""
+        with pytest.raises(ValueError, match="Iteration"):
+            self._mock_get(sample_spec_filterable, iteration=999)
+
+    def test_get_invalid_iteration_string_raises_valueerror(self, sample_spec_filterable):
+        """get(iteration='not-a-number') must raise ValueError."""
+        with pytest.raises(ValueError, match="iteration"):
+            self._mock_get(sample_spec_filterable, iteration="not-a-number")
+
+    def test_get_valid_statuses_accepted(self, sample_spec_filterable):
+        """All valid TaskStatus values must be accepted without error."""
+        valid_statuses = ["not_started", "in_progress", "completed", "blocked", "paused"]
+        for s in valid_statuses:
+            # Should not raise (combine with include_completed to allow 'completed' to pass through)
+            self._mock_get(sample_spec_filterable, status=s, include_completed=True)
 
 
 class TestRunQualityChecksMutualExclusivity:

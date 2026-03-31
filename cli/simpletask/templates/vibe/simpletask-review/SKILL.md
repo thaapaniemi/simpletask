@@ -19,20 +19,21 @@ This review is strictly scoped to the original prompt and acceptance criteria de
 
    ```
    Use simpletask_get() MCP tool to retrieve task data:
-   - Call simpletask_get() to use current git branch (auto-detected)
+   - Call simpletask_get(include_completed=True) to use current git branch (auto-detected)
    - Returns SimpleTaskGetResponse with spec, file_path, and summary
+   - Note: use include_completed=True so completed tasks appear in spec.tasks for review
    - If error occurs, task file does not exist - abort and inform the user
    ```
 
 **Step 2: Analyze Task Completion**
 
-From the `simpletask_get()` response:
+From the `simpletask_get(include_completed=True)` response:
 - Filter `spec.tasks` by status: completed, in_progress, not_started, blocked, paused
 - Use `summary` fields for quick counts
 
 **Step 3: Check Acceptance Criteria**
 
-From the `simpletask_get()` response:
+From the `simpletask_get(include_completed=True)` response:
 - Check `spec.acceptance_criteria` array for `completed` status
 - Use `summary.criteria_total` and `summary.criteria_completed` for counts
 
@@ -136,7 +137,7 @@ If Critical/High severity blocking issues exist:
 
 1. Create iteration: `simpletask_iteration(action="add", label="review fixes")`
 2. Add fix tasks: `simpletask_task(action="add", name="Fix: [issue]", goal="[remediation]", iteration=<id>)`
-3. Validate: `simpletask_get(validate=True)`
+3. Validate: `simpletask_get(validate=True, full=True)`
 
 If no blocking issues: report "No fix tasks needed."
 
@@ -149,4 +150,4 @@ Before marking as "READY TO MERGE":
 2. All criteria met
 3. No blocking issues
 4. Tests pass
-5. Schema valid: `simpletask_get(validate=True)`
+5. Schema valid: `simpletask_get(validate=True, full=True)`

@@ -71,7 +71,7 @@ User input: $ARGUMENTS
    
    ```
    Use simpletask_get() MCP tool to check for existing task:
-   - Call simpletask_get() to use current git branch
+   - Call simpletask_get(full=True) to use current git branch
    - If successful, task file exists - analyze spec.tasks to see if empty/minimal
    - If error (FileNotFoundError), task file does not exist
    ```
@@ -233,7 +233,7 @@ tasks:
    
    ```
    Use simpletask_get() MCP tool with validation:
-   - Call simpletask_get(validate=True)
+   - Call simpletask_get(validate=True, full=True)
    - Check validation.valid in response
    - If validation.valid is False, check validation.errors for details
    ```
@@ -242,7 +242,7 @@ tasks:
    
    ```
    Use simpletask_get() MCP tool:
-   - Call simpletask_get()
+   - Call simpletask_get(full=True)
    - Display spec.branch, spec.title
    - Display summary.criteria_total, summary.tasks_total
    - List spec.acceptance_criteria and spec.tasks

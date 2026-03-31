@@ -162,31 +162,73 @@ __all__ = [
 @mcp.tool()
 def get(
     validate: bool = False,
+    iteration: int | str | None = None,
+    status: str | None = None,
+    include_completed: bool = False,
+    include_design: bool = False,
+    include_quality: bool = False,
+    full: bool = False,
 ) -> SimpleTaskGetResponse:
     """Get complete task specification with status summary.
 
     Returns the full task specification from .tasks/<branch>.yml with
     pre-computed status counts. Optionally validates against JSON schema.
 
+    By default, the response is filtered to reduce context bloat for AI consumers:
+    - Only non-completed tasks are returned (exclude completed unless include_completed=True)
+    - design section is excluded (include with include_design=True)
+    - quality_requirements section is excluded (include with include_quality=True)
+    - summary always reflects the FULL unfiltered spec (all task counts)
+
+    Use full=True to bypass all filtering and retrieve the complete unmodified spec.
+    This is the equivalent of the pre-filter behavior.
+
     Args:
         validate: Whether to include schema validation result (default: False).
                   Opt-in to reduce overhead for simple queries.
+        iteration: Filter tasks to only those assigned to this iteration ID.
+                   Accepts int or string integer (e.g. "2") for Qwen CLI compatibility.
+                   Combined with include_completed filter (AND logic).
+                   Raises ValueError if the iteration ID does not exist in the spec.
+        status: Filter tasks to only those with this status value.
+                Valid values: not_started, in_progress, completed, blocked, paused.
+                Raises ValueError if the value is not a valid TaskStatus.
+        include_completed: Include completed tasks in the response (default: False).
+                           When False, tasks with status='completed' are excluded.
+        include_design: Include the design section in the response (default: False).
+                        When False, spec.design is set to None to reduce payload size.
+        include_quality: Include quality_requirements in the response (default: False).
+                         When False, spec.quality_requirements is set to None.
+        full: Return the complete unfiltered spec (default: False).
+              When True, all other filter parameters are ignored and filters_applied is None.
+              Equivalent to include_completed=True, include_design=True, include_quality=True
+              with no iteration or status filter.
 
     Returns:
-        SimpleTaskGetResponse with spec, file_path, summary, and optional validation.
+        SimpleTaskGetResponse with spec, file_path, summary, validation, and filters_applied.
 
     Raises:
         ValueError: If not in a git repository, or branch is None and not on a git branch.
+        ValueError: If status is not a valid TaskStatus value.
+        ValueError: If iteration ID does not exist in the spec.
         FileNotFoundError: If task file doesn't exist for the specified branch.
         InvalidTaskFileError: If YAML file is malformed or invalid.
     """
+    # Coerce iteration string to int (Qwen CLI compat)
+    iteration_int: int | None = None
+    if iteration is not None:
+        try:
+            iteration_int = int(iteration)
+        except (ValueError, TypeError):
+            raise ValueError(f"'iteration' must be an integer, got: {iteration!r}") from None
+
     # Get file path (normalizes branch name and validates git repo)
     file_path = get_current_task_file_path()
 
     # Parse task file
     spec = parse_task_file(file_path)
 
-    # Compute status summary
+    # Compute status summary BEFORE any filtering — summary always reflects full spec
     summary = compute_status_summary(spec)
 
     # Optionally validate
@@ -195,11 +237,67 @@ def get(
         errors = validate_task_file(file_path)
         validation = ValidationResult(valid=len(errors) == 0, errors=errors)
 
+    # Determine filtered spec and filters_applied metadata
+    if full:
+        # full=True: bypass all filtering, return spec as-is
+        filters_applied: dict[str, object] | None = None
+        filtered_spec = spec
+    else:
+        # Validate status parameter
+        status_enum: TaskStatus | None = None
+        if status is not None:
+            try:
+                status_enum = TaskStatus(status)
+            except ValueError:
+                valid = [s.value for s in TaskStatus]
+                raise ValueError(f"Invalid status '{status}'. Valid values: {valid}") from None
+
+        # Validate iteration parameter
+        if iteration_int is not None:
+            existing_ids = {it.id for it in spec.iterations} if spec.iterations else set()
+            if iteration_int not in existing_ids:
+                raise ValueError(
+                    f"Iteration {iteration_int!r} does not exist in the spec. "
+                    f"Existing iteration IDs: {sorted(existing_ids)}"
+                )
+
+        # Apply task filters (AND logic: all predicates must match)
+        total_tasks = len(spec.tasks) if spec.tasks else 0
+        filtered_tasks = spec.tasks or []
+
+        if not include_completed:
+            filtered_tasks = [t for t in filtered_tasks if t.status != TaskStatus.COMPLETED]
+        if status_enum is not None:
+            filtered_tasks = [t for t in filtered_tasks if t.status == status_enum]
+        if iteration_int is not None:
+            filtered_tasks = [t for t in filtered_tasks if t.iteration == iteration_int]
+
+        tasks_returned = len(filtered_tasks)
+        tasks_excluded = total_tasks - tasks_returned
+
+        # Build filtered copy without mutating original
+        filtered_spec = spec.model_copy(
+            update={
+                "tasks": filtered_tasks,
+                "design": spec.design if include_design else None,
+                "quality_requirements": spec.quality_requirements if include_quality else None,
+            }
+        )
+
+        filters_applied = {
+            "include_completed": include_completed,
+            "include_design": include_design,
+            "include_quality": include_quality,
+            "tasks_returned": tasks_returned,
+            "tasks_excluded": tasks_excluded,
+        }
+
     return SimpleTaskGetResponse(
-        spec=spec,
+        spec=filtered_spec,
         file_path=str(file_path),
         summary=summary,
         validation=validation,
+        filters_applied=filters_applied,
     )
 
 
