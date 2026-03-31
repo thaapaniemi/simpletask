@@ -303,12 +303,12 @@ operations = []
 
 # Add remove operations for complex tasks
 for task in complex_tasks:
-    operations.append({"op": "remove", "task_id": task.id})
+    operations.append({"action": "remove", "task_id": task.id})
 
 # Add create operations for subtasks
 for subtask in generated_subtasks:
     operations.append({
-        "op": "add",
+        "action": "add",
         "name": subtask.name,
         "goal": subtask.goal,
         "steps": subtask.steps

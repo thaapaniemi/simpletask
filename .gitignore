@@ -53,6 +53,7 @@ htmlcov/
 .opencode/
 .qwen/
 .gemini/
+.vibe/
 
 # OS
 .DS_Store

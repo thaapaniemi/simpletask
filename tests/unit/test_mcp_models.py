@@ -165,12 +165,12 @@ class TestBatchTaskOperation:
     def test_add_operation_valid(self):
         """Test valid add operation with required name field."""
         op = BatchTaskOperation(
-            op="add",
+            action="add",
             name="New task",
             goal="Task goal",
             steps=["Step 1", "Step 2"],
         )
-        assert op.op == "add"
+        assert op.action == "add"
         assert op.name == "New task"
         assert op.goal == "Task goal"
         assert op.steps == ["Step 1", "Step 2"]
@@ -180,34 +180,34 @@ class TestBatchTaskOperation:
         """Test add operation without name raises ValidationError."""
         with pytest.raises(ValidationError, match="name is required for add operation"):
             BatchTaskOperation(
-                op="add",
+                action="add",
                 goal="Task goal",
             )
 
     def test_remove_operation_valid(self):
         """Test valid remove operation with required task_id."""
         op = BatchTaskOperation(
-            op="remove",
+            action="remove",
             task_id="T001",
         )
-        assert op.op == "remove"
+        assert op.action == "remove"
         assert op.task_id == "T001"
         assert op.name is None
 
     def test_remove_operation_missing_task_id_raises(self):
         """Test remove operation without task_id raises ValidationError."""
         with pytest.raises(ValidationError, match="task_id is required for remove operation"):
-            BatchTaskOperation(op="remove")
+            BatchTaskOperation(action="remove")
 
     def test_update_operation_valid(self):
         """Test valid update operation with required task_id."""
         op = BatchTaskOperation(
-            op="update",
+            action="update",
             task_id="T002",
             status="completed",
             name="Updated name",
         )
-        assert op.op == "update"
+        assert op.action == "update"
         assert op.task_id == "T002"
         assert op.status == "completed"
         assert op.name == "Updated name"
@@ -216,7 +216,7 @@ class TestBatchTaskOperation:
         """Test update operation without task_id raises ValidationError."""
         with pytest.raises(ValidationError, match="task_id is required for update operation"):
             BatchTaskOperation(
-                op="update",
+                action="update",
                 status="completed",
             )
 
@@ -224,29 +224,29 @@ class TestBatchTaskOperation:
         """Test that extra fields are rejected."""
         with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
             BatchTaskOperation(
-                op="add",
+                action="add",
                 name="Task",
                 invalid_field="value",
             )
 
     def test_iteration_string_coerced_to_int(self):
         """Test that string integers are coerced to int for Qwen CLI compatibility."""
-        op = BatchTaskOperation(op="update", task_id="T001", iteration="3")
+        op = BatchTaskOperation(action="update", task_id="T001", iteration="3")
         assert op.iteration == 3
         assert isinstance(op.iteration, int)
 
     def test_iteration_int_unchanged(self):
         """Test that integer iterations pass through unchanged."""
-        op = BatchTaskOperation(op="update", task_id="T001", iteration=3)
+        op = BatchTaskOperation(action="update", task_id="T001", iteration=3)
         assert op.iteration == 3
         assert isinstance(op.iteration, int)
 
     def test_iteration_none_unchanged(self):
         """Test that None iterations pass through unchanged."""
-        op = BatchTaskOperation(op="update", task_id="T001", iteration=None)
+        op = BatchTaskOperation(action="update", task_id="T001", iteration=None)
         assert op.iteration is None
 
     def test_iteration_invalid_string_raises(self):
         """Test that non-numeric strings raise ValidationError."""
         with pytest.raises(ValidationError):
-            BatchTaskOperation(op="update", task_id="T001", iteration="not-a-number")
+            BatchTaskOperation(action="update", task_id="T001", iteration="not-a-number")

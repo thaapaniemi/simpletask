@@ -820,7 +820,7 @@ class TestTaskNewFields:
             action="batch",
             operations=[
                 BatchTaskOperation(
-                    op="add",
+                    action="add",
                     name="Batch Typed Task",
                     goal="Batch task with typed models",
                     steps=["Step 1"],
@@ -851,61 +851,6 @@ class TestTaskNewFields:
         assert len(batch_task.code_examples) == 1
         assert batch_task.code_examples[0].language == "python"
         assert batch_task.code_examples[0].code == "def batch_typed(): pass"
-        """Test task add with all new parameters combined."""
-        import subprocess
-
-        from simpletask.core.project import get_task_file_path
-        from simpletask.core.yaml_parser import parse_task_file
-
-        new(branch="all-fields-test", title="Test", prompt="Test", criteria=["AC1"])
-
-        subprocess.run(["git", "checkout", "-b", "all-fields-test"], cwd=temp_project, check=True)
-
-        # Add first task to use as prerequisite
-        task(action="add", name="First Task", goal="First")
-
-        # Add second task with all fields
-        result = task(
-            action="add",
-            name="Full Task",
-            goal="Task with all fields",
-            steps=["Step 1", "Step 2"],
-            done_when=["All tests pass", "No errors"],
-            prerequisites=["T001"],
-            files=[
-                {"path": "src/module.py", "action": "create"},
-            ],
-            code_examples=[
-                {
-                    "language": "python",
-                    "description": "Pattern to follow",
-                    "code": "class Example: pass",
-                },
-            ],
-        )
-
-        assert result.success is True
-
-        # Verify all fields were saved correctly
-        task_path = get_task_file_path("all-fields-test")
-        spec = parse_task_file(task_path)
-        assert spec.tasks is not None
-        assert len(spec.tasks) == 2
-        full_task = spec.tasks[1]
-
-        assert full_task.name == "Full Task"
-        assert full_task.goal == "Task with all fields"
-        assert full_task.steps == ["Step 1", "Step 2"]
-        assert full_task.done_when == ["All tests pass", "No errors"]
-        assert full_task.prerequisites == ["T001"]
-        assert full_task.files is not None
-        assert len(full_task.files) == 1
-        assert full_task.files[0].path == "src/module.py"
-        assert full_task.files[0].action == "create"
-        assert full_task.code_examples is not None
-        assert len(full_task.code_examples) == 1
-        assert full_task.code_examples[0].language == "python"
-        assert full_task.code_examples[0].code == "class Example: pass"
 
     def test_task_update_steps(self, temp_project):
         """Test task update can modify steps."""
@@ -989,7 +934,7 @@ class TestTaskNewFields:
             action="batch",
             operations=[
                 {
-                    "op": "add",
+                    "action": "add",
                     "name": "Full Batch Task",
                     "goal": "Task with all fields in batch",
                     "steps": ["Batch step 1", "Batch step 2"],
@@ -1048,7 +993,7 @@ class TestTaskNewFields:
             action="batch",
             operations=[
                 {
-                    "op": "update",
+                    "action": "update",
                     "task_id": "T001",
                     "done_when": ["Updated condition 1", "Updated condition 2"],
                     "files": [
@@ -1118,13 +1063,13 @@ class TestTaskNewFields:
             task(
                 action="batch",
                 operations=[
-                    {"op": "add", "name": "Valid Add", "goal": "This should not be added"},
+                    {"action": "add", "name": "Valid Add", "goal": "This should not be added"},
                     {
-                        "op": "add",
+                        "action": "add",
                         "name": "Invalid Prereq",
                         "prerequisites": ["T999"],  # Non-existent prerequisite
                     },
-                    {"op": "update", "task_id": "T001", "name": "Updated Name"},
+                    {"action": "update", "task_id": "T001", "name": "Updated Name"},
                 ],
             )
 
@@ -1281,8 +1226,8 @@ class TestCompactWriteResponseContract:
         result = task(
             action="batch",
             operations=[
-                {"op": "add", "name": "Batch Task 1"},
-                {"op": "add", "name": "Batch Task 2"},
+                {"action": "add", "name": "Batch Task 1"},
+                {"action": "add", "name": "Batch Task 2"},
             ],
         )
         assert isinstance(result, SimpleTaskBatchResponse)

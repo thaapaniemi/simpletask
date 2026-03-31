@@ -51,9 +51,9 @@ class TestMCPBatchValidOperations:
         result = task(
             action="batch",
             operations=[
-                {"op": "add", "name": "Task 1", "goal": "First task"},
-                {"op": "add", "name": "Task 2", "goal": "Second task"},
-                {"op": "add", "name": "Task 3", "goal": "Third task"},
+                {"action": "add", "name": "Task 1", "goal": "First task"},
+                {"action": "add", "name": "Task 2", "goal": "Second task"},
+                {"action": "add", "name": "Task 3", "goal": "Third task"},
             ],
         )
 
@@ -83,8 +83,8 @@ class TestMCPBatchValidOperations:
         result = task(
             action="batch",
             operations=[
-                {"op": "remove", "task_id": "T001"},
-                {"op": "remove", "task_id": "T002"},
+                {"action": "remove", "task_id": "T001"},
+                {"action": "remove", "task_id": "T002"},
             ],
         )
 
@@ -111,8 +111,8 @@ class TestMCPBatchValidOperations:
         result = task(
             action="batch",
             operations=[
-                {"op": "update", "task_id": "T001", "status": "in_progress"},
-                {"op": "update", "task_id": "T002", "status": "completed"},
+                {"action": "update", "task_id": "T001", "status": "in_progress"},
+                {"action": "update", "task_id": "T002", "status": "completed"},
             ],
         )
 
@@ -141,10 +141,10 @@ class TestMCPBatchValidOperations:
         result = task(
             action="batch",
             operations=[
-                {"op": "remove", "task_id": "T001"},
-                {"op": "update", "task_id": "T002", "status": "completed"},
-                {"op": "add", "name": "New Task 1", "goal": "Added in batch"},
-                {"op": "add", "name": "New Task 2", "goal": "Also added in batch"},
+                {"action": "remove", "task_id": "T001"},
+                {"action": "update", "task_id": "T002", "status": "completed"},
+                {"action": "add", "name": "New Task 1", "goal": "Added in batch"},
+                {"action": "add", "name": "New Task 2", "goal": "Also added in batch"},
             ],
         )
 
@@ -172,11 +172,11 @@ class TestMCPBatchInvalidOperations:
         )
 
         # Batch with missing task_id for remove
-        with pytest.raises(ValueError, match="task_id required for remove"):
+        with pytest.raises(ValueError, match="task_id is required for remove"):
             task(
                 action="batch",
                 operations=[
-                    {"op": "remove"},  # Missing task_id
+                    {"action": "remove"},  # Missing task_id
                 ],
             )
 
@@ -191,11 +191,11 @@ class TestMCPBatchInvalidOperations:
         )
 
         # Batch with missing name for add
-        with pytest.raises(ValueError, match="name required for add operation"):
+        with pytest.raises(ValueError, match="name is required for add operation"):
             task(
                 action="batch",
                 operations=[
-                    {"op": "add", "goal": "Missing name"},  # Missing name
+                    {"action": "add", "goal": "Missing name"},  # Missing name
                 ],
             )
 
@@ -215,7 +215,7 @@ class TestMCPBatchInvalidOperations:
             task(
                 action="batch",
                 operations=[
-                    {"op": "update", "task_id": "T999", "status": "completed"},
+                    {"action": "update", "task_id": "T999", "status": "completed"},
                 ],
             )
 
@@ -245,8 +245,8 @@ class TestMCPBatchAtomicity:
             task(
                 action="batch",
                 operations=[
-                    {"op": "update", "task_id": "T001", "status": "completed"},
-                    {"op": "update", "task_id": "T999", "status": "completed"},
+                    {"action": "update", "task_id": "T001", "status": "completed"},
+                    {"action": "update", "task_id": "T999", "status": "completed"},
                 ],
             )
 
@@ -278,8 +278,8 @@ class TestMCPBatchResponseStructure:
         result = task(
             action="batch",
             operations=[
-                {"op": "add", "name": "Task 1"},
-                {"op": "add", "name": "Task 2"},
+                {"action": "add", "name": "Task 1"},
+                {"action": "add", "name": "Task 2"},
             ],
         )
 
@@ -310,9 +310,9 @@ class TestMCPBatchResponseStructure:
         result = task(
             action="batch",
             operations=[
-                {"op": "remove", "task_id": "T001"},
-                {"op": "add", "name": "New Task 1"},
-                {"op": "add", "name": "New Task 2"},
+                {"action": "remove", "task_id": "T001"},
+                {"action": "add", "name": "New Task 1"},
+                {"action": "add", "name": "New Task 2"},
             ],
         )
 
