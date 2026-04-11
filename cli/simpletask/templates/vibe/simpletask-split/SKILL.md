@@ -13,7 +13,7 @@ user-invocable: true
 ## Step 1: Load Task File
 
 ```
-simpletask_get()  # Uses current git branch
+simpletask_get(full=True)  # Uses current git branch
 Returns: SimpleTaskGetResponse with spec, file_path, summary
 ```
 
@@ -24,8 +24,8 @@ If task file not found: Report "No task file found. Run /simpletask-plan first."
 ## Step 1.5: Codebase Analysis & Design (Conditional)
 
 **SKIP this step if:**
-- `simpletask_get()` shows `spec.design` is already populated (has patterns, constraints, or references)
-- `simpletask_get()` shows `spec.quality_requirements` already configured
+- `simpletask_get(full=True)` shows `spec.design` is already populated (has patterns, constraints, or references)
+- `simpletask_get(full=True)` shows `spec.quality_requirements` already configured
 
 **If design section is empty or missing, execute this mandatory codebase analysis:**
 
@@ -108,7 +108,7 @@ Call simpletask_quality(
 
 **After completing Step 1.5, reload the task file:**
 ```
-simpletask_get()  # Refresh to see populated design section
+simpletask_get(full=True)  # Refresh to see populated design section
 ```
 
 ---
@@ -191,18 +191,18 @@ Task IDs are already sequential after a batch operation. If further renumbering 
 (e.g. to close gaps), use additional batch operations via MCP — never edit `.tasks/` YAML
 directly, as that bypasses schema validation and can corrupt the task file.
 
-1. Load updated task file with `simpletask_get()`
+1. Load updated task file with `simpletask_get(full=True)`
 2. Identify any ID gaps or out-of-order IDs
 3. Use `simpletask_task(action='batch', operations=[...])` with update operations to
    rename tasks and fix prerequisite references
-4. Validate the result: `simpletask_get(validate=True)`
+4. Validate the result: `simpletask_get(validate=True, full=True)`
 
 ---
 
 ## Step 6: Validate and Report
 
 ```
-simpletask_get(validate=True)
+simpletask_get(validate=True, full=True)
 ```
 
 Generate split summary showing: original state, splitting results, cognitive load reduction, and validation status.

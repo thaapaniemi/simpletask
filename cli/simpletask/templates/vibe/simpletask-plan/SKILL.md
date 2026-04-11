@@ -42,7 +42,7 @@ user-invocable: true
 
    ```
    Use simpletask_get() MCP tool to check for existing task:
-   - Call simpletask_get() to use current git branch
+   - Call simpletask_get(full=True) to use current git branch
    - If successful, task file exists - analyze spec.tasks to see if empty/minimal
    - If error (FileNotFoundError), task file does not exist
    ```
@@ -150,7 +150,7 @@ Then assign tasks: simpletask_task(action="add", name="...", iteration=1)
 
    ```
    Use simpletask_get() MCP tool with validation:
-   - Call simpletask_get(validate=True)
+   - Call simpletask_get(validate=True, full=True)
    - Check validation.valid in response
    ```
 

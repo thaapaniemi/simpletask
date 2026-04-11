@@ -19,8 +19,9 @@ This review is strictly scoped to the original prompt and acceptance criteria de
    
    ```
    Use simpletask_get() MCP tool to retrieve task data:
-   - Call simpletask_get() to use current git branch (auto-detected)
+   - Call simpletask_get(include_completed=True) to use current git branch (auto-detected)
    - Returns SimpleTaskGetResponse with spec, file_path, and summary
+   - Note: use include_completed=True so completed tasks appear in spec.tasks for review
    - If error occurs, task file does not exist — abort and inform the user
    ```
    
@@ -33,6 +34,7 @@ This review is strictly scoped to the original prompt and acceptance criteria de
    ```
    Use simpletask_get() MCP tool to retrieve complete task data:
    - Returns SimpleTaskGetResponse with spec and summary
+   - Call simpletask_get(include_completed=True) so all tasks appear in spec.tasks
    - spec.tasks: array of all tasks with id, name, status, goal, steps, etc.
    - summary.tasks_total, tasks_completed, tasks_in_progress, tasks_not_started, tasks_blocked
    
@@ -339,7 +341,7 @@ If blocking issues exist:
    ```
    ```
    Use simpletask_get() MCP tool with validation:
-   - Call simpletask_get(validate=True)
+   - Call simpletask_get(validate=True, full=True)
    - Check validation.valid in response
    ```
    
@@ -376,6 +378,7 @@ If no blocking issues exist: report "No fix tasks needed." Do NOT create an iter
 ```
 Use simpletask_get() MCP tool to retrieve complete task data:
 - Returns SimpleTaskGetResponse with spec and summary
+- Call simpletask_get(include_completed=True) so all tasks appear in spec.tasks
 - spec.tasks: array of all tasks with full details
 - spec.acceptance_criteria: array of all criteria
 - summary: pre-computed status counts
@@ -420,7 +423,7 @@ simpletask task add "Fix: [description]" -g "[goal]" -i <iter_id>
 Use simpletask_get() MCP tool with validation:
 
 # Validate task file
-simpletask_get(validate=True)
+simpletask_get(validate=True, full=True)
 # Check validation.valid and validation.errors in response
 ```
 

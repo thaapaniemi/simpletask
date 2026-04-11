@@ -778,7 +778,7 @@ The MCP server exposes 11 tools for task management:
 
 | Tool | Description | Parameters |
 |------|-------------|------------|
-| `get` | Get complete task specification with status summary | `validate` (bool, optional): Include schema validation (default: false) |
+| `get` | Get complete task specification with status summary | `validate` (bool, optional): Include schema validation (default: false)<br>`include_completed` (bool, optional): Include completed tasks in spec.tasks (default: false)<br>`include_design` (bool, optional): Include design section (default: false)<br>`include_quality` (bool, optional): Include quality_requirements section (default: false)<br>`status` (str, optional): Filter tasks by status value<br>`iteration` (int\|str, optional): Filter tasks by iteration ID<br>`full` (bool, optional): Return everything unfiltered, overrides all other filters (default: false) |
 | `list` | List all task file branch names in the project | None |
 | `new` | Create a new task file | `branch` (str): Branch identifier<br>`title` (str): Task title<br>`prompt` (str): Original user request<br>`criteria` (list[str] \| None, optional): Acceptance criteria |
 | `task` | Manage implementation tasks (add/update/remove/get/batch) | `action` (str): 'add', 'update', 'remove', 'get', or 'batch'<br>`task_id` (str, optional): Task ID (required for update/remove/get)<br>`name` (str, optional): Task name (required for add)<br>`goal` (str, optional): Task goal/description<br>`status` (str, optional): Status for update ('not_started', 'in_progress', 'completed', 'blocked', 'paused')<br>`steps` (list[str] \| None, optional): Task steps for add action. None or [] adds placeholder ['To be defined']<br>`done_when` (list[str] \| None, optional): Completion verification conditions<br>`prerequisites` (list[str] \| None, optional): Prerequisite task IDs<br>`files` (list[dict] \| None, optional): Files to create/modify/delete<br>`code_examples` (list[dict] \| None, optional): Code patterns to follow<br>`operations` (list[dict], optional): List of BatchTaskOperation dicts (required for batch action) |
@@ -794,24 +794,64 @@ The MCP server exposes 11 tools for task management:
 
 #### get
 
-Returns enriched task data with pre-computed status counts:
+Returns enriched task data with pre-computed status counts. By default, filters out completed tasks and omits the design and quality_requirements sections to reduce context size for AI consumers.
+
+**Default Behavior (no parameters):**
+- `spec.tasks` contains only non-completed tasks (excludes `completed` status)
+- `spec.design` is set to `null`
+- `spec.quality_requirements` is set to `null`
+- `summary` always reflects the **full unfiltered** spec regardless of filters
+- `filters_applied` dict is included showing what was filtered
 
 **Parameters:**
 - `validate` (optional): Whether to include schema validation result. Default is `false` to reduce overhead.
+- `include_completed` (bool, optional): Include completed tasks in `spec.tasks`. Default: `false`.
+- `include_design` (bool, optional): Include the design section in the response. Default: `false`.
+- `include_quality` (bool, optional): Include `quality_requirements` in the response. Default: `false`.
+- `status` (str, optional): Filter `spec.tasks` to only tasks with this status. Valid values: `not_started`, `in_progress`, `completed`, `blocked`, `paused`. Combined with `include_completed` filter.
+- `iteration` (int|str, optional): Filter `spec.tasks` to only tasks assigned to this iteration ID. Combined with other filters.
+- `full` (bool, optional): Return everything unfiltered — all tasks (including completed), design, quality_requirements. Overrides all other filter parameters. Sets `filters_applied` to `null`. Default: `false`.
+
+**Key Behaviors:**
+
+| Parameter | Default | Effect |
+|-----------|---------|--------|
+| `include_completed=False` | default | Excludes tasks with `status: completed` from `spec.tasks` |
+| `include_design=False` | default | Sets `spec.design` to `null` |
+| `include_quality=False` | default | Sets `spec.quality_requirements` to `null` |
+| `full=True` | — | Returns everything, `filters_applied=null` |
+| `status="in_progress"` | — | Returns only in-progress tasks (combined with completed filter) |
+| `iteration=2` | — | Returns only tasks assigned to iteration 2 |
+
+**Workflow-Specific Usage Patterns:**
+
+| Workflow | Recommended Call | Why |
+|----------|-----------------|-----|
+| `plan` | `get(full=True)` | Needs design + quality to check if analysis required |
+| `split` | `get(full=True)` | Needs all tasks + design + quality for codebase analysis |
+| `implement` | `get()` | Needs only actionable (non-completed) tasks |
+| `review` | `get(include_completed=True)` | Needs all tasks to verify completion status |
+| validate | `get(validate=True, full=True)` | Schema validation against full spec |
 
 **Note:** This tool always uses the current git branch. Branch auto-detection prevents MCP clients from incorrectly passing string values like "None".
 
 **Returns:** `SimpleTaskGetResponse` with:
-- `spec`: Full `SimpleTaskSpec` (branch, title, acceptance_criteria, tasks, etc.)
+- `spec`: Filtered `SimpleTaskSpec` (branch, title, acceptance_criteria, tasks, etc.)
 - `file_path`: Path to task YAML file
-- `summary`: Pre-computed `StatusSummary` with:
+- `summary`: Pre-computed `StatusSummary` with **unfiltered** counts — always reflects the complete task file:
   - `branch`, `title`
   - `overall_status`: Computed from task states (blocked > paused > in_progress > completed > not_started)
   - `criteria_total`, `criteria_completed`
   - `tasks_total`, `tasks_completed`, `tasks_in_progress`, `tasks_not_started`, `tasks_blocked`, `tasks_paused`
+- `filters_applied` (dict or null): When filtering is active (`full=False`), contains:
+  - `include_completed` (bool)
+  - `include_design` (bool)
+  - `include_quality` (bool)
+  - `tasks_returned` (int): count of tasks in filtered `spec.tasks`
+  - `tasks_excluded` (int): count of tasks removed by filters
 - `validation` (optional): `ValidationResult` with `valid` (bool) and `errors` (list)
 
-**Example Response Structure:**
+**Example Response Structure (default call):**
 
 ```json
 {
@@ -819,7 +859,9 @@ Returns enriched task data with pre-computed status counts:
     "branch": "feature/mcp-server",
     "title": "Add MCP server support",
     "acceptance_criteria": [...],
-    "tasks": [...]
+    "tasks": [...],
+    "design": null,
+    "quality_requirements": null
   },
   "file_path": ".tasks/feature-mcp-server.yml",
   "summary": {
@@ -834,6 +876,13 @@ Returns enriched task data with pre-computed status counts:
     "tasks_not_started": 5,
     "tasks_blocked": 0,
     "tasks_paused": 0
+  },
+  "filters_applied": {
+    "include_completed": false,
+    "include_design": false,
+    "include_quality": false,
+    "tasks_returned": 6,
+    "tasks_excluded": 5
   },
   "validation": null
 }

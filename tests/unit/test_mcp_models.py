@@ -158,6 +158,78 @@ class TestSimpleTaskGetResponse:
 
         assert response.validation is None
 
+    def test_filters_applied_none_by_default(self, sample_spec: SimpleTaskSpec):
+        """filters_applied defaults to None when not provided."""
+        summary = compute_status_summary(sample_spec)
+
+        response = SimpleTaskGetResponse(
+            spec=sample_spec,
+            file_path="/path/to/task.yml",
+            summary=summary,
+        )
+
+        assert response.filters_applied is None
+
+    def test_filters_applied_accepts_dict(self, sample_spec: SimpleTaskSpec):
+        """filters_applied accepts and serializes a dict[str, Any] correctly."""
+        summary = compute_status_summary(sample_spec)
+        filters: dict[str, object] = {
+            "include_completed": False,
+            "include_design": False,
+            "include_quality": False,
+            "tasks_returned": 3,
+            "tasks_excluded": 2,
+        }
+
+        response = SimpleTaskGetResponse(
+            spec=sample_spec,
+            file_path="/path/to/task.yml",
+            summary=summary,
+            filters_applied=filters,
+        )
+
+        assert response.filters_applied is not None
+        assert response.filters_applied["include_completed"] is False
+        assert response.filters_applied["include_design"] is False
+        assert response.filters_applied["include_quality"] is False
+        assert response.filters_applied["tasks_returned"] == 3
+        assert response.filters_applied["tasks_excluded"] == 2
+
+    def test_filters_applied_serializes_to_json(self, sample_spec: SimpleTaskSpec):
+        """filters_applied round-trips through model_dump correctly."""
+        summary = compute_status_summary(sample_spec)
+        filters: dict[str, object] = {
+            "include_completed": True,
+            "tasks_returned": 5,
+            "tasks_excluded": 0,
+        }
+
+        response = SimpleTaskGetResponse(
+            spec=sample_spec,
+            file_path="/path/to/task.yml",
+            summary=summary,
+            filters_applied=filters,
+        )
+
+        dumped = response.model_dump()
+        assert dumped["filters_applied"]["include_completed"] is True
+        assert dumped["filters_applied"]["tasks_returned"] == 5
+        assert dumped["filters_applied"]["tasks_excluded"] == 0
+
+    def test_filters_applied_extra_fields_forbidden(self, sample_spec: SimpleTaskSpec):
+        """Verify extra='forbid' still applies to the response model itself."""
+        from pydantic import ValidationError
+
+        summary = compute_status_summary(sample_spec)
+
+        with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
+            SimpleTaskGetResponse(
+                spec=sample_spec,
+                file_path="/path/to/task.yml",
+                summary=summary,
+                unknown_field="value",  # type: ignore[call-arg]
+            )
+
 
 class TestBatchTaskOperation:
     """Tests for BatchTaskOperation model validation."""

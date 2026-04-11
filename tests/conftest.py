@@ -8,9 +8,18 @@ import git
 import pytest
 from simpletask.core.models import (
     AcceptanceCriterion,
+    ArchitecturalPattern,
+    Design,
+    DesignReference,
+    Iteration,
+    LintingConfig,
+    QualityRequirements,
     SimpleTaskSpec,
     Task,
     TaskStatus,
+    TestingConfig,
+    ToolName,
+    TypeCheckConfig,
 )
 from simpletask.core.yaml_parser import write_task_file
 
@@ -490,6 +499,177 @@ def sample_spec_only_paused() -> SimpleTaskSpec:
                 code_examples=None,
                 prerequisites=None,
                 files=None,
+            ),
+        ],
+    )
+
+
+@pytest.fixture
+def sample_spec_filterable() -> SimpleTaskSpec:
+    """Comprehensive spec for testing all filtering dimensions.
+
+    Contains:
+    - 3 iterations with tasks distributed across them (and one unassigned)
+    - All 5 task statuses represented: not_started (2), in_progress (2), completed (3),
+      blocked (1), paused (1) — 9 tasks total
+    - Populated design section with patterns and constraints
+    - Populated quality_requirements (linting and testing)
+    - 3 acceptance criteria (1 completed)
+    - Notes and constraints
+    """
+    now = datetime.now(UTC)
+    return SimpleTaskSpec(
+        schema_version="1.0",
+        branch="test-filterable",
+        title="Filterable Test Feature",
+        original_prompt="A comprehensive spec for testing filter combinations",
+        created=now,
+        acceptance_criteria=[
+            AcceptanceCriterion(id="AC1", description="Core feature works", completed=True),
+            AcceptanceCriterion(id="AC2", description="Tests pass", completed=False),
+            AcceptanceCriterion(id="AC3", description="Docs updated", completed=False),
+        ],
+        constraints=["Use Pydantic models with extra='forbid'", "No shell=True in subprocess"],
+        context={"language": "python", "framework": "fastapi"},
+        notes=["Root note 1", "Root note 2"],
+        iterations=[
+            Iteration(id=1, label="Core Models", created=now),
+            Iteration(id=2, label="API Layer", created=now),
+            Iteration(id=3, label="Polish", created=now),
+        ],
+        design=Design(
+            patterns=[ArchitecturalPattern.REPOSITORY, ArchitecturalPattern.SERVICE_LAYER],
+            reference_implementations=[
+                DesignReference(
+                    path="cli/simpletask/mcp/server.py",
+                    reason="MCP tool pattern to follow",
+                )
+            ],
+            architectural_constraints=[
+                "Use Pydantic models with extra='forbid'",
+                "No direct database access from views",
+            ],
+            security=None,
+            error_handling=None,
+        ),
+        quality_requirements=QualityRequirements(
+            linting=LintingConfig(enabled=True, tool=ToolName.RUFF, args=["check", "."]),
+            type_checking=TypeCheckConfig(enabled=True, tool=ToolName.MYPY, args=["cli/"]),
+            testing=TestingConfig(enabled=True, tool=ToolName.PYTEST, args=[], min_coverage=80),
+            security_check=None,
+        ),
+        tasks=[
+            # Iteration 1: Core Models — 3 tasks (2 completed, 1 in_progress)
+            Task(
+                id="T001",
+                name="Create model A",
+                status=TaskStatus.COMPLETED,
+                goal="Define model A",
+                steps=["Write model"],
+                done_when=None,
+                code_examples=None,
+                prerequisites=None,
+                files=None,
+                iteration=1,
+            ),
+            Task(
+                id="T002",
+                name="Create model B",
+                status=TaskStatus.COMPLETED,
+                goal="Define model B",
+                steps=["Write model"],
+                done_when=None,
+                code_examples=None,
+                prerequisites=None,
+                files=None,
+                iteration=1,
+            ),
+            Task(
+                id="T003",
+                name="Write model tests",
+                status=TaskStatus.IN_PROGRESS,
+                goal="Test models",
+                steps=["Write tests"],
+                done_when=None,
+                code_examples=None,
+                prerequisites=["T001", "T002"],
+                files=None,
+                iteration=1,
+            ),
+            # Iteration 2: API Layer — 3 tasks (1 completed, 1 blocked, 1 in_progress)
+            Task(
+                id="T004",
+                name="Create API router",
+                status=TaskStatus.COMPLETED,
+                goal="Set up API routing",
+                steps=["Define routes"],
+                done_when=None,
+                code_examples=None,
+                prerequisites=None,
+                files=None,
+                iteration=2,
+            ),
+            Task(
+                id="T005",
+                name="Implement endpoint logic",
+                status=TaskStatus.BLOCKED,
+                goal="Business logic for endpoints",
+                steps=["Implement handlers"],
+                done_when=None,
+                code_examples=None,
+                prerequisites=["T004"],
+                files=None,
+                iteration=2,
+            ),
+            Task(
+                id="T006",
+                name="Add middleware",
+                status=TaskStatus.IN_PROGRESS,
+                goal="Auth and logging middleware",
+                steps=["Write middleware"],
+                done_when=None,
+                code_examples=None,
+                prerequisites=["T004"],
+                files=None,
+                iteration=2,
+            ),
+            # Iteration 3: Polish — 2 tasks (not_started + paused)
+            Task(
+                id="T007",
+                name="Write integration tests",
+                status=TaskStatus.NOT_STARTED,
+                goal="End-to-end testing",
+                steps=["Write e2e tests"],
+                done_when=None,
+                code_examples=None,
+                prerequisites=None,
+                files=None,
+                iteration=3,
+            ),
+            Task(
+                id="T008",
+                name="Update documentation",
+                status=TaskStatus.PAUSED,
+                goal="Docs and examples",
+                steps=["Write docs"],
+                done_when=None,
+                code_examples=None,
+                prerequisites=None,
+                files=None,
+                iteration=3,
+            ),
+            # Unassigned — 1 task (not_started, no iteration)
+            Task(
+                id="T009",
+                name="Performance profiling",
+                status=TaskStatus.NOT_STARTED,
+                goal="Profile and optimize",
+                steps=["Run profiler"],
+                done_when=None,
+                code_examples=None,
+                prerequisites=None,
+                files=None,
+                iteration=None,
             ),
         ],
     )

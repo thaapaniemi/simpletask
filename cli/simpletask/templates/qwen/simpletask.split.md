@@ -13,7 +13,7 @@ User input: $ARGUMENTS
 ## Step 1: Load Task File
 
 ```
-simpletask_get()  # Uses current git branch
+simpletask_get(full=True)  # Uses current git branch
 Returns: SimpleTaskGetResponse with spec, file_path, summary
 ```
 
@@ -24,8 +24,8 @@ If task file not found: Report "No task file found. Run /simpletask.plan first."
 ## Step 1.5: Codebase Analysis & Design (Conditional)
 
 **SKIP this step if ANY of the following are true:**
-- `simpletask_get()` shows `spec.design` is already populated (has patterns, constraints, or references)
-- `simpletask_get()` shows `spec.quality_requirements` already configured
+- `simpletask_get(full=True)` shows `spec.design` is already populated (has patterns, constraints, or references)
+- `simpletask_get(full=True)` shows `spec.quality_requirements` already configured
 - `.tasks/defaults.yml` exists AND contains design patterns or quality requirements (they were already auto-merged into the task file at creation time — no need to repeat analysis)
 
 **If design section is empty or missing, execute this mandatory codebase analysis:**
@@ -186,7 +186,7 @@ This is a one-time investment — future `/simpletask.plan` runs will skip this 
 
 **After completing Step 1.5, reload the task file:**
 ```
-simpletask_get()  # Refresh to see populated design section
+simpletask_get(full=True)  # Refresh to see populated design section
 ```
 
 ---
@@ -206,7 +206,7 @@ simpletask_get()  # Refresh to see populated design section
 
 **Process:**
 ```
-From simpletask_get() response:
+From simpletask_get(full=True) response:
 - Iterate spec.tasks array
 - Evaluate each against split criteria
 - Store complex tasks in complex_tasks list
@@ -339,7 +339,7 @@ result = simpletask_task(action="batch", operations=operations)
 
 **5.1: Load updated task file**
 ```
-simpletask_get()
+simpletask_get(full=True)
 ```
 
 **5.2: Create ID mapping**
@@ -369,7 +369,7 @@ Example: `prerequisites: [T015, T016]` → `prerequisites: [T003, T004]`
 
 **Validate schema:**
 ```
-simpletask_get(validate=True)
+simpletask_get(validate=True, full=True)
 # Check validation.valid and validation.errors
 ```
 
