@@ -1,5 +1,6 @@
 """Shared pytest fixtures for simpletask tests."""
 
+import asyncio
 from collections.abc import Generator
 from datetime import UTC, datetime
 from pathlib import Path
@@ -22,6 +23,18 @@ from simpletask.core.models import (
     TypeCheckConfig,
 )
 from simpletask.core.yaml_parser import write_task_file
+
+
+@pytest.fixture(scope="session")
+def mcp_tools_list():
+    """Cache the FastMCP tools list to avoid per-method asyncio.run() overhead.
+
+    This session-scoped fixture runs mcp.list_tools() once per test session,
+    avoiding the creation and destruction of an event loop per test method.
+    """
+    from simpletask.mcp.server import mcp
+
+    return asyncio.run(mcp.list_tools())
 
 
 @pytest.fixture

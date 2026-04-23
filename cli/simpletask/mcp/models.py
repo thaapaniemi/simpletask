@@ -2,11 +2,23 @@
 
 This module defines Pydantic models for MCP tool responses,
 including status summaries and validation results.
+
+WithJsonSchema Overrides (Architectural Debt):
+    This module defines three Annotated type aliases (TaskIdAnnotation, CriterionIdAnnotation,
+    OperationsAnnotation) that override the JSON Schema FastMCP advertises to MCP clients.
+
+    The overrides advertise stricter types ({type: string}, {type: array}) than the Python
+    runtime types (str | None, list[...] | None), intentionally omitting null from the
+    advertised schema to prevent weaker LLMs from inferring null is valid for contextually-
+    required parameters.
+
+    This is a known limitation and a form of schema deception. The correct long-term fix is
+    per-action tools or discriminated unions. See server.py module docstring for full context.
 """
 
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, WithJsonSchema, field_validator, model_validator
 
 from ..core.models import (
     AcceptanceCriterion,
@@ -23,7 +35,9 @@ from ..core.models import (
 
 __all__ = [
     "BatchTaskOperation",
+    "CriterionIdAnnotation",
     "IterationSummary",
+    "OperationsAnnotation",
     "QualityCheckResult",
     "SimpleTaskBatchResponse",
     "SimpleTaskConstraintResponse",
@@ -36,8 +50,37 @@ __all__ = [
     "SimpleTaskQualityResponse",
     "SimpleTaskWriteResponse",
     "StatusSummary",
+    "TaskIdAnnotation",
     "ValidationResult",
+    "compute_compact_status_summary",
     "compute_status_summary",
+]
+
+
+TaskIdAnnotation = Annotated[
+    str | None,
+    WithJsonSchema(
+        {
+            "type": "string",
+            "description": (
+                "Task ID string (e.g. 'T001'). Required for action='update', "
+                "'remove', 'get'. Omit for 'add' or 'batch'."
+            ),
+        }
+    ),
+]
+
+CriterionIdAnnotation = Annotated[
+    str | None,
+    WithJsonSchema(
+        {
+            "type": "string",
+            "description": (
+                "Criterion ID string (e.g. 'AC1'). Required for "
+                "action='complete', 'remove', 'get', 'update'. Omit for 'add'."
+            ),
+        }
+    ),
 ]
 
 
@@ -53,7 +96,7 @@ class BatchTaskOperation(BaseModel):
     action: Literal["add", "remove", "update"] = Field(
         ..., description="Operation type: 'add', 'remove', or 'update'"
     )
-    task_id: str | None = Field(None, description="Task ID (required for remove/update)")
+    task_id: TaskIdAnnotation = None
     name: str | None = Field(None, description="Task name (required for add)")
     goal: str | None = Field(None, description="Task goal/description")
     status: str | None = Field(None, description="Task status (for update)")
@@ -86,11 +129,126 @@ class BatchTaskOperation(BaseModel):
     @model_validator(mode="after")
     def validate_required_fields(self) -> "BatchTaskOperation":
         """Validate that required fields are present based on operation type."""
-        if self.action in ("remove", "update") and not self.task_id:
-            raise ValueError(f"task_id is required for {self.action} operation")
-        if self.action == "add" and not self.name:
-            raise ValueError("name is required for add operation")
+        if self.action in ("remove", "update"):
+            if self.task_id is None:
+                raise ValueError(
+                    f"task_id is required for {self.action} operation. "
+                    f'Example: {{"action": "{self.action}", "task_id": "T001"}}'
+                )
+            if not self.task_id:
+                raise ValueError(
+                    f"task_id cannot be empty for {self.action} operation. "
+                    f'Example: {{"action": "{self.action}", "task_id": "T001"}}'
+                )
+        if self.action == "add":
+            if self.name is None:
+                raise ValueError(
+                    'name is required for add operation. Example: {"action": "add", "name": "My Task"}'
+                )
+            if not self.name:
+                raise ValueError(
+                    'name cannot be empty for add operation. Example: {"action": "add", "name": "My Task"}'
+                )
         return self
+
+
+# Defined here (after BatchTaskOperation) so the concrete type is available —
+# avoids forward-ref string "BatchTaskOperation" which Pydantic cannot resolve
+# when FastMCP builds its internal taskArguments model in a separate namespace.
+OperationsAnnotation = Annotated[
+    list[BatchTaskOperation] | None,
+    WithJsonSchema(
+        {
+            "type": "array",
+            "minItems": 1,
+            "description": (
+                "Non-empty list of batch operations (required for action='batch'). "
+                'Example: [{"action": "update", "task_id": "T001", '
+                '"status": "completed"}, {"action": "add", "name": '
+                '"New Task"}]'
+            ),
+            "items": {
+                "type": "object",
+                "description": "A single batch operation (add, remove, or update)",
+                "properties": {
+                    "action": {
+                        "type": "string",
+                        "enum": ["add", "remove", "update"],
+                        "description": "Operation type",
+                    },
+                    "task_id": {
+                        "type": "string",
+                        "description": (
+                            "Task ID string (e.g. 'T001'). Required for "
+                            "action='remove' or 'update'. Omit for 'add'."
+                        ),
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "Task name (required for add)",
+                    },
+                    "goal": {
+                        "type": "string",
+                        "description": "Task goal/description",
+                    },
+                    "status": {
+                        "type": "string",
+                        "description": "Task status (for update)",
+                    },
+                    "steps": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Task steps (for add)",
+                    },
+                    "done_when": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Completion conditions",
+                    },
+                    "prerequisites": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Task IDs that must complete first",
+                    },
+                    "files": {
+                        "type": "array",
+                        "description": "Files to create/modify/delete",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "path": {"type": "string"},
+                                "action": {
+                                    "type": "string",
+                                    "enum": ["create", "modify", "delete"],
+                                },
+                            },
+                        },
+                    },
+                    "code_examples": {
+                        "type": "array",
+                        "description": "Code patterns to follow",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "language": {"type": "string"},
+                                "code": {"type": "string"},
+                                "description": {"type": "string"},
+                            },
+                        },
+                    },
+                    "iteration": {
+                        "type": ["integer", "string", "null"],
+                        "description": (
+                            "Iteration ID to assign task to (for add/update). "
+                            "Use null to unassign the iteration."
+                        ),
+                    },
+                },
+                "required": ["action"],
+            },
+        }
+    ),
+]
 
 
 class IterationSummary(BaseModel):

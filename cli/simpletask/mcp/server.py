@@ -1,6 +1,40 @@
 """MCP server implementation for simpletask.
 
 Exposes task file operations as MCP tools for AI editor integration.
+
+WithJsonSchema Usage (Architectural Debt):
+    This module uses Pydantic's WithJsonSchema to override the JSON Schema that FastMCP
+    advertises to MCP clients. This is a pragmatic but imperfect solution to a design issue:
+
+    DESIGN PROBLEM:
+      - The task() and criteria() tools use polymorphic dispatch (single function, action-
+        dependent parameters) for ergonomic API design in Python.
+      - This means some parameters are optional at the Python level (str | None) but are
+        contextually required based on the 'action' argument.
+      - Example: task(action='get', task_id='T001') requires task_id; task(action='add',
+        name='...') requires name but task_id is optional.
+
+    SCHEMA ADVERTISEMENT:
+      - Pydantic normally generates anyOf:[string, null] for str | None type hints.
+      - Weaker LLMs read "null is valid" and call task(action='get', task_id=None),
+        causing infinite retry loops when the error message doesn't fully explain the
+        context-dependent requirement.
+      - WithJsonSchema overrides advertise {type: string} (no null branch) to prevent
+        this confusion.
+
+    THE DECEPTION:
+      - The advertised schema ({type: string}) is stricter than the Python type (str | None).
+      - Clients that validate responses bidirectionally may see mismatches.
+      - This is a known limitation; the correct fix is per-action tools or discriminated
+        unions, which were rejected in favor of a simpler API surface.
+      - See GitHub issue #14 and related discussions for context.
+
+    RISK MITIGATION:
+      - Error messages include concrete call examples so models can self-correct.
+      - Runtime validation uses explicit is None / not x checks to handle both None and
+        empty strings with distinct error messages.
+      - Regression tests (TestSchemaOverrides) verify the advertised schema actually
+        reaches the MCP wire protocol.
 """
 
 import builtins  # noqa: I001
@@ -58,8 +92,10 @@ from ..core.task_ops import (
 from ..core.validation import validate_task_file
 from ..core.yaml_parser import parse_task_file, write_task_file
 from .models import (
-    BatchTaskOperation,
+    BatchTaskOperation,  # noqa: F401 — required in module namespace for Pydantic forward-ref resolution at @mcp.tool() registration
     CompactStatusSummary,
+    CriterionIdAnnotation,
+    OperationsAnnotation,
     QualityCheckResult,
     SimpleTaskBatchResponse,
     SimpleTaskConstraintResponse,
@@ -72,6 +108,7 @@ from .models import (
     SimpleTaskQualityResponse,
     SimpleTaskWriteResponse,
     StatusSummary,
+    TaskIdAnnotation,
     ValidationResult,
     compute_compact_status_summary,
     compute_status_summary,
@@ -359,10 +396,19 @@ def new(
     )
 
 
+# DESIGN NOTE: Polymorphic dispatch — single function, action-dependent required parameters.
+# task_id is optional at the Python level (str | None) so 'add' and 'batch' can omit it, but
+# 'update', 'remove', and 'get' treat it as required and raise ValueError if absent.
+# The WithJsonSchema override on task_id advertises {type: string} to MCP clients (rather than
+# anyOf:[string,null]) so weaker models cannot infer null is a valid value for those actions.
+# Long-term alternative: split into per-action tools or use discriminated unions — rejected
+# because it would create verbose tool names (simpletask_task_update, etc.) and break clients.
+
+
 @mcp.tool()
 def task(
     action: Literal["add", "update", "remove", "get", "batch"],
-    task_id: str | None = None,
+    task_id: TaskIdAnnotation = None,
     name: str | None = None,
     goal: str | None = None,
     status: str | None = None,
@@ -371,7 +417,7 @@ def task(
     prerequisites: _list[str] | None = None,
     files: _list[FileAction] | None = None,
     code_examples: _list[CodeExample] | None = None,
-    operations: _list[BatchTaskOperation] | None = None,
+    operations: OperationsAnnotation = None,
     iteration: int | str | None = None,
     unassign_iteration: bool = False,
 ) -> SimpleTaskWriteResponse | SimpleTaskItemResponse | SimpleTaskBatchResponse:
@@ -420,8 +466,17 @@ def task(
 
     match action:
         case "get":
+            # Dual guards distinguish None (missing) from "" (empty string) for better
+            # error messages. AC8 requires empty strings to be rejected distinctly.
+            if task_id is None:
+                raise ValueError(
+                    "'task_id' is required for action='get'. "
+                    "Example: task(action='get', task_id='T001')"
+                )
             if not task_id:
-                raise ValueError("'task_id' is required for action='get'")
+                raise ValueError(
+                    "'task_id' cannot be empty. Example: task(action='get', task_id='T001')"
+                )
             spec = parse_task_file(file_path)
             task = next((t for t in spec.tasks or [] if t.id == task_id), None)
             if not task:
@@ -465,8 +520,18 @@ def task(
             )
 
         case "update":
+            # Dual guards distinguish None (missing) from "" (empty string) for better
+            # error messages. AC8 requires empty strings to be rejected distinctly.
+            if task_id is None:
+                raise ValueError(
+                    "'task_id' is required for action='update'. "
+                    "Example: task(action='update', task_id='T001', status='completed')"
+                )
             if not task_id:
-                raise ValueError("'task_id' is required for action='update'")
+                raise ValueError(
+                    "'task_id' cannot be empty. "
+                    "Example: task(action='update', task_id='T001', status='completed')"
+                )
             task_status = None
             if status:
                 try:
@@ -513,8 +578,17 @@ def task(
             )
 
         case "remove":
+            # Dual guards distinguish None (missing) from "" (empty string) for better
+            # error messages. AC8 requires empty strings to be rejected distinctly.
+            if task_id is None:
+                raise ValueError(
+                    "'task_id' is required for action='remove'. "
+                    "Example: task(action='remove', task_id='T001')"
+                )
             if not task_id:
-                raise ValueError("'task_id' is required for action='remove'")
+                raise ValueError(
+                    "'task_id' cannot be empty. Example: task(action='remove', task_id='T001')"
+                )
             spec = remove_implementation_task(file_path, task_id)
             summary = compute_compact_status_summary(spec)
             return SimpleTaskWriteResponse(
@@ -527,8 +601,16 @@ def task(
             )
 
         case "batch":
+            if operations is None:
+                raise ValueError(
+                    "'operations' is required for action='batch'. Example: task(action='batch', "
+                    'operations=[{"action": "update", "task_id": "T001", "status": "completed"}])'
+                )
             if not operations:
-                raise ValueError("'operations' is required for action='batch'")
+                raise ValueError(
+                    "'operations' cannot be empty for action='batch'. Example: task(action='batch', "
+                    'operations=[{"action": "update", "task_id": "T001", "status": "completed"}])'
+                )
             # FastMCP deserializes list[BatchTaskOperation] automatically; operations are
             # already validated BatchTaskOperation instances at this point.
             # Execute batch operations atomically; returns (new_ids, updated spec)
@@ -544,10 +626,16 @@ def task(
             )
 
 
+# DESIGN NOTE: Same polymorphic dispatch pattern as task() above.
+# criterion_id is optional at the Python level so 'add' can omit it, but 'complete', 'remove',
+# 'get', and 'update' require it. WithJsonSchema advertises {type: string} to prevent models
+# from passing null for those actions.
+
+
 @mcp.tool()
 def criteria(
     action: Literal["add", "complete", "remove", "get", "update"],
-    criterion_id: str | None = None,
+    criterion_id: CriterionIdAnnotation = None,
     description: str | None = None,
     completed: bool = True,
 ) -> SimpleTaskWriteResponse | SimpleTaskItemResponse:
@@ -572,8 +660,18 @@ def criteria(
 
     match action:
         case "get":
+            # Dual guards distinguish None (missing) from "" (empty string) for better
+            # error messages. AC8 requires empty strings to be rejected distinctly.
+            if criterion_id is None:
+                raise ValueError(
+                    "'criterion_id' is required for action='get'. "
+                    "Example: criteria(action='get', criterion_id='AC1')"
+                )
             if not criterion_id:
-                raise ValueError("'criterion_id' is required for action='get'")
+                raise ValueError(
+                    "'criterion_id' cannot be empty. "
+                    "Example: criteria(action='get', criterion_id='AC1')"
+                )
             spec = parse_task_file(file_path)
             criterion = next((c for c in spec.acceptance_criteria if c.id == criterion_id), None)
             if not criterion:
@@ -605,8 +703,18 @@ def criteria(
             )
 
         case "complete":
+            # Dual guards distinguish None (missing) from "" (empty string) for better
+            # error messages. AC8 requires empty strings to be rejected distinctly.
+            if criterion_id is None:
+                raise ValueError(
+                    "'criterion_id' is required for action='complete'. "
+                    "Example: criteria(action='complete', criterion_id='AC1', completed=True)"
+                )
             if not criterion_id:
-                raise ValueError("'criterion_id' is required for action='complete'")
+                raise ValueError(
+                    "'criterion_id' cannot be empty. "
+                    "Example: criteria(action='complete', criterion_id='AC1', completed=True)"
+                )
             spec = mark_criterion_complete(file_path, criterion_id, completed)
             summary = compute_compact_status_summary(spec)
             status_word = "completed" if completed else "incomplete"
@@ -620,8 +728,18 @@ def criteria(
             )
 
         case "remove":
+            # Dual guards distinguish None (missing) from "" (empty string) for better
+            # error messages. AC8 requires empty strings to be rejected distinctly.
+            if criterion_id is None:
+                raise ValueError(
+                    "'criterion_id' is required for action='remove'. "
+                    "Example: criteria(action='remove', criterion_id='AC1')"
+                )
             if not criterion_id:
-                raise ValueError("'criterion_id' is required for action='remove'")
+                raise ValueError(
+                    "'criterion_id' cannot be empty. "
+                    "Example: criteria(action='remove', criterion_id='AC1')"
+                )
             spec = remove_acceptance_criterion(file_path, criterion_id)
             summary = compute_compact_status_summary(spec)
             return SimpleTaskWriteResponse(
@@ -634,8 +752,18 @@ def criteria(
             )
 
         case "update":
+            # Dual guards distinguish None (missing) from "" (empty string) for better
+            # error messages. AC8 requires empty strings to be rejected distinctly.
+            if criterion_id is None:
+                raise ValueError(
+                    "'criterion_id' is required for action='update'. "
+                    "Example: criteria(action='update', criterion_id='AC1', description='New description')"
+                )
             if not criterion_id:
-                raise ValueError("'criterion_id' is required for action='update'")
+                raise ValueError(
+                    "'criterion_id' cannot be empty. "
+                    "Example: criteria(action='update', criterion_id='AC1', description='New description')"
+                )
             if not description:
                 raise ValueError("'description' is required for action='update'")
             spec = update_acceptance_criterion(file_path, criterion_id, description)
