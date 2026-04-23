@@ -14,6 +14,7 @@ from simpletask.core.models import (
 )
 from simpletask.core.quality_ops import run_quality_checks
 from simpletask.core.yaml_parser import InvalidTaskFileError
+from simpletask.mcp.server import criteria as criteria_tool
 from simpletask.mcp.server import get, iteration, list, quality, task
 
 
@@ -250,7 +251,12 @@ class TestMCPServerRegistration:
 
 
 class TestMCPIterationTool:
-    """Tests for the iteration MCP tool."""
+    """Tests for the iteration MCP tool and quality() filter flags.
+
+    This class covers:
+    - Iteration management (list, add, get, remove)
+    - Quality check filter flags (lint_only, test_only, type_only, security_only)
+    """
 
     def test_list_returns_empty_when_no_iterations(self, tmp_project_with_task):
         """Test listing iterations when none exist returns empty list."""
@@ -363,6 +369,23 @@ class TestMCPIterationTool:
         t001 = next(t for t in get_result.spec.tasks if t.id == "T001")
         assert unassign_result.success is True
         assert unassign_result.action == "task_updated"
+        assert t001.iteration is None
+
+    def test_task_batch_update_unassigns_iteration_with_null(self, tmp_project_with_task):
+        """Test that batch update can unassign a task from an iteration via iteration=None."""
+        _project_root, task_file = tmp_project_with_task
+        with patch("simpletask.mcp.server.get_current_task_file_path", return_value=task_file):
+            add_result = iteration(action="add", label="Sprint 1")
+            new_id = int(add_result.new_item_ids[0])
+            task(action="update", task_id="T001", iteration=new_id)
+            batch_result = task(
+                action="batch",
+                operations=[{"action": "update", "task_id": "T001", "iteration": None}],
+            )
+            get_result = get()
+        t001 = next(t for t in get_result.spec.tasks if t.id == "T001")
+        assert batch_result.success is True
+        assert batch_result.action == "batch_tasks_applied"
         assert t001.iteration is None
 
     def test_task_update_omitting_iteration_preserves_existing(self, tmp_project_with_task):
@@ -487,8 +510,6 @@ class TestMCPIterationTool:
         with patch("simpletask.mcp.server.get_current_task_file_path", return_value=task_file):
             with pytest.raises(ValueError, match="iteration"):
                 task(action="update", task_id="T001", iteration="not-a-number")
-
-    """Tests for quality() MCP tool filter flags."""
 
     def _make_mock_spec(self, tmp_project_with_task):
         """Return (task_file, mock_spec) with a non-None quality_requirements."""
@@ -942,3 +963,417 @@ class TestRunQualityChecksMutualExclusivity:
             result = run_quality_checks(reqs, **{flag_name: True})
             getattr(mock_checker, checker_method).assert_called_once()
             assert result == ([], True)
+
+
+class TestSchemaOverrides:
+    """Tests that WithJsonSchema overrides reach the FastMCP wire schema."""
+
+    def _get_wire_tool_schema(self, tool_name: str, mcp_tools_list) -> dict:
+        """Return the inputSchema dict advertised by FastMCP for a named tool.
+
+        Args:
+            tool_name: Name of the tool to look up
+            mcp_tools_list: Fixture providing cached FastMCP tools list
+
+        Returns:
+            The inputSchema dict for the tool
+        """
+        tool = next((t for t in mcp_tools_list if t.name == tool_name), None)
+        assert tool is not None, f"Tool '{tool_name}' not found in mcp.list_tools()"
+        return tool.inputSchema
+
+    def test_task_id_wire_schema_is_string_not_nullable(self, mcp_tools_list):
+        """Verify FastMCP advertises task_id as {type: string} (no anyOf) on the wire."""
+        schema = self._get_wire_tool_schema("task", mcp_tools_list)
+        task_id_schema = schema.get("properties", {}).get("task_id", {})
+        assert task_id_schema.get("type") == "string", (
+            f"task_id schema should be {{type: string}}, got: {task_id_schema}"
+        )
+        assert "anyOf" not in task_id_schema, (
+            f"task_id schema must not contain anyOf; got: {task_id_schema}"
+        )
+
+    def test_criterion_id_wire_schema_is_string_not_nullable(self, mcp_tools_list):
+        """Verify FastMCP advertises criterion_id as {type: string} (no anyOf) on the wire."""
+        schema = self._get_wire_tool_schema("criteria", mcp_tools_list)
+        criterion_id_schema = schema.get("properties", {}).get("criterion_id", {})
+        assert criterion_id_schema.get("type") == "string", (
+            f"criterion_id schema should be {{type: string}}, got: {criterion_id_schema}"
+        )
+        assert "anyOf" not in criterion_id_schema, (
+            f"criterion_id schema must not contain anyOf; got: {criterion_id_schema}"
+        )
+
+    def test_batch_task_operation_task_id_schema_is_string_not_nullable(self):
+        """Verify BatchTaskOperation.task_id schema is {type: string} not anyOf."""
+        from simpletask.mcp.models import BatchTaskOperation
+
+        schema = BatchTaskOperation.model_json_schema()
+        task_id_schema = schema["properties"]["task_id"]
+
+        # Should be {type: string} not {anyOf: [...]}
+        assert task_id_schema.get("type") == "string"
+        assert "anyOf" not in task_id_schema
+
+    def test_operations_wire_schema_has_items(self, mcp_tools_list):
+        """Verify FastMCP advertises operations as {type: array, items: ...} with structure."""
+        schema = self._get_wire_tool_schema("task", mcp_tools_list)
+        operations_schema = schema.get("properties", {}).get("operations", {})
+
+        # Should have type: array
+        assert operations_schema.get("type") == "array", (
+            f"operations schema should be {{type: array}}, got: {operations_schema}"
+        )
+
+        # Should have items subschema describing BatchTaskOperation structure
+        assert "items" in operations_schema, (
+            f"operations schema must have items subschema; got: {operations_schema}"
+        )
+
+        # Items should have BatchTaskOperation properties
+        items_schema = operations_schema.get("items", {})
+        assert "properties" in items_schema or "type" in items_schema, (
+            f"operations items must define structure; got: {items_schema}"
+        )
+        assert operations_schema.get("minItems") == 1, (
+            f"operations schema should require at least one item; got: {operations_schema}"
+        )
+
+
+class TestTaskErrorMessages:
+    """Tests that task() error messages include concrete examples."""
+
+    def test_task_get_error_has_example(self, tmp_project_with_task):
+        """Verify task get action error includes Example call."""
+        _project_root, task_file = tmp_project_with_task
+
+        with patch("simpletask.mcp.server.get_current_task_file_path") as mock_path:
+            mock_path.return_value = task_file
+
+            with pytest.raises(ValueError) as exc_info:
+                task(action="get")  # type: ignore
+
+            error_msg = str(exc_info.value)
+            assert "Example:" in error_msg
+            assert "task(action='get', task_id='T001')" in error_msg
+
+    def test_task_update_error_has_example(self, tmp_project_with_task):
+        """Verify task update action error includes Example call."""
+        _project_root, task_file = tmp_project_with_task
+
+        with patch("simpletask.mcp.server.get_current_task_file_path") as mock_path:
+            mock_path.return_value = task_file
+
+            with pytest.raises(ValueError) as exc_info:
+                task(action="update")  # type: ignore
+
+            error_msg = str(exc_info.value)
+            assert "Example:" in error_msg
+            assert "task(action='update', task_id='T001'" in error_msg
+
+    def test_task_remove_error_has_example(self, tmp_project_with_task):
+        """Verify task remove action error includes Example call."""
+        _project_root, task_file = tmp_project_with_task
+
+        with patch("simpletask.mcp.server.get_current_task_file_path") as mock_path:
+            mock_path.return_value = task_file
+
+            with pytest.raises(ValueError) as exc_info:
+                task(action="remove")  # type: ignore
+
+            error_msg = str(exc_info.value)
+            assert "Example:" in error_msg
+            assert "task(action='remove', task_id='T001')" in error_msg
+
+    def test_task_get_error_with_empty_string(self, tmp_project_with_task):
+        """Verify task get action rejects empty-string task_id with Example message."""
+        _project_root, task_file = tmp_project_with_task
+
+        with patch("simpletask.mcp.server.get_current_task_file_path") as mock_path:
+            mock_path.return_value = task_file
+
+            with pytest.raises(ValueError) as exc_info:
+                task(action="get", task_id="")  # type: ignore
+
+            error_msg = str(exc_info.value)
+            assert "Example:" in error_msg
+            assert "task(action='get', task_id='T001')" in error_msg
+            assert "cannot be empty" in error_msg
+
+    def test_task_update_error_with_empty_string(self, tmp_project_with_task):
+        """Verify task update action rejects empty-string task_id with Example message."""
+        _project_root, task_file = tmp_project_with_task
+
+        with patch("simpletask.mcp.server.get_current_task_file_path") as mock_path:
+            mock_path.return_value = task_file
+
+            with pytest.raises(ValueError) as exc_info:
+                task(action="update", task_id="")  # type: ignore
+
+            error_msg = str(exc_info.value)
+            assert "Example:" in error_msg
+            assert "task(action='update', task_id='T001'" in error_msg
+            assert "cannot be empty" in error_msg
+
+    def test_task_remove_error_with_empty_string(self, tmp_project_with_task):
+        """Verify task remove action rejects empty-string task_id with Example message."""
+        _project_root, task_file = tmp_project_with_task
+
+        with patch("simpletask.mcp.server.get_current_task_file_path") as mock_path:
+            mock_path.return_value = task_file
+
+            with pytest.raises(ValueError) as exc_info:
+                task(action="remove", task_id="")  # type: ignore
+
+            error_msg = str(exc_info.value)
+            assert "Example:" in error_msg
+            assert "task(action='remove', task_id='T001')" in error_msg
+            assert "cannot be empty" in error_msg
+
+    def test_task_batch_error_has_example(self, tmp_project_with_task):
+        """Verify task batch action error includes Example call."""
+        _project_root, task_file = tmp_project_with_task
+
+        with patch("simpletask.mcp.server.get_current_task_file_path") as mock_path:
+            mock_path.return_value = task_file
+
+            with pytest.raises(ValueError) as exc_info:
+                task(action="batch")  # type: ignore
+
+            error_msg = str(exc_info.value)
+            assert "Example:" in error_msg
+            assert "task(action='batch', operations=" in error_msg
+            assert "'operations' is required" in error_msg
+
+    def test_task_batch_error_with_empty_operations(self, tmp_project_with_task):
+        """Verify task batch action rejects empty operations list with Example message."""
+        _project_root, task_file = tmp_project_with_task
+
+        with patch("simpletask.mcp.server.get_current_task_file_path") as mock_path:
+            mock_path.return_value = task_file
+
+            with pytest.raises(ValueError) as exc_info:
+                task(action="batch", operations=[])
+
+            error_msg = str(exc_info.value)
+            assert "Example:" in error_msg
+            assert "task(action='batch', operations=" in error_msg
+            assert "cannot be empty" in error_msg
+
+    def test_task_get_error_with_explicit_none(self, tmp_project_with_task):
+        """Verify task get action with explicit None rejects with Example message."""
+        _project_root, task_file = tmp_project_with_task
+
+        with patch("simpletask.mcp.server.get_current_task_file_path") as mock_path:
+            mock_path.return_value = task_file
+
+            with pytest.raises(ValueError) as exc_info:
+                task(action="get", task_id=None)  # type: ignore
+
+            error_msg = str(exc_info.value)
+            assert "Example:" in error_msg
+            assert "task(action='get', task_id='T001')" in error_msg
+
+    def test_task_update_error_with_explicit_none(self, tmp_project_with_task):
+        """Verify task update action with explicit None rejects with Example message."""
+        _project_root, task_file = tmp_project_with_task
+
+        with patch("simpletask.mcp.server.get_current_task_file_path") as mock_path:
+            mock_path.return_value = task_file
+
+            with pytest.raises(ValueError) as exc_info:
+                task(action="update", task_id=None)  # type: ignore
+
+            error_msg = str(exc_info.value)
+            assert "Example:" in error_msg
+            assert "task(action='update', task_id='T001'" in error_msg
+
+    def test_task_remove_error_with_explicit_none(self, tmp_project_with_task):
+        """Verify task remove action with explicit None rejects with Example message."""
+        _project_root, task_file = tmp_project_with_task
+
+        with patch("simpletask.mcp.server.get_current_task_file_path") as mock_path:
+            mock_path.return_value = task_file
+
+            with pytest.raises(ValueError) as exc_info:
+                task(action="remove", task_id=None)  # type: ignore
+
+            error_msg = str(exc_info.value)
+            assert "Example:" in error_msg
+            assert "task(action='remove', task_id='T001')" in error_msg
+
+
+class TestCriteriaErrorMessages:
+    """Tests that criteria() error messages include concrete examples."""
+
+    def test_criteria_get_error_has_example(self, tmp_project_with_task):
+        """Verify criteria get action error includes Example call."""
+        _project_root, task_file = tmp_project_with_task
+
+        with patch("simpletask.mcp.server.get_current_task_file_path") as mock_path:
+            mock_path.return_value = task_file
+
+            with pytest.raises(ValueError) as exc_info:
+                criteria_tool(action="get")  # type: ignore
+
+            error_msg = str(exc_info.value)
+            assert "Example:" in error_msg
+            assert "criteria(action='get', criterion_id='AC1')" in error_msg
+
+    def test_criteria_complete_error_has_example(self, tmp_project_with_task):
+        """Verify criteria complete action error includes Example call."""
+        _project_root, task_file = tmp_project_with_task
+
+        with patch("simpletask.mcp.server.get_current_task_file_path") as mock_path:
+            mock_path.return_value = task_file
+
+            with pytest.raises(ValueError) as exc_info:
+                criteria_tool(action="complete")  # type: ignore
+
+            error_msg = str(exc_info.value)
+            assert "Example:" in error_msg
+            assert "criteria(action='complete'" in error_msg
+
+    def test_criteria_remove_error_has_example(self, tmp_project_with_task):
+        """Verify criteria remove action error includes Example call."""
+        _project_root, task_file = tmp_project_with_task
+
+        with patch("simpletask.mcp.server.get_current_task_file_path") as mock_path:
+            mock_path.return_value = task_file
+
+            with pytest.raises(ValueError) as exc_info:
+                criteria_tool(action="remove")  # type: ignore
+
+            error_msg = str(exc_info.value)
+            assert "Example:" in error_msg
+            assert "criteria(action='remove', criterion_id='AC1')" in error_msg
+
+    def test_criteria_update_error_has_example(self, tmp_project_with_task):
+        """Verify criteria update action error includes Example call."""
+        _project_root, task_file = tmp_project_with_task
+
+        with patch("simpletask.mcp.server.get_current_task_file_path") as mock_path:
+            mock_path.return_value = task_file
+
+            with pytest.raises(ValueError) as exc_info:
+                criteria_tool(action="update")  # type: ignore
+
+            error_msg = str(exc_info.value)
+            assert "Example:" in error_msg
+            assert "criteria(action='update', criterion_id='AC1'" in error_msg
+
+    def test_criteria_get_error_with_empty_string(self, tmp_project_with_task):
+        """Verify criteria get action rejects empty-string criterion_id with Example message."""
+        _project_root, task_file = tmp_project_with_task
+
+        with patch("simpletask.mcp.server.get_current_task_file_path") as mock_path:
+            mock_path.return_value = task_file
+
+            with pytest.raises(ValueError) as exc_info:
+                criteria_tool(action="get", criterion_id="")  # type: ignore
+
+            error_msg = str(exc_info.value)
+            assert "Example:" in error_msg
+            assert "criteria(action='get', criterion_id='AC1')" in error_msg
+            assert "cannot be empty" in error_msg
+
+    def test_criteria_complete_error_with_empty_string(self, tmp_project_with_task):
+        """Verify criteria complete action rejects empty-string criterion_id with Example message."""
+        _project_root, task_file = tmp_project_with_task
+
+        with patch("simpletask.mcp.server.get_current_task_file_path") as mock_path:
+            mock_path.return_value = task_file
+
+            with pytest.raises(ValueError) as exc_info:
+                criteria_tool(action="complete", criterion_id="")  # type: ignore
+
+            error_msg = str(exc_info.value)
+            assert "Example:" in error_msg
+            assert "criteria(action='complete'" in error_msg
+            assert "cannot be empty" in error_msg
+
+    def test_criteria_remove_error_with_empty_string(self, tmp_project_with_task):
+        """Verify criteria remove action rejects empty-string criterion_id with Example message."""
+        _project_root, task_file = tmp_project_with_task
+
+        with patch("simpletask.mcp.server.get_current_task_file_path") as mock_path:
+            mock_path.return_value = task_file
+
+            with pytest.raises(ValueError) as exc_info:
+                criteria_tool(action="remove", criterion_id="")  # type: ignore
+
+            error_msg = str(exc_info.value)
+            assert "Example:" in error_msg
+            assert "criteria(action='remove', criterion_id='AC1')" in error_msg
+            assert "cannot be empty" in error_msg
+
+    def test_criteria_update_error_with_empty_string(self, tmp_project_with_task):
+        """Verify criteria update action rejects empty-string criterion_id with Example message."""
+        _project_root, task_file = tmp_project_with_task
+
+        with patch("simpletask.mcp.server.get_current_task_file_path") as mock_path:
+            mock_path.return_value = task_file
+
+            with pytest.raises(ValueError) as exc_info:
+                criteria_tool(action="update", criterion_id="")  # type: ignore
+
+            error_msg = str(exc_info.value)
+            assert "Example:" in error_msg
+            assert "criteria(action='update', criterion_id='AC1'" in error_msg
+            assert "cannot be empty" in error_msg
+
+    def test_criteria_get_error_with_explicit_none(self, tmp_project_with_task):
+        """Verify criteria get action with explicit None rejects with Example message."""
+        _project_root, task_file = tmp_project_with_task
+
+        with patch("simpletask.mcp.server.get_current_task_file_path") as mock_path:
+            mock_path.return_value = task_file
+
+            with pytest.raises(ValueError) as exc_info:
+                criteria_tool(action="get", criterion_id=None)  # type: ignore
+
+            error_msg = str(exc_info.value)
+            assert "Example:" in error_msg
+            assert "criteria(action='get', criterion_id='AC1')" in error_msg
+
+    def test_criteria_complete_error_with_explicit_none(self, tmp_project_with_task):
+        """Verify criteria complete action with explicit None rejects with Example message."""
+        _project_root, task_file = tmp_project_with_task
+
+        with patch("simpletask.mcp.server.get_current_task_file_path") as mock_path:
+            mock_path.return_value = task_file
+
+            with pytest.raises(ValueError) as exc_info:
+                criteria_tool(action="complete", criterion_id=None)  # type: ignore
+
+            error_msg = str(exc_info.value)
+            assert "Example:" in error_msg
+            assert "criteria(action='complete'" in error_msg
+
+    def test_criteria_remove_error_with_explicit_none(self, tmp_project_with_task):
+        """Verify criteria remove action with explicit None rejects with Example message."""
+        _project_root, task_file = tmp_project_with_task
+
+        with patch("simpletask.mcp.server.get_current_task_file_path") as mock_path:
+            mock_path.return_value = task_file
+
+            with pytest.raises(ValueError) as exc_info:
+                criteria_tool(action="remove", criterion_id=None)  # type: ignore
+
+            error_msg = str(exc_info.value)
+            assert "Example:" in error_msg
+            assert "criteria(action='remove', criterion_id='AC1')" in error_msg
+
+    def test_criteria_update_error_with_explicit_none(self, tmp_project_with_task):
+        """Verify criteria update action with explicit None rejects with Example message."""
+        _project_root, task_file = tmp_project_with_task
+
+        with patch("simpletask.mcp.server.get_current_task_file_path") as mock_path:
+            mock_path.return_value = task_file
+
+            with pytest.raises(ValueError) as exc_info:
+                criteria_tool(action="update", criterion_id=None)  # type: ignore
+
+            error_msg = str(exc_info.value)
+            assert "Example:" in error_msg
+            assert "criteria(action='update', criterion_id='AC1'" in error_msg

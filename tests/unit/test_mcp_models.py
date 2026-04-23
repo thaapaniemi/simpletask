@@ -256,6 +256,15 @@ class TestBatchTaskOperation:
                 goal="Task goal",
             )
 
+    def test_add_operation_empty_name_raises(self):
+        """Test add operation with empty string name raises ValidationError."""
+        with pytest.raises(ValidationError, match="name cannot be empty for add operation"):
+            BatchTaskOperation(
+                action="add",
+                name="",
+                goal="Task goal",
+            )
+
     def test_remove_operation_valid(self):
         """Test valid remove operation with required task_id."""
         op = BatchTaskOperation(
@@ -270,6 +279,11 @@ class TestBatchTaskOperation:
         """Test remove operation without task_id raises ValidationError."""
         with pytest.raises(ValidationError, match="task_id is required for remove operation"):
             BatchTaskOperation(action="remove")
+
+    def test_remove_operation_empty_task_id_raises(self):
+        """Test remove operation with empty string task_id raises ValidationError."""
+        with pytest.raises(ValidationError, match="task_id cannot be empty for remove operation"):
+            BatchTaskOperation(action="remove", task_id="")
 
     def test_update_operation_valid(self):
         """Test valid update operation with required task_id."""
@@ -289,6 +303,15 @@ class TestBatchTaskOperation:
         with pytest.raises(ValidationError, match="task_id is required for update operation"):
             BatchTaskOperation(
                 action="update",
+                status="completed",
+            )
+
+    def test_update_operation_empty_task_id_raises(self):
+        """Test update operation with empty string task_id raises ValidationError."""
+        with pytest.raises(ValidationError, match="task_id cannot be empty for update operation"):
+            BatchTaskOperation(
+                action="update",
+                task_id="",
                 status="completed",
             )
 
