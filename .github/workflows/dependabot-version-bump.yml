@@ -1,0 +1,183 @@
+name: Dependabot Version Bump
+
+on:
+  pull_request_target:
+    branches: [main]
+    types: [closed]
+
+concurrency:
+  group: dependabot-version-bump
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  bump-version:
+    name: Bump Version After Dependabot Merge
+    if: >
+      github.event.pull_request.merged == true &&
+      github.event.pull_request.user.login == 'dependabot[bot]' &&
+      startsWith(github.event.pull_request.head.ref, 'dependabot/pip/')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check release bot token
+        env:
+          RELEASE_BOT_TOKEN: ${{ secrets.RELEASE_BOT_TOKEN }}
+        run: |
+          if [ -z "$RELEASE_BOT_TOKEN" ]; then
+            echo "::error::RELEASE_BOT_TOKEN is required. Use a PAT or app token instead of GITHUB_TOKEN so the follow-up push triggers CI and release workflows."
+            exit 1
+          fi
+
+      # Use a non-GITHUB_TOKEN credential here. Pushes made with GITHUB_TOKEN do not
+      # trigger downstream push/workflow_run workflows, which would break CI -> Release.
+      - name: Checkout main
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.base.ref }}
+          fetch-depth: 0
+          token: ${{ secrets.RELEASE_BOT_TOKEN }}
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Sync main
+        run: git pull --ff-only origin "${{ github.event.pull_request.base.ref }}"
+
+      - name: Check for existing version bump
+        id: existing-bump
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          existing_bump_commit=$(git log \
+            --format=%H \
+            --grep="^chore(release): bump version after dependabot merge (#${PR_NUMBER})$" \
+            -n 1 \
+            HEAD)
+
+          if [ -n "$existing_bump_commit" ]; then
+            echo "already_bumped=true" >> "$GITHUB_OUTPUT"
+            echo "Version bump already exists for PR #${PR_NUMBER} in commit ${existing_bump_commit}; skipping rerun."
+          else
+            echo "already_bumped=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Skip duplicate bump
+        if: steps.existing-bump.outputs.already_bumped == 'true'
+        run: |
+          echo "This Dependabot PR already triggered a version bump."
+
+      - name: Validate current version
+        if: steps.existing-bump.outputs.already_bumped != 'true'
+        run: |
+          VERSION=$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")
+          INIT_VERSION=$(python3 - <<'PY'
+          import ast
+          import pathlib
+          import sys
+
+          tree = ast.parse(pathlib.Path("cli/simpletask/__init__.py").read_text())
+          version = None
+          for node in ast.walk(tree):
+              if isinstance(node, ast.Assign):
+                  for target in node.targets:
+                      if isinstance(target, ast.Name) and target.id == "__version__":
+                          version = ast.literal_eval(node.value)
+                          break
+              elif (
+                  isinstance(node, ast.AnnAssign)
+                  and isinstance(node.target, ast.Name)
+                  and node.target.id == "__version__"
+                  and node.value
+              ):
+                  version = ast.literal_eval(node.value)
+
+              if version is not None:
+                  break
+
+          if version is None:
+              sys.exit(1)
+
+          print(version)
+          PY
+          )
+          if [ "$VERSION" != "$INIT_VERSION" ]; then
+            echo "::error::Version mismatch before bump: pyproject.toml has '$VERSION' but __init__.py has '$INIT_VERSION'"
+            exit 1
+          fi
+
+      - name: Bump patch version
+        if: steps.existing-bump.outputs.already_bumped != 'true'
+        run: |
+          python3 - <<'PY'
+          import pathlib
+          import re
+          import tomllib
+
+          pyproject_path = pathlib.Path("pyproject.toml")
+          init_path = pathlib.Path("cli/simpletask/__init__.py")
+
+          pyproject_text = pyproject_path.read_text()
+          init_text = init_path.read_text()
+
+          current_version = tomllib.loads(pyproject_text)["project"]["version"]
+          init_match = re.search(r'^__version__\s*=\s*"([^"]+)"\s*$', init_text, re.MULTILINE)
+          if init_match is None:
+              raise SystemExit("Could not find __version__ in cli/simpletask/__init__.py")
+
+          init_version = init_match.group(1)
+          if current_version != init_version:
+              raise SystemExit(
+                  "Version mismatch before bump: "
+                  f"pyproject.toml has '{current_version}' but __init__.py has '{init_version}'"
+              )
+
+          parts = current_version.split(".")
+          if len(parts) != 3 or not all(part.isdigit() for part in parts):
+              raise SystemExit(f"Expected semantic version x.y.z, got '{current_version}'")
+
+          major, minor, patch = map(int, parts)
+          new_version = f"{major}.{minor}.{patch + 1}"
+
+          pyproject_text, pyproject_count = re.subn(
+              r'(?m)^version = "[^"]+"$',
+              f'version = "{new_version}"',
+              pyproject_text,
+              count=1,
+          )
+          if pyproject_count != 1:
+              raise SystemExit("Could not update version in pyproject.toml")
+
+          init_text, init_count = re.subn(
+              r'(?m)^__version__\s*=\s*"[^"]+"$',
+              f'__version__ = "{new_version}"',
+              init_text,
+              count=1,
+          )
+          if init_count != 1:
+              raise SystemExit("Could not update version in cli/simpletask/__init__.py")
+
+          pyproject_path.write_text(pyproject_text)
+          init_path.write_text(init_text)
+
+          print(f"Bumped version: {current_version} -> {new_version}")
+          PY
+
+      - name: Commit version bump
+        if: steps.existing-bump.outputs.already_bumped != 'true'
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pyproject.toml cli/simpletask/__init__.py
+          git commit -m "chore(release): bump version after dependabot merge (#${PR_NUMBER})"
+          git push origin HEAD:${{ github.event.pull_request.base.ref }} || {
+            echo "::error::Push failed. If '${{ github.event.pull_request.base.ref }}' is protected, the actor behind RELEASE_BOT_TOKEN must be allowed to push to it or bypass branch protection."
+            exit 1
+          }
