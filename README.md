@@ -291,6 +291,19 @@ This installs hooks that:
 - Require [Conventional Commits](https://conventionalcommits.org/) format
 - Run tests before push
 
+### Dependabot Version Bumps
+
+Merged Dependabot `pip` pull requests are followed by an automated patch version bump on `main`.
+The workflow updates both `pyproject.toml` and `cli/simpletask/__init__.py`, then pushes the
+follow-up commit so the normal CI and release workflows can run. Rerunning the workflow for the
+same PR is safe: it detects the existing bump commit and exits without creating another release.
+
+This automation requires a repository secret named `RELEASE_BOT_TOKEN`. Do not use
+`GITHUB_TOKEN` for this workflow, because pushes made with `GITHUB_TOKEN` do not trigger the
+downstream CI and release workflows. The token must have permission to push to `main`; if `main`
+is protected, the user or app behind `RELEASE_BOT_TOKEN` must also be allowed to push to that
+branch or bypass its branch protection rules.
+
 ### Run tests
 
 ```sh
