@@ -1,5 +1,7 @@
 """Update implementation task command."""
 
+from typing import Annotated
+
 import typer
 
 from simpletask.commands.task.helpers import _parse_file_actions
@@ -8,6 +10,27 @@ from simpletask.core.project import get_task_file_path
 from simpletask.core.task_ops import _UNSET, _UnsetType, update_implementation_task
 from simpletask.core.yaml_parser import InvalidTaskFileError
 from simpletask.utils.console import handle_exception, success
+from simpletask.utils.output import (
+    OutputFormat,
+    build_write_response,
+    json_error,
+    json_success,
+    resolve_format,
+)
+
+
+def _print_json_task_update(task_id: str, action: str, file_path: str, spec) -> None:
+    """Print task update result as JSON.
+
+    Args:
+        task_id: The updated task ID
+        action: The action performed (e.g., 'task_updated')
+        file_path: Path to the task file
+        spec: The updated task spec
+    """
+    json_success(
+        build_write_response(action, f"Updated task {task_id}", spec, file_path, task_id=task_id)
+    )
 
 
 def update_command(
@@ -46,6 +69,10 @@ def update_command(
         "--unassign-iteration",
         help="Remove task from its current iteration",
     ),
+    format: Annotated[
+        OutputFormat,
+        typer.Option("--format", "-f", help="Output format (rich, plain, json)"),
+    ] = OutputFormat.RICH,
     branch: str | None = typer.Option(
         None, "--branch", "-b", help="Branch name (defaults to current git branch)"
     ),
@@ -69,6 +96,9 @@ def update_command(
         InvalidTaskFileError: If task file is malformed and cannot be parsed
     """
     try:
+        # Resolve format
+        format = resolve_format(format)
+
         # Convert status string to enum if provided
         task_status = None
         if status is not None:
@@ -101,7 +131,7 @@ def update_command(
         file_actions = _parse_file_actions(file) if file else None
 
         file_path = get_task_file_path(branch)
-        update_implementation_task(
+        spec = update_implementation_task(
             file_path,
             task_id,
             name=name,
@@ -114,7 +144,15 @@ def update_command(
             iteration=iteration_value,
         )
 
-        success(f"Updated task {task_id}")
+        # Output results based on format
+        if format == OutputFormat.JSON:
+            _print_json_task_update(task_id, "task_updated", str(file_path), spec)
+        else:
+            success(f"Updated task {task_id}")
 
     except (ValueError, FileNotFoundError, InvalidTaskFileError) as e:
-        handle_exception(e, "updating task")
+        if format == OutputFormat.JSON:
+            json_error(str(e))
+        else:
+            handle_exception(e, "updating task")
+        raise typer.Exit(1) from None

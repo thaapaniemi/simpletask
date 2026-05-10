@@ -1,11 +1,14 @@
 """List implementation tasks command."""
 
+from typing import Annotated
+
 import typer
 
 from simpletask.core.models import Task, TaskStatus
-from simpletask.core.project import get_task_file_path
+from simpletask.core.project import ensure_project, get_task_file_path
 from simpletask.core.yaml_parser import InvalidTaskFileError, parse_task_file
 from simpletask.utils.console import console, error
+from simpletask.utils.output import OutputFormat, json_error, json_success, resolve_format
 
 
 def _get_status_icon(status: TaskStatus) -> str:
@@ -41,6 +44,32 @@ def _print_task_line(task: Task, iter_label: str | None = None, indent: bool = T
     console.print(line)
 
 
+def _print_json_task_list(tasks: list[Task], file_path: str, total_count: int) -> None:
+    """Print tasks as JSON.
+
+    Args:
+        tasks: List of tasks to print
+        file_path: Path to the task file
+        total_count: Total count of tasks in file
+    """
+    output = {
+        "file_path": file_path,
+        "tasks": [
+            {
+                "id": t.id,
+                "name": t.name,
+                "status": t.status.value,
+                "goal": t.goal,
+                "iteration": t.iteration,
+            }
+            for t in tasks
+        ],
+        "returned": len(tasks),
+        "total": total_count,
+    }
+    json_success(output)
+
+
 def list_command(
     status: str | None = typer.Option(
         None,
@@ -59,6 +88,10 @@ def list_command(
         "--flat",
         help="Display flat list without iteration grouping",
     ),
+    format: Annotated[
+        OutputFormat,
+        typer.Option("--format", "-f", help="Output format (rich, plain, json)"),
+    ] = OutputFormat.RICH,
     branch: str | None = typer.Option(
         None, "--branch", "-b", help="Branch name (defaults to current git branch)"
     ),
@@ -77,13 +110,19 @@ def list_command(
     """
     try:
         # Get file path
+        project = ensure_project()
         file_path = get_task_file_path(branch)
+        relative_path = file_path.relative_to(project.root)
 
         # Parse task file
         spec = parse_task_file(file_path)
 
+        # Resolve format
+        format = resolve_format(format)
+
         # Get tasks
         tasks = spec.tasks or []
+        total_count = len(tasks)
 
         # Apply status filter if provided
         if status:
@@ -91,18 +130,29 @@ def list_command(
                 status_enum = TaskStatus(status)
                 tasks = [t for t in tasks if t.status == status_enum]
             except ValueError:
-                error(
-                    f"Invalid status: {status}. Valid values: not_started, in_progress, completed, blocked, paused"
-                )
-                return
+                msg = f"Invalid status: {status}. Valid values: not_started, in_progress, completed, blocked, paused"
+                if format == OutputFormat.JSON:
+                    json_error(msg)
+                else:
+                    error(msg)
+                raise typer.Exit(1) from None
 
         # Apply iteration filter if provided
         if iteration is not None:
             valid_iter_ids = {it.id for it in (spec.iterations or [])}
             if iteration not in valid_iter_ids:
-                error(f"Iteration {iteration} not found. Valid IDs: {sorted(valid_iter_ids)}")
+                msg = f"Iteration {iteration} not found. Valid IDs: {sorted(valid_iter_ids)}"
+                if format == OutputFormat.JSON:
+                    json_error(msg)
+                    error(msg)
+                raise typer.Exit(1) from None
                 return
             tasks = [t for t in tasks if t.iteration == iteration]
+
+        # JSON output path
+        if format == OutputFormat.JSON:
+            _print_json_task_list(tasks, str(relative_path), total_count)
+            return
 
         # Display tasks
         if not tasks:
@@ -148,7 +198,15 @@ def list_command(
 
         console.print(f"[dim]Total: {len(tasks)} task(s)[/dim]\n")
 
-    except FileNotFoundError as e:
-        error(str(e))
+    except FileNotFoundError:
+        if format == OutputFormat.JSON:
+            json_error("Task file not found")
+        else:
+            error("Task file not found")
+        raise typer.Exit(1) from None
     except (ValueError, InvalidTaskFileError) as e:
-        error(str(e))
+        if format == OutputFormat.JSON:
+            json_error(str(e))
+        else:
+            error(str(e))
+        raise typer.Exit(1) from None

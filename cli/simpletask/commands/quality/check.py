@@ -1,7 +1,5 @@
 """Quality check command."""
 
-import json
-from enum import Enum
 from typing import Annotated
 
 import typer
@@ -12,14 +10,7 @@ from simpletask.core.project import get_task_file_path
 from simpletask.core.quality_ops import run_quality_checks
 from simpletask.core.yaml_parser import parse_task_file
 from simpletask.utils.console import console, error
-
-
-class OutputFormat(str, Enum):
-    """Output format options."""
-
-    RICH = "rich"
-    PLAIN = "plain"
-    JSON = "json"
+from simpletask.utils.output import OutputFormat, json_error, json_success, resolve_format
 
 
 def print_plain_results(results: list[QualityCheckResult], all_passed: bool) -> None:
@@ -63,7 +54,7 @@ def print_json_results(results: list[QualityCheckResult], all_passed: bool) -> N
             for r in results
         ],
     }
-    print(json.dumps(output, indent=2))
+    json_success(output)
 
 
 def check_command(
@@ -97,18 +88,20 @@ def check_command(
         # Get file path
         file_path = get_task_file_path(branch)
 
+        # Auto-detect non-terminal environment and use plain format if rich was selected
+        format = resolve_format(format)
+
         # Parse task file
         spec = parse_task_file(file_path)
 
         # Get quality requirements
         quality_reqs = spec.quality_requirements
         if quality_reqs is None:
-            error("No quality_requirements configuration found in task file")
+            if format == OutputFormat.JSON:
+                json_error("No quality_requirements configuration found in task file")
+            else:
+                error("No quality_requirements configuration found in task file")
             raise typer.Exit(1)
-
-        # Auto-detect non-terminal environment and use plain format if rich was selected
-        if format == OutputFormat.RICH and not console.is_terminal:
-            format = OutputFormat.PLAIN
 
         # Only print Rich formatted header if using rich format
         if format == OutputFormat.RICH:
@@ -129,7 +122,7 @@ def check_command(
             elif format == OutputFormat.PLAIN:
                 print("No quality checks enabled or selected")
             else:  # JSON
-                print(json.dumps({"all_passed": True, "results": []}))
+                json_success({"all_passed": True, "results": []})
             return
 
         # Display results based on format
@@ -186,9 +179,18 @@ def check_command(
             raise typer.Exit(1)
 
     except FileNotFoundError as e:
-        error(str(e))
+        if format == OutputFormat.JSON:
+            json_error(str(e))
+        else:
+            error(str(e))
     except ValueError as e:
-        error(str(e))
+        if format == OutputFormat.JSON:
+            json_error(str(e))
+        else:
+            error(str(e))
         raise typer.Exit(1) from None
     except Exception as e:
-        error(f"Unexpected error: {e}")
+        if format == OutputFormat.JSON:
+            json_error(f"Unexpected error: {e}")
+        else:
+            error(f"Unexpected error: {e}")

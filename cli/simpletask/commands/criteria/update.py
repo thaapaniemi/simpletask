@@ -1,16 +1,48 @@
 """Update acceptance criterion description command."""
 
+from typing import Annotated
+
 import typer
 
 from simpletask.core.criteria_ops import update_acceptance_criterion
 from simpletask.core.project import get_task_file_path
 from simpletask.core.yaml_parser import InvalidTaskFileError
 from simpletask.utils.console import handle_exception, success
+from simpletask.utils.output import (
+    OutputFormat,
+    build_write_response,
+    json_error,
+    json_success,
+    resolve_format,
+)
+
+
+def _print_json_criterion_update(criterion_id: str, file_path: str, spec) -> None:
+    """Print criterion update result as JSON.
+
+    Args:
+        criterion_id: The updated criterion ID
+        file_path: Path to the task file
+        spec: The updated task spec
+    """
+    json_success(
+        build_write_response(
+            "criterion_updated",
+            f"Updated {criterion_id} description",
+            spec,
+            file_path,
+            criterion_id=criterion_id,
+        )
+    )
 
 
 def update_command(
     criterion_id: str = typer.Argument(..., help="Criterion ID (e.g., AC1)"),
     description: str = typer.Argument(..., help="New criterion description"),
+    format: Annotated[
+        OutputFormat,
+        typer.Option("--format", "-f", help="Output format (rich, plain, json)"),
+    ] = OutputFormat.RICH,
     branch: str | None = typer.Option(
         None, "--branch", "-b", help="Branch name (defaults to current git branch)"
     ),
@@ -27,9 +59,21 @@ def update_command(
         InvalidTaskFileError: If task file is malformed and cannot be parsed
     """
     try:
+        # Resolve format
+        format = resolve_format(format)
+
         file_path = get_task_file_path(branch)
-        update_acceptance_criterion(file_path, criterion_id, description)
-        success(f"Updated {criterion_id} description")
+        spec = update_acceptance_criterion(file_path, criterion_id, description)
+
+        # Output results based on format
+        if format == OutputFormat.JSON:
+            _print_json_criterion_update(criterion_id, str(file_path), spec)
+        else:
+            success(f"Updated {criterion_id} description")
 
     except (ValueError, FileNotFoundError, InvalidTaskFileError) as e:
-        handle_exception(e, "updating criterion")
+        if format == OutputFormat.JSON:
+            json_error(str(e))
+        else:
+            handle_exception(e, "updating criterion")
+        raise typer.Exit(1) from None
