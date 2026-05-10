@@ -9,6 +9,13 @@ from simpletask.core.models import ToolName
 from simpletask.core.project import get_task_file_path
 from simpletask.core.yaml_parser import parse_task_file
 from simpletask.utils.console import console, error
+from simpletask.utils.output import (
+    OutputFormat,
+    json_error,
+    json_success,
+    resolve_format,
+    serialize_quality_reqs,
+)
 
 
 def _format_tool_command(tool: ToolName | None, args: list[str]) -> str:
@@ -22,7 +29,22 @@ def _format_tool_command(tool: ToolName | None, args: list[str]) -> str:
     return f"{tool.value} {' '.join(args)}"
 
 
+def _print_json_quality_show(quality_reqs, file_path: str) -> None:
+    """Print quality requirements as JSON.
+
+    Args:
+        quality_reqs: Quality requirements configuration
+        file_path: Path to the task file
+    """
+    output = {"file_path": file_path, **serialize_quality_reqs(quality_reqs)}
+    json_success(output)
+
+
 def show_command(
+    format: Annotated[
+        OutputFormat,
+        typer.Option("--format", "-f", help="Output format (rich, plain, json)"),
+    ] = OutputFormat.RICH,
     branch: Annotated[
         str | None,
         typer.Option("--branch", "-b", help="Branch name (defaults to current git branch)"),
@@ -44,12 +66,23 @@ def show_command(
         # Parse task file
         spec = parse_task_file(file_path)
 
+        # Resolve format
+        format = resolve_format(format)
+
         # Get quality requirements
         quality_reqs = spec.quality_requirements
 
         if quality_reqs is None:
-            error("No quality requirements configured in task file")
+            if format == OutputFormat.JSON:
+                json_error("No quality requirements configured in task file")
+            else:
+                error("No quality requirements configured in task file")
             raise typer.Exit(1)
+
+        # JSON output path
+        if format == OutputFormat.JSON:
+            _print_json_quality_show(quality_reqs, str(file_path))
+            return
 
         console.print(f"\n[bold]Quality Requirements[/bold] ({file_path.name})\n")
 
@@ -117,7 +150,13 @@ def show_command(
         console.print(table)
         console.print("")
 
-    except FileNotFoundError as e:
-        error(str(e))
+    except FileNotFoundError:
+        if format == OutputFormat.JSON:
+            json_error("Task file not found")
+        else:
+            error("Task file not found")
     except Exception as e:
-        error(f"Unexpected error: {e}")
+        if format == OutputFormat.JSON:
+            json_error(f"Unexpected error: {e}")
+        else:
+            error(f"Unexpected error: {e}")

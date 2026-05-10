@@ -1,6 +1,6 @@
 [project]
 name = "simpletask"
-version = "0.35.11"
+version = "0.35.13"
 description = "CLI tool for managing AI-friendly task definitions in branch-based development workflows"
 requires-python = ">=3.11"
 license = {text = "MIT"}
@@ -103,6 +103,7 @@ warn_required_dynamic_aliases = true
 testpaths = ["tests"]
 python_files = "test_*.py"
 python_classes = "Test*"
+pythonpath = ["cli"]
 # Only collect test classes from test files, not from imported modules
 # This prevents pytest from trying to collect Pydantic models like TestingConfig
 filterwarnings = [

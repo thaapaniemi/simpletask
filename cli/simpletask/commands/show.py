@@ -1,5 +1,6 @@
-"""
-Show command - Display task details."""
+"""Show command - Display task details."""
+
+from typing import Annotated
 
 import typer
 
@@ -7,6 +8,13 @@ from ..core.models import Design, QualityRequirements, Task
 from ..core.project import ensure_project, get_task_file_path
 from ..core.yaml_parser import InvalidTaskFileError, parse_task_file
 from ..utils.console import console, error
+from ..utils.output import (
+    OutputFormat,
+    json_error,
+    json_success,
+    resolve_format,
+    serialize_quality_reqs,
+)
 
 
 def _format_quality_summary(quality_reqs: QualityRequirements) -> str:
@@ -161,8 +169,107 @@ def _task_status_parts(task: Task) -> tuple[str, str]:
         return "○", "white"
 
 
+def _print_json_show(spec, file_path: str) -> None:
+    """Print task specification as JSON.
+
+    Args:
+        spec: Parsed SimpleTaskSpec object
+        file_path: Path to the task file
+    """
+    output = {
+        "file_path": file_path,
+        "branch": spec.branch,
+        "title": spec.title,
+        "created": spec.created.isoformat(),
+        "original_prompt": spec.original_prompt,
+        "acceptance_criteria": [
+            {
+                "id": c.id,
+                "description": c.description,
+                "completed": c.completed,
+            }
+            for c in spec.acceptance_criteria
+        ],
+        "constraints": spec.constraints or [],
+        "tasks": [
+            {
+                "id": t.id,
+                "name": t.name,
+                "status": t.status.value,
+                "goal": t.goal,
+                "steps": t.steps,
+                "done_when": t.done_when or [],
+                "prerequisites": t.prerequisites or [],
+                "files": (
+                    [{"path": f.path, "action": f.action} for f in t.files] if t.files else []
+                ),
+                "code_examples": (
+                    [
+                        {"language": ce.language, "description": ce.description, "code": ce.code}
+                        for ce in t.code_examples
+                    ]
+                    if t.code_examples
+                    else []
+                ),
+                "notes": t.notes or [],
+                "iteration": t.iteration,
+            }
+            for t in (spec.tasks or [])
+        ],
+        "quality_requirements": (
+            serialize_quality_reqs(spec.quality_requirements) if spec.quality_requirements else None
+        ),
+        "design": (
+            {
+                "patterns": [p.value for p in spec.design.patterns] if spec.design.patterns else [],
+                "references": (
+                    [
+                        {"path": r.path, "reason": r.reason}
+                        for r in spec.design.reference_implementations
+                    ]
+                    if spec.design.reference_implementations
+                    else []
+                ),
+                "constraints": (
+                    spec.design.architectural_constraints
+                    if spec.design.architectural_constraints
+                    else []
+                ),
+                "security": (
+                    [
+                        {"category": s.category.value, "description": s.description}
+                        for s in spec.design.security
+                    ]
+                    if spec.design.security
+                    else []
+                ),
+                "error_handling": (
+                    spec.design.error_handling.value if spec.design.error_handling else None
+                ),
+            }
+            if spec.design
+            else None
+        ),
+        "notes": spec.notes or [],
+        "iterations": (
+            [
+                {"id": it.id, "label": it.label, "created": it.created.isoformat()}
+                for it in spec.iterations
+            ]
+            if spec.iterations
+            else []
+        ),
+        "context": spec.context or {},
+    }
+    json_success(output)
+
+
 def show(
     branch: str | None = typer.Argument(None, help="Branch name (defaults to current git branch)"),
+    format: Annotated[
+        OutputFormat,
+        typer.Option("--format", "-f", help="Output format (rich, plain, json)"),
+    ] = OutputFormat.RICH,
 ) -> None:
     """Show detailed information about a task.
 
@@ -183,11 +290,20 @@ def show(
     """
     task_file = None
     try:
+        # Resolve format first so exception handlers can use it
+        format = resolve_format(format)
+
         task_file = get_task_file_path(branch)
         project = ensure_project()
 
         # Parse task file
         spec = parse_task_file(task_file)
+
+        # JSON output path
+        if format == OutputFormat.JSON:
+            relative_path = task_file.relative_to(project.root)
+            _print_json_show(spec, str(relative_path))
+            return
 
         # Display file location (relative to project root)
         relative_path = task_file.relative_to(project.root)
@@ -312,10 +428,26 @@ def show(
         console.print()
 
     except FileNotFoundError:
-        error(f"Task file not found: {task_file}")
+        if format == OutputFormat.JSON:
+            json_error(f"Task file not found: {task_file}")
+            raise typer.Exit(1) from None
+        else:
+            error(f"Task file not found: {task_file}")
     except InvalidTaskFileError as e:
-        error(f"Invalid task file: {e}")
+        if format == OutputFormat.JSON:
+            json_error(f"Invalid task file: {e}")
+            raise typer.Exit(1) from None
+        else:
+            error(f"Invalid task file: {e}")
     except ValueError as e:
-        error(str(e))
+        if format == OutputFormat.JSON:
+            json_error(str(e))
+            raise typer.Exit(1) from None
+        else:
+            error(str(e))
     except Exception as e:
-        error(f"Unexpected error: {e}")
+        if format == OutputFormat.JSON:
+            json_error(f"Unexpected error: {e}")
+            raise typer.Exit(1) from None
+        else:
+            error(f"Unexpected error: {e}")

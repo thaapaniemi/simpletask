@@ -1,5 +1,7 @@
 """Add implementation task command."""
 
+from typing import Annotated
+
 import typer
 
 from simpletask.commands.task.helpers import _parse_file_actions
@@ -7,6 +9,28 @@ from simpletask.core.project import get_task_file_path
 from simpletask.core.task_ops import add_implementation_task
 from simpletask.core.yaml_parser import InvalidTaskFileError
 from simpletask.utils.console import handle_exception, success
+from simpletask.utils.output import (
+    OutputFormat,
+    build_write_response,
+    json_error,
+    json_success,
+    resolve_format,
+)
+
+
+def _print_json_task_add(task_id: str, file_path: str, spec) -> None:
+    """Print task add result as JSON.
+
+    Args:
+        task_id: The new task ID
+        file_path: Path to the task file
+        spec: The updated task spec
+    """
+    json_success(
+        build_write_response(
+            "task_added", f"Added task {task_id}", spec, file_path, task_id=task_id
+        )
+    )
 
 
 def add_command(
@@ -28,6 +52,10 @@ def add_command(
     iteration: int | None = typer.Option(
         None, "--iteration", "-i", help="Assign task to iteration by ID"
     ),
+    format: Annotated[
+        OutputFormat,
+        typer.Option("--format", "-f", help="Output format (rich, plain, json)"),
+    ] = OutputFormat.RICH,
     branch: str | None = typer.Option(
         None, "--branch", "-b", help="Branch name (defaults to current git branch)"
     ),
@@ -50,6 +78,9 @@ def add_command(
         InvalidTaskFileError: If task file is malformed and cannot be parsed
     """
     try:
+        # Resolve format
+        format = resolve_format(format)
+
         # Resolve task file path
         file_path = get_task_file_path(branch)
         steps_value = step or None
@@ -57,7 +88,7 @@ def add_command(
         prerequisites_value = prerequisite or None
         file_actions = _parse_file_actions(file) if file else None
 
-        new_id, _ = add_implementation_task(
+        new_id, spec = add_implementation_task(
             file_path,
             name,
             goal,
@@ -68,8 +99,16 @@ def add_command(
             iteration=iteration,
         )
 
-        iter_suffix = f" (iteration {iteration})" if iteration is not None else ""
-        success(f"Added task {new_id}: {name}{iter_suffix}")
+        # Output results based on format
+        if format == OutputFormat.JSON:
+            _print_json_task_add(new_id, str(file_path), spec)
+        else:
+            iter_suffix = f" (iteration {iteration})" if iteration is not None else ""
+            success(f"Added task {new_id}: {name}{iter_suffix}")
 
     except (ValueError, FileNotFoundError, InvalidTaskFileError) as e:
-        handle_exception(e, "adding implementation task")
+        if format == OutputFormat.JSON:
+            json_error(str(e))
+        else:
+            handle_exception(e, "adding implementation task")
+        raise typer.Exit(1) from None
