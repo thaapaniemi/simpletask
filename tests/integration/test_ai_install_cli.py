@@ -3,6 +3,7 @@
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
 from simpletask import app
 from typer.testing import CliRunner
 
@@ -11,6 +12,12 @@ runner = CliRunner()
 
 class TestAiInstallCLI:
     """Integration tests for 'simpletask ai install' command."""
+
+    @pytest.fixture(autouse=True)
+    def mock_editor_installed(self):
+        """Assume all editors are installed for these behavioural tests."""
+        with patch("simpletask.commands.ai.install.is_editor_installed", return_value=True):
+            yield
 
     @patch("simpletask.commands.ai.install.get_global_commands_dir")
     @patch("simpletask.commands.ai.install.get_global_qwen_commands_dir")
@@ -297,6 +304,12 @@ class TestAiInstallCLI:
 class TestAiInstallAgentsCLI:
     """Integration tests for agent installation via 'simpletask ai install' command."""
 
+    @pytest.fixture(autouse=True)
+    def mock_editor_installed(self):
+        """Assume all editors are installed for these behavioural tests."""
+        with patch("simpletask.commands.ai.install.is_editor_installed", return_value=True):
+            yield
+
     @patch("simpletask.commands.ai.install.get_global_commands_dir")
     @patch("simpletask.commands.ai.install.get_global_agents_dir")
     def test_opencode_flag_installs_agents(
@@ -409,6 +422,12 @@ class TestAiInstallAgentsCLI:
 
 class TestAiInstallVibeCLI:
     """Integration tests for Vibe skill installation via 'simpletask ai install' command."""
+
+    @pytest.fixture(autouse=True)
+    def mock_editor_installed(self):
+        """Assume all editors are installed for these behavioural tests."""
+        with patch("simpletask.commands.ai.install.is_editor_installed", return_value=True):
+            yield
 
     @patch("simpletask.commands.ai.install.get_global_vibe_commands_dir")
     def test_vibe_flag_only(self, mock_vibe_dir, tmp_path: Path):
@@ -535,3 +554,150 @@ class TestAiInstallVibeCLI:
 
         assert result.exit_code == 0
         assert "Installing OpenCode agents" not in result.stdout
+
+
+class TestInstallEditorDetection:
+    """Integration tests for editor detection behaviour in 'simpletask ai install'."""
+
+    @patch("simpletask.commands.ai.install.get_global_commands_dir")
+    @patch("simpletask.commands.ai.install.get_global_qwen_commands_dir")
+    @patch("simpletask.commands.ai.install.get_global_gemini_commands_dir")
+    @patch("simpletask.commands.ai.install.get_global_vibe_commands_dir")
+    @patch("simpletask.commands.ai.install.get_global_agents_dir")
+    @patch("simpletask.commands.ai.install.is_editor_installed", return_value=False)
+    def test_default_skips_missing_editors(
+        self,
+        mock_installed,
+        mock_agents_dir,
+        mock_vibe_dir,
+        mock_gemini_dir,
+        mock_qwen_dir,
+        mock_opencode_dir,
+        tmp_path: Path,
+    ):
+        """Default install skips editors whose base directory does not exist."""
+        for mock, name in [
+            (mock_opencode_dir, "opencode"),
+            (mock_qwen_dir, "qwen"),
+            (mock_gemini_dir, "gemini"),
+            (mock_vibe_dir, "vibe"),
+            (mock_agents_dir, "agents"),
+        ]:
+            mock.return_value = tmp_path / name
+
+        result = runner.invoke(app, ["ai", "install"])
+
+        assert result.exit_code == 0
+        assert "not detected" in result.stdout
+        # No templates should be written
+        assert not (tmp_path / "opencode").exists()
+        assert not (tmp_path / "qwen").exists()
+        assert not (tmp_path / "gemini").exists()
+        assert not (tmp_path / "vibe").exists()
+
+    @patch("simpletask.commands.ai.install.get_global_commands_dir")
+    @patch("simpletask.commands.ai.install.get_global_agents_dir")
+    @patch("simpletask.commands.ai.install.is_editor_installed", return_value=False)
+    def test_explicit_flag_prompts_when_editor_missing_and_user_declines(
+        self,
+        mock_installed,
+        mock_agents_dir,
+        mock_commands_dir,
+        tmp_path: Path,
+    ):
+        """Explicit --opencode flag prompts when editor missing; no files written on decline."""
+        mock_commands_dir.return_value = tmp_path / "opencode"
+        mock_agents_dir.return_value = tmp_path / "agents"
+
+        result = runner.invoke(app, ["ai", "install", "--opencode"], input="n\n")
+
+        assert result.exit_code == 0
+        assert "not found" in result.stdout
+        assert not (tmp_path / "opencode").exists()
+
+    @patch("simpletask.commands.ai.install.get_global_commands_dir")
+    @patch("simpletask.commands.ai.install.get_global_agents_dir")
+    @patch("simpletask.commands.ai.install.is_editor_installed", return_value=False)
+    def test_explicit_flag_installs_when_editor_missing_and_user_confirms(
+        self,
+        mock_installed,
+        mock_agents_dir,
+        mock_commands_dir,
+        tmp_path: Path,
+    ):
+        """Explicit --opencode flag installs when editor missing and user confirms."""
+        mock_commands_dir.return_value = tmp_path / "opencode"
+        mock_agents_dir.return_value = tmp_path / "agents"
+
+        result = runner.invoke(app, ["ai", "install", "--opencode"], input="y\n")
+
+        assert result.exit_code == 0
+        assert (tmp_path / "opencode" / "simpletask.plan.md").exists()
+
+    @patch("simpletask.commands.ai.install.get_local_commands_dir")
+    @patch("simpletask.commands.ai.install.get_local_qwen_commands_dir")
+    @patch("simpletask.commands.ai.install.get_local_gemini_commands_dir")
+    @patch("simpletask.commands.ai.install.get_local_vibe_commands_dir")
+    @patch("simpletask.commands.ai.install.get_local_agents_dir")
+    @patch("simpletask.commands.ai.install.is_editor_installed", return_value=False)
+    def test_local_flag_bypasses_detection(
+        self,
+        mock_installed,
+        mock_agents_dir,
+        mock_vibe_dir,
+        mock_gemini_dir,
+        mock_qwen_dir,
+        mock_opencode_dir,
+        tmp_path: Path,
+    ):
+        """--local flag bypasses editor detection; all editors install regardless."""
+        for mock, name in [
+            (mock_opencode_dir, "opencode"),
+            (mock_qwen_dir, "qwen"),
+            (mock_gemini_dir, "gemini"),
+            (mock_vibe_dir, "vibe"),
+            (mock_agents_dir, "agents"),
+        ]:
+            mock.return_value = tmp_path / name
+
+        result = runner.invoke(app, ["ai", "install", "--local"])
+
+        assert result.exit_code == 0
+        assert (tmp_path / "opencode" / "simpletask.plan.md").exists()
+        assert (tmp_path / "qwen" / "simpletask.plan.md").exists()
+        assert (tmp_path / "gemini" / "simpletask.plan.toml").exists()
+        assert (tmp_path / "vibe" / "simpletask-plan").is_dir()
+
+    @patch("simpletask.commands.ai.install.get_global_commands_dir")
+    @patch("simpletask.commands.ai.install.get_global_qwen_commands_dir")
+    @patch("simpletask.commands.ai.install.get_global_gemini_commands_dir")
+    @patch("simpletask.commands.ai.install.get_global_vibe_commands_dir")
+    @patch("simpletask.commands.ai.install.get_global_agents_dir")
+    @patch("simpletask.commands.ai.install.is_editor_installed", return_value=True)
+    def test_default_installs_all_detected_editors(
+        self,
+        mock_installed,
+        mock_agents_dir,
+        mock_vibe_dir,
+        mock_gemini_dir,
+        mock_qwen_dir,
+        mock_opencode_dir,
+        tmp_path: Path,
+    ):
+        """Default install proceeds for all editors when all are detected."""
+        for mock, name in [
+            (mock_opencode_dir, "opencode"),
+            (mock_qwen_dir, "qwen"),
+            (mock_gemini_dir, "gemini"),
+            (mock_vibe_dir, "vibe"),
+            (mock_agents_dir, "agents"),
+        ]:
+            mock.return_value = tmp_path / name
+
+        result = runner.invoke(app, ["ai", "install"])
+
+        assert result.exit_code == 0
+        assert (tmp_path / "opencode" / "simpletask.plan.md").exists()
+        assert (tmp_path / "qwen" / "simpletask.plan.md").exists()
+        assert (tmp_path / "gemini" / "simpletask.plan.toml").exists()
+        assert (tmp_path / "vibe" / "simpletask-plan").is_dir()
