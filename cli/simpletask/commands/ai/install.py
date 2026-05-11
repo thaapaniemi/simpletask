@@ -3,6 +3,7 @@
 import typer
 
 from simpletask.core.ai_templates import (
+    EditorType,
     get_global_agents_dir,
     get_global_commands_dir,
     get_global_gemini_commands_dir,
@@ -18,8 +19,40 @@ from simpletask.core.ai_templates import (
     install_qwen_templates,
     install_templates,
     install_vibe_templates,
+    is_editor_installed,
 )
 from simpletask.utils.console import error, info, success, warning
+
+
+def _should_install(editor: EditorType, display_name: str, explicit: bool, local: bool) -> bool:
+    """Determine whether to install templates for an editor.
+
+    Truth table for global installs:
+    - local=True  → always install (bypass detection)
+    - editor detected (base dir exists) → install
+    - editor not detected, explicit flag → prompt user
+    - editor not detected, implicit (all-editors default) → skip with info message
+
+    Args:
+        editor: Editor type identifier.
+        display_name: Human-readable editor name for messages.
+        explicit: True if the user passed this editor's flag explicitly.
+        local: True if --local flag was used (bypasses detection).
+
+    Returns:
+        True if installation should proceed, False otherwise.
+    """
+    if local:
+        return True
+    if is_editor_installed(editor):
+        return True
+    if explicit:
+        return typer.confirm(
+            f"{display_name} config directory not found. Install anyway?",
+            default=False,
+        )
+    info(f"{display_name} not detected — skipping")
+    return False
 
 
 def _report_installation_results(
@@ -106,17 +139,24 @@ def install_command(
         simpletask ai install --vibe          # Install Mistral Vibe only
         simpletask ai install --opencode --qwen --gemini --vibe --local  # All four, locally
     """
-    # If no flags specified, install all four
+    # If no flags specified, install all four (implicit mode)
     none_specified = not opencode and not qwen and not gemini and not vibe
     install_opencode = opencode or none_specified
     install_qwen = qwen or none_specified
     install_gemini = gemini or none_specified
     install_vibe = vibe or none_specified
 
+    # Track whether each editor was explicitly requested by the user
+    opencode_explicit = bool(opencode)
+    qwen_explicit = bool(qwen)
+    gemini_explicit = bool(gemini)
+    vibe_explicit = bool(vibe)
+
     any_skipped = False
+    opencode_installed = False
 
     # Install OpenCode templates
-    if install_opencode:
+    if install_opencode and _should_install("opencode", "OpenCode", opencode_explicit, local):
         try:
             target_dir = get_local_commands_dir() if local else get_global_commands_dir()
 
@@ -130,13 +170,14 @@ def install_command(
             any_skipped = (
                 _report_installation_results(installed, skipped, overwritten) or any_skipped
             )
+            opencode_installed = True
         except FileNotFoundError as e:
             warning(f"Skipping OpenCode installation: {e}")
         except Exception as e:
             error(f"Unexpected error installing OpenCode: {e}")
 
     # Install Qwen templates
-    if install_qwen:
+    if install_qwen and _should_install("qwen", "Qwen", qwen_explicit, local):
         try:
             target_dir = get_local_qwen_commands_dir() if local else get_global_qwen_commands_dir()
 
@@ -156,7 +197,7 @@ def install_command(
             error(f"Unexpected error installing Qwen: {e}")
 
     # Install Gemini CLI templates
-    if install_gemini:
+    if install_gemini and _should_install("gemini", "Gemini CLI", gemini_explicit, local):
         try:
             target_dir = (
                 get_local_gemini_commands_dir() if local else get_global_gemini_commands_dir()
@@ -178,7 +219,7 @@ def install_command(
             error(f"Unexpected error installing Gemini: {e}")
 
     # Install Vibe skills
-    if install_vibe:
+    if install_vibe and _should_install("vibe", "Mistral Vibe", vibe_explicit, local):
         try:
             target_dir = get_local_vibe_commands_dir() if local else get_global_vibe_commands_dir()
 
@@ -197,8 +238,8 @@ def install_command(
         except Exception as e:
             error(f"Unexpected error installing Vibe: {e}")
 
-    # Install OpenCode agents separately with independent error handling
-    if install_opencode:
+    # Install OpenCode agents alongside OpenCode commands
+    if install_opencode and opencode_installed:
         try:
             agents_dir = get_local_agents_dir() if local else get_global_agents_dir()
 

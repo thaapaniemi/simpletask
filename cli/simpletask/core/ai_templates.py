@@ -18,6 +18,7 @@ class EditorConfig:
     file_extension: str
     global_config_dir: tuple[str, ...]
     local_config_dir: tuple[str, ...]
+    global_base_dir: tuple[str, ...] = ()
     global_agents_dir: tuple[str, ...] | None = None
     local_agents_dir: tuple[str, ...] | None = None
     is_directory_based: bool = False
@@ -30,6 +31,7 @@ EDITOR_CONFIGS: dict[EditorType, EditorConfig] = {
         file_extension=".md",
         global_config_dir=(".config", "opencode", "commands"),
         local_config_dir=(".opencode", "commands"),
+        global_base_dir=(".config", "opencode"),
         global_agents_dir=(".config", "opencode", "agents"),
         local_agents_dir=(".opencode", "agents"),
     ),
@@ -39,6 +41,7 @@ EDITOR_CONFIGS: dict[EditorType, EditorConfig] = {
         file_extension=".md",
         global_config_dir=(".qwen", "commands"),
         local_config_dir=(".qwen", "commands"),
+        global_base_dir=(".qwen",),
     ),
     "gemini": EditorConfig(
         display_name="Gemini CLI",
@@ -46,6 +49,7 @@ EDITOR_CONFIGS: dict[EditorType, EditorConfig] = {
         file_extension=".toml",
         global_config_dir=(".gemini", "commands"),
         local_config_dir=(".gemini", "commands"),
+        global_base_dir=(".gemini",),
     ),
     "vibe": EditorConfig(
         display_name="Mistral Vibe",
@@ -53,6 +57,7 @@ EDITOR_CONFIGS: dict[EditorType, EditorConfig] = {
         file_extension=".md",
         global_config_dir=(".vibe", "skills"),
         local_config_dir=(".vibe", "skills"),
+        global_base_dir=(".vibe",),
         is_directory_based=True,
     ),
 }
@@ -131,6 +136,36 @@ def _get_local_commands_dir(editor: EditorType) -> Path:
     """
     config = EDITOR_CONFIGS[editor]
     return Path.cwd().joinpath(*config.local_config_dir)
+
+
+def get_editor_base_dir(editor: EditorType) -> Path:
+    """Get the global base directory for an editor.
+
+    This is the top-level directory whose existence indicates whether the
+    editor is installed on the machine (e.g. ~/.config/opencode for OpenCode).
+
+    Args:
+        editor: Editor type ("opencode", "qwen", "gemini", or "vibe")
+
+    Returns:
+        Path to the editor's global base directory.
+    """
+    config = EDITOR_CONFIGS[editor]
+    return Path.home().joinpath(*config.global_base_dir)
+
+
+def is_editor_installed(editor: EditorType) -> bool:
+    """Check whether an editor is installed on the current machine.
+
+    An editor is considered installed if its global base directory exists.
+
+    Args:
+        editor: Editor type ("opencode", "qwen", "gemini", or "vibe")
+
+    Returns:
+        True if the editor's global base directory exists, False otherwise.
+    """
+    return get_editor_base_dir(editor).exists()
 
 
 def _install_files(
