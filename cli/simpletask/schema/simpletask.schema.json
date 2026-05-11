@@ -1,33 +1,57 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "simpletask-v1.schema.json",
-  "title": "SimpleTask Schema",
-  "description": "Schema for AI-friendly task definitions with acceptance criteria, implementation tasks, and context. Designed for branch-based development workflows.",
+  "$id": "simpletask-v1.1.schema.json",
+  "title": "SimpleTask Schema v1.1",
+  "description": "Schema for AI-friendly task definitions with execution specs, quality requirements, and design guidance. Supports schema versions 1.0 (legacy) and 1.1 (canonical).",
   "type": "object",
-  "required": ["schema_version", "branch", "title", "original_prompt", "created", "acceptance_criteria"],
+  "required": [
+    "schema_version",
+    "branch",
+    "title",
+    "original_prompt",
+    "created",
+    "acceptance_criteria"
+  ],
   "properties": {
     "schema_version": {
       "type": "string",
-      "description": "Schema version for compatibility tracking",
-      "examples": ["1.0"]
+      "enum": [
+        "1.0",
+        "1.1"
+      ],
+      "description": "Schema version for compatibility tracking. 1.1 is canonical for all writes.",
+      "examples": [
+        "1.0",
+        "1.1"
+      ]
     },
     "branch": {
       "type": "string",
       "description": "Branch name / unique task identifier. Used for both the Git branch and filename.",
-      "examples": ["020-list-show-commands", "feature/dark-mode"]
+      "examples": [
+        "020-list-show-commands",
+        "feature/dark-mode"
+      ]
     },
     "title": {
       "type": "string",
       "description": "Human-readable task title",
-      "examples": ["Add list and show commands for task management"]
+      "examples": [
+        "Add list and show commands for task management"
+      ]
     },
     "original_prompt": {
       "type": "string",
       "description": "The verbatim user request that initiated this task. Preserved for context recovery and human verification.",
-      "examples": ["Add list and show commands so users can see available tasks and their details"]
+      "examples": [
+        "Add list and show commands so users can see available tasks and their details"
+      ]
     },
     "notes": {
-      "type": ["array", "null"],
+      "type": [
+        "array",
+        "null"
+      ],
       "description": "Freeform notes about this task specification",
       "items": {
         "type": "string"
@@ -37,7 +61,9 @@
       "type": "string",
       "format": "date-time",
       "description": "Timestamp when the task was created (ISO 8601 format)",
-      "examples": ["2024-01-15T14:30:00Z"]
+      "examples": [
+        "2024-01-15T14:30:00Z"
+      ]
     },
     "acceptance_criteria": {
       "type": "array",
@@ -54,13 +80,33 @@
         "type": "string"
       },
       "examples": [
-        ["Do not modify files in src/core/legacy/", "Follow existing error handling patterns", "No new dependencies without approval"]
+        [
+          "Do not modify files in src/core/legacy/",
+          "Follow existing error handling patterns",
+          "No new dependencies without approval"
+        ]
       ]
     },
     "context": {
       "type": "object",
       "description": "Flexible context block for requirements, dependencies, related files, gotchas, and any other relevant information",
       "additionalProperties": true
+    },
+    "design": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "description": "Design guidance including patterns, references, constraints, and security considerations",
+      "$ref": "#/$defs/Design"
+    },
+    "quality_requirements": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "description": "Quality check configuration (linting, type-checking, testing, security) with execution specs",
+      "$ref": "#/$defs/QualityRequirements"
     },
     "tasks": {
       "type": "array",
@@ -70,7 +116,10 @@
       }
     },
     "iterations": {
-      "type": ["array", "null"],
+      "type": [
+        "array",
+        "null"
+      ],
       "description": "List of development iterations for semantic separation of work rounds",
       "items": {
         "$ref": "#/$defs/Iteration"
@@ -81,12 +130,19 @@
     "AcceptanceCriterion": {
       "type": "object",
       "description": "A single acceptance criterion that must be met",
-      "required": ["id", "description", "completed"],
+      "required": [
+        "id",
+        "description",
+        "completed"
+      ],
       "properties": {
         "id": {
           "type": "string",
           "description": "Unique identifier for the criterion",
-          "examples": ["AC1", "AC2"]
+          "examples": [
+            "AC1",
+            "AC2"
+          ]
         },
         "description": {
           "type": "string",
@@ -98,15 +154,391 @@
         }
       }
     },
+    "Design": {
+      "type": "object",
+      "description": "Design guidance for implementation",
+      "properties": {
+        "patterns": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "description": "Architectural patterns to follow",
+          "items": {
+            "type": "string"
+          }
+        },
+        "reference_implementations": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "description": "Reference implementations to study or follow",
+          "items": {
+            "$ref": "#/$defs/DesignReference"
+          }
+        },
+        "architectural_constraints": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "description": "Architectural constraints and requirements",
+          "items": {
+            "type": "string"
+          }
+        },
+        "security": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "description": "Security considerations",
+          "items": {
+            "$ref": "#/$defs/SecurityRequirement"
+          }
+        },
+        "error_handling": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Error handling strategy",
+          "enum": [
+            "exceptions",
+            "result_type",
+            "error_codes",
+            "callbacks",
+            "panic_recover"
+          ]
+        }
+      }
+    },
+    "DesignReference": {
+      "type": "object",
+      "description": "A reference implementation or pattern to follow",
+      "required": [
+        "path",
+        "reason"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "Path to the reference file or location"
+        },
+        "reason": {
+          "type": "string",
+          "description": "Why this reference is important to follow"
+        }
+      }
+    },
+    "SecurityRequirement": {
+      "type": "object",
+      "description": "A security requirement or consideration",
+      "required": [
+        "category",
+        "description"
+      ],
+      "properties": {
+        "category": {
+          "type": "string",
+          "description": "Security category",
+          "enum": [
+            "authentication",
+            "authorization",
+            "cryptography",
+            "input_validation",
+            "output_encoding",
+            "session_management",
+            "secure_communication",
+            "data_protection",
+            "audit_logging"
+          ]
+        },
+        "description": {
+          "type": "string",
+          "description": "Security requirement description"
+        }
+      }
+    },
+    "QualityRequirements": {
+      "type": "object",
+      "description": "Quality check configuration with nested execution specs (canonical form)",
+      "required": [
+        "linting",
+        "testing"
+      ],
+      "properties": {
+        "linting": {
+          "$ref": "#/$defs/LintingConfig"
+        },
+        "type_checking": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "$ref": "#/$defs/TypeCheckConfig"
+        },
+        "testing": {
+          "$ref": "#/$defs/TestingConfig"
+        },
+        "security_check": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "$ref": "#/$defs/SecurityCheckConfig"
+        }
+      }
+    },
+    "LintingConfig": {
+      "type": "object",
+      "description": "Linting configuration with execution spec",
+      "required": [
+        "enabled"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Whether linting is enabled"
+        },
+        "execution": {
+          "description": "Execution spec (tool or workflow mode)",
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ToolExecutionSpec"
+            },
+            {
+              "$ref": "#/$defs/WorkflowExecutionSpec"
+            }
+          ]
+        },
+        "timeout": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1,
+          "description": "Timeout in seconds (default: 300)"
+        }
+      }
+    },
+    "TypeCheckConfig": {
+      "type": "object",
+      "description": "Type checking configuration with execution spec",
+      "required": [
+        "enabled"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Whether type checking is enabled"
+        },
+        "execution": {
+          "description": "Execution spec (tool or workflow mode)",
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ToolExecutionSpec"
+            },
+            {
+              "$ref": "#/$defs/WorkflowExecutionSpec"
+            }
+          ]
+        },
+        "timeout": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1,
+          "description": "Timeout in seconds (default: 300)"
+        }
+      }
+    },
+    "TestingConfig": {
+      "type": "object",
+      "description": "Testing configuration with execution spec and coverage threshold",
+      "required": [
+        "enabled"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Whether testing is enabled"
+        },
+        "execution": {
+          "description": "Execution spec (tool or workflow mode)",
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ToolExecutionSpec"
+            },
+            {
+              "$ref": "#/$defs/WorkflowExecutionSpec"
+            }
+          ]
+        },
+        "min_coverage": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Minimum test coverage percentage"
+        },
+        "timeout": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1,
+          "description": "Timeout in seconds (default: 300)"
+        }
+      }
+    },
+    "SecurityCheckConfig": {
+      "type": "object",
+      "description": "Security check configuration with execution spec",
+      "required": [
+        "enabled"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Whether security check is enabled"
+        },
+        "execution": {
+          "description": "Execution spec (tool or workflow mode)",
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ToolExecutionSpec"
+            },
+            {
+              "$ref": "#/$defs/WorkflowExecutionSpec"
+            }
+          ]
+        },
+        "timeout": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1,
+          "description": "Timeout in seconds (default: 300)"
+        }
+      }
+    },
+    "ToolExecutionSpec": {
+      "type": "object",
+      "description": "Execution spec for direct tool execution",
+      "required": [
+        "kind",
+        "tool"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "tool"
+          ],
+          "description": "Execution kind"
+        },
+        "tool": {
+          "type": "string",
+          "description": "Tool name to execute",
+          "enum": [
+            "ruff",
+            "mypy",
+            "pytest",
+            "black",
+            "pylint",
+            "bandit",
+            "eslint",
+            "tsc",
+            "npm",
+            "yarn",
+            "jest",
+            "go",
+            "golangci-lint",
+            "gosec",
+            "cargo",
+            "clippy",
+            "mvn",
+            "gradle",
+            "make",
+            "earthly"
+          ]
+        },
+        "args": {
+          "type": "array",
+          "description": "Tool arguments",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "WorkflowExecutionSpec": {
+      "type": "object",
+      "description": "Execution spec for workflow runners (make, earthly)",
+      "required": [
+        "kind",
+        "runner",
+        "target"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "workflow"
+          ],
+          "description": "Execution kind"
+        },
+        "runner": {
+          "type": "string",
+          "enum": [
+            "make",
+            "earthly"
+          ],
+          "description": "Workflow runner to use"
+        },
+        "target": {
+          "type": "string",
+          "description": "Workflow target or rule name"
+        },
+        "no_cache": {
+          "type": "boolean",
+          "default": false,
+          "description": "Pass --no-cache to Earthly runner (ignored for make)"
+        },
+        "extra_args": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Additional flags passed to the runner before the target"
+        }
+      }
+    },
     "Task": {
       "type": "object",
       "description": "A single implementation task",
-      "required": ["id", "name", "status", "goal", "steps"],
+      "required": [
+        "id",
+        "name",
+        "status",
+        "goal",
+        "steps"
+      ],
       "properties": {
         "id": {
           "type": "string",
           "description": "Unique task identifier",
-          "examples": ["T001", "T002"]
+          "examples": [
+            "T001",
+            "T002"
+          ]
         },
         "name": {
           "type": "string",
@@ -114,7 +546,13 @@
         },
         "status": {
           "type": "string",
-          "enum": ["not_started", "in_progress", "completed", "blocked", "paused"],
+          "enum": [
+            "not_started",
+            "in_progress",
+            "completed",
+            "blocked",
+            "paused"
+          ],
           "description": "Current status of this task"
         },
         "goal": {
@@ -136,7 +574,11 @@
             "type": "string"
           },
           "examples": [
-            ["File exists at src/commands/list.py", "All imports are present", "pytest tests/test_list.py passes"]
+            [
+              "File exists at src/commands/list.py",
+              "All imports are present",
+              "pytest tests/test_list.py passes"
+            ]
           ]
         },
         "code_examples": {
@@ -147,7 +589,10 @@
           }
         },
         "notes": {
-          "type": ["array", "null"],
+          "type": [
+            "array",
+            "null"
+          ],
           "description": "Freeform notes about this task",
           "items": {
             "type": "string"
@@ -168,7 +613,10 @@
           }
         },
         "iteration": {
-          "type": ["integer", "null"],
+          "type": [
+            "integer",
+            "null"
+          ],
           "minimum": 1,
           "description": "ID of the iteration this task belongs to"
         }
@@ -177,12 +625,20 @@
     "CodeExample": {
       "type": "object",
       "description": "A code example to guide implementation",
-      "required": ["language", "code"],
+      "required": [
+        "language",
+        "code"
+      ],
       "properties": {
         "language": {
           "type": "string",
           "description": "Programming language for syntax highlighting",
-          "examples": ["python", "javascript", "bash", "yaml"]
+          "examples": [
+            "python",
+            "javascript",
+            "bash",
+            "yaml"
+          ]
         },
         "description": {
           "type": "string",
@@ -197,7 +653,10 @@
     "FileAction": {
       "type": "object",
       "description": "A file to be created or modified",
-      "required": ["path", "action"],
+      "required": [
+        "path",
+        "action"
+      ],
       "properties": {
         "path": {
           "type": "string",
@@ -205,7 +664,11 @@
         },
         "action": {
           "type": "string",
-          "enum": ["create", "modify", "delete"],
+          "enum": [
+            "create",
+            "modify",
+            "delete"
+          ],
           "description": "Action to perform on the file"
         }
       }
@@ -213,7 +676,11 @@
     "Iteration": {
       "type": "object",
       "description": "A development iteration representing a round of work",
-      "required": ["id", "label", "created"],
+      "required": [
+        "id",
+        "label",
+        "created"
+      ],
       "properties": {
         "id": {
           "type": "integer",
@@ -223,7 +690,11 @@
         "label": {
           "type": "string",
           "description": "Human-readable label for this iteration",
-          "examples": ["Initial implementation", "Review feedback", "Performance improvements"]
+          "examples": [
+            "Initial implementation",
+            "Review feedback",
+            "Performance improvements"
+          ]
         },
         "created": {
           "type": "string",

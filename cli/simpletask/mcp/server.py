@@ -69,6 +69,7 @@ from ..core.models import (
     SecurityRequirement,
     TaskStatus,
     ToolName,
+    WorkflowRunner,
 )
 from ..core.note_ops import add_note, list_notes, remove_note
 from ..core.project import ensure_project, get_current_task_file_path
@@ -788,6 +789,8 @@ def quality(
     min_coverage: int | None = None,
     timeout: int | None = None,
     preset_name: str | None = None,
+    workflow_runner: str | None = None,
+    workflow_target: str | None = None,
     lint_only: bool = False,
     test_only: bool = False,
     type_only: bool = False,
@@ -805,6 +808,8 @@ def quality(
         min_coverage: Minimum coverage for 'set' action with testing type
         timeout: Timeout in seconds for 'set' action (default: 300)
         preset_name: Preset name for 'preset' action
+        workflow_runner: Workflow runner for 'set' action (make or earthly)
+        workflow_target: Workflow target for 'set' action (used with workflow_runner)
         lint_only: Only run linting check (for 'check' action). Raises ValueError
             if combined with a non-check action or combined with another filter flag.
         test_only: Only run testing check (for 'check' action). Raises ValueError
@@ -860,6 +865,17 @@ def quality(
             valid_tools = ", ".join([t.value for t in ToolName])
             raise ValueError(f"Invalid tool '{tool}'. Valid tools: {valid_tools}") from None
 
+    # Convert workflow_runner string to WorkflowRunner enum if provided
+    runner_enum: WorkflowRunner | None = None
+    if workflow_runner:
+        try:
+            runner_enum = WorkflowRunner(workflow_runner)
+        except ValueError:
+            valid_runners = ", ".join([r.value for r in WorkflowRunner])
+            raise ValueError(
+                f"Invalid workflow_runner '{workflow_runner}'. Valid runners: {valid_runners}"
+            ) from None
+
     # ------------------------------------------------------------------ #
     # Defaults target path
     # ------------------------------------------------------------------ #
@@ -902,6 +918,8 @@ def quality(
                     enabled=enabled,
                     min_coverage=min_coverage,
                     timeout=timeout,
+                    workflow_runner=runner_enum,
+                    workflow_target=workflow_target,
                 )
                 set_defaults_path: str = _commit_defaults(defaults)
                 return SimpleTaskWriteResponse(
@@ -1004,6 +1022,8 @@ def quality(
                 enabled=enabled,
                 min_coverage=min_coverage,
                 timeout=timeout,
+                workflow_runner=runner_enum,
+                workflow_target=workflow_target,
             )
 
             write_task_file(file_path, spec)

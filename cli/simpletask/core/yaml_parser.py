@@ -100,6 +100,35 @@ def parse_task_file_lenient(path: Path) -> dict[str, Any]:
     return data
 
 
+_QUALITY_CONFIG_KEYS = ("linting", "type_checking", "testing", "security_check")
+
+
+def _bump_schema_version_if_canonical(data: dict[str, Any]) -> dict[str, Any]:
+    """Upgrade schema_version to '1.1' when any quality section uses canonical execution.
+
+    The model serializer already strips legacy 'args' from canonical sections;
+    this function only handles the version bump that belongs to the writer layer.
+
+    Args:
+        data: Serialized task spec dict (from model_dump)
+
+    Returns:
+        Mutated dict with schema_version bumped to '1.1' when canonical execution is present
+    """
+    quality_reqs = data.get("quality_requirements")
+    if not isinstance(quality_reqs, dict):
+        return data
+
+    has_canonical = any(
+        isinstance(quality_reqs.get(key), dict) and "execution" in quality_reqs[key]
+        for key in _QUALITY_CONFIG_KEYS
+    )
+    if has_canonical:
+        data["schema_version"] = "1.1"
+
+    return data
+
+
 def write_task_file(path: Path, spec: SimpleTaskSpec) -> None:
     """Write task YAML file.
 
@@ -132,6 +161,9 @@ def write_task_file(path: Path, spec: SimpleTaskSpec) -> None:
 
     # Convert spec to dict (mode='json' for datetime serialization)
     data = spec.model_dump(mode="json", exclude_none=True)
+
+    # Bump schema_version for files using canonical execution specs
+    data = _bump_schema_version_if_canonical(data)
 
     # Generate YAML with nice formatting
     yaml_content = yaml.dump(

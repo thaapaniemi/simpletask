@@ -6,8 +6,76 @@ from typing import Protocol
 from simpletask.core.models import QualityCheckResult, QualityRequirements, ToolName
 from simpletask.core.presets import build_command
 
+
+def extract_tool_and_args_from_execution(
+    execution,  # ToolExecutionSpec | WorkflowExecutionSpec
+) -> tuple:
+    """Extract tool and args from execution spec.
+
+    For ToolExecutionSpec, returns (tool, args).
+    For WorkflowExecutionSpec, builds workflow runner command.
+
+    Args:
+        execution: ExecutionSpec instance (tool or workflow mode)
+
+    Returns:
+        Tuple of (tool: ToolName, args: list[str])
+
+    Raises:
+        ValueError: If execution type is unsupported or runner is invalid
+    """
+    from simpletask.core.models import (
+        ToolExecutionSpec,
+        ToolName,
+        WorkflowExecutionSpec,
+        WorkflowRunner,
+    )
+
+    if isinstance(execution, ToolExecutionSpec):
+        return (execution.tool, execution.args)
+
+    if isinstance(execution, WorkflowExecutionSpec):
+        # Build workflow runner command
+        if execution.runner == WorkflowRunner.MAKE:
+            # Make target: make <extra_args> <target>
+            return (ToolName.MAKE, [*execution.extra_args, execution.target])
+        elif execution.runner == WorkflowRunner.EARTHLY:
+            # Earthly target: earthly [--no-cache] <extra_args> <target>
+            no_cache_flag = ["--no-cache"] if execution.no_cache else []
+            return (ToolName.EARTHLY, [*no_cache_flag, *execution.extra_args, execution.target])
+        else:
+            raise ValueError(
+                f"Unsupported workflow runner: {execution.runner}. Supported runners: make, earthly"
+            )
+
+    raise ValueError(f"Unknown execution type: {type(execution)}")
+
+
 # Maximum output size (1MB) to prevent memory exhaustion
 MAX_OUTPUT_SIZE = 1024 * 1024  # 1MB in bytes
+
+
+def get_tool_and_args_from_config(config):
+    """Extract tool and args from quality config (supporting both forms).
+
+    If execution spec is present (canonical form), extracts from there.
+    Otherwise falls back to legacy tool/args fields.
+
+    Args:
+        config: LintingConfig, TypeCheckConfig, TestingConfig, or SecurityCheckConfig
+
+    Returns:
+        Tuple of (tool: ToolName, args: list[str])
+
+    Raises:
+        ValueError: If execution spec is workflow type (not yet supported)
+    """
+    # Prefer execution spec if present
+    if config.execution is not None:
+        return extract_tool_and_args_from_execution(config.execution)
+
+    # Fall back to legacy fields
+    return (config.tool, config.args)
 
 
 class QualityCheckRunner(Protocol):
@@ -230,10 +298,11 @@ class QualityChecker:
 
         # Run linting
         if lint and self.requirements.linting.enabled:
+            tool_name, args = get_tool_and_args_from_config(self.requirements.linting)
             result = self.runner.run_check(
                 "Linting",
-                self.requirements.linting.tool,
-                self.requirements.linting.args,
+                tool_name,
+                args,
                 self.requirements.linting.timeout,
             )
             results.append(result)
@@ -241,31 +310,34 @@ class QualityChecker:
         # Run type checking
         if type_check and self.requirements.type_checking:
             if self.requirements.type_checking.enabled:
+                tool_name, args = get_tool_and_args_from_config(self.requirements.type_checking)
                 result = self.runner.run_check(
                     "Type Checking",
-                    self.requirements.type_checking.tool,
-                    self.requirements.type_checking.args,
+                    tool_name,
+                    args,
                     self.requirements.type_checking.timeout,
                 )
                 results.append(result)
 
         # Run testing
         if test and self.requirements.testing.enabled:
+            tool_name, args = get_tool_and_args_from_config(self.requirements.testing)
             result = self.runner.run_check(
                 "Testing",
-                self.requirements.testing.tool,
-                self.requirements.testing.args,
+                tool_name,
+                args,
                 self.requirements.testing.timeout,
             )
             results.append(result)
 
         # Run security checks
         if security and self.requirements.security_check:
-            if self.requirements.security_check.enabled and self.requirements.security_check.tool:
+            if self.requirements.security_check.enabled:
+                tool_name, args = get_tool_and_args_from_config(self.requirements.security_check)
                 result = self.runner.run_check(
                     "Security Check",
-                    self.requirements.security_check.tool,
-                    self.requirements.security_check.args,
+                    tool_name,
+                    args,
                     self.requirements.security_check.timeout,
                 )
                 results.append(result)

@@ -4,7 +4,13 @@ from typing import Annotated
 
 import typer
 
-from ..core.models import Design, QualityRequirements, Task
+from ..core.models import (
+    Design,
+    QualityRequirements,
+    Task,
+    ToolExecutionSpec,
+    WorkflowExecutionSpec,
+)
 from ..core.project import ensure_project, get_task_file_path
 from ..core.yaml_parser import InvalidTaskFileError, parse_task_file
 from ..utils.console import console, error
@@ -28,16 +34,24 @@ def _format_quality_summary(quality_reqs: QualityRequirements) -> str:
     """
     parts = []
 
+    def _exec_label(execution: ToolExecutionSpec | WorkflowExecutionSpec | None) -> str:
+        """Return a short human-readable label for an execution spec."""
+        if execution is None:
+            return ""
+        if isinstance(execution, ToolExecutionSpec):
+            return execution.tool.value
+        return f"{execution.runner.value} {execution.target}"
+
     # Linting
     icon = "✓" if quality_reqs.linting.enabled else "○"
     color = "green" if quality_reqs.linting.enabled else "dim"
-    tool_name = quality_reqs.linting.tool.value if quality_reqs.linting.enabled else ""
+    tool_name = _exec_label(quality_reqs.linting.execution) if quality_reqs.linting.enabled else ""
     parts.append(f"[{color}]{icon}[/{color}] lint" + (f" ({tool_name})" if tool_name else ""))
 
     # Testing
     icon = "✓" if quality_reqs.testing.enabled else "○"
     color = "green" if quality_reqs.testing.enabled else "dim"
-    tool_name = quality_reqs.testing.tool.value if quality_reqs.testing.enabled else ""
+    tool_name = _exec_label(quality_reqs.testing.execution) if quality_reqs.testing.enabled else ""
     cov = f", {quality_reqs.testing.min_coverage}% cov" if quality_reqs.testing.min_coverage else ""
     parts.append(f"[{color}]{icon}[/{color}] test" + (f" ({tool_name}{cov})" if tool_name else ""))
 
@@ -46,7 +60,9 @@ def _format_quality_summary(quality_reqs: QualityRequirements) -> str:
         icon = "✓" if quality_reqs.type_checking.enabled else "○"
         color = "green" if quality_reqs.type_checking.enabled else "dim"
         tool_name = (
-            quality_reqs.type_checking.tool.value if quality_reqs.type_checking.enabled else ""
+            _exec_label(quality_reqs.type_checking.execution)
+            if quality_reqs.type_checking.enabled
+            else ""
         )
         parts.append(f"[{color}]{icon}[/{color}] types" + (f" ({tool_name})" if tool_name else ""))
     else:
@@ -57,8 +73,8 @@ def _format_quality_summary(quality_reqs: QualityRequirements) -> str:
         icon = "✓" if quality_reqs.security_check.enabled else "○"
         color = "green" if quality_reqs.security_check.enabled else "dim"
         tool_name = (
-            quality_reqs.security_check.tool.value
-            if quality_reqs.security_check.enabled and quality_reqs.security_check.tool
+            _exec_label(quality_reqs.security_check.execution)
+            if quality_reqs.security_check.enabled
             else ""
         )
         parts.append(

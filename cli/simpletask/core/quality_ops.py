@@ -9,8 +9,11 @@ from simpletask.core.models import (
     SecurityCheckConfig,
     SimpleTaskSpec,
     TestingConfig,
+    ToolExecutionSpec,
     ToolName,
     TypeCheckConfig,
+    WorkflowExecutionSpec,
+    WorkflowRunner,
 )
 from simpletask.core.presets import apply_preset as apply_preset_impl
 from simpletask.core.quality_checker import QualityChecker
@@ -57,6 +60,68 @@ def run_quality_checks(
         return checker.run_all()
 
 
+def _build_updated_execution_spec(
+    existing: ToolExecutionSpec | WorkflowExecutionSpec | None,
+    tool: ToolName | None,
+    args: list[str] | None,
+    workflow_runner: WorkflowRunner | None,
+    workflow_target: str | None,
+) -> ToolExecutionSpec | WorkflowExecutionSpec | None:
+    """Build an updated execution spec from inputs.
+
+    Returns None when no execution-related inputs are provided (caller should
+    leave existing execution spec unchanged).
+
+    Args:
+        existing: Current execution spec, if any.
+        tool: Tool name for tool-mode execution.
+        args: Arguments for tool-mode execution.
+        workflow_runner: Runner for workflow-mode execution.
+        workflow_target: Target/rule for workflow-mode execution.
+
+    Returns:
+        Updated execution spec, or None if no execution-related inputs provided.
+
+    Raises:
+        ValueError: If workflow and tool inputs are mixed, or required fields are missing.
+    """
+    has_workflow = workflow_runner is not None or workflow_target is not None
+    has_tool = tool is not None or args is not None
+
+    if has_workflow and has_tool:
+        raise ValueError(
+            "Cannot mix tool and workflow fields: provide either (tool/args) or "
+            "(workflow_runner/workflow_target), not both."
+        )
+
+    if has_workflow:
+        if isinstance(existing, WorkflowExecutionSpec):
+            runner = workflow_runner if workflow_runner is not None else existing.runner
+            target = workflow_target if workflow_target is not None else existing.target
+        else:
+            if workflow_runner is None or workflow_target is None:
+                raise ValueError(
+                    "Both workflow_runner and workflow_target are required when creating "
+                    "a new workflow execution spec."
+                )
+            runner = workflow_runner
+            target = workflow_target
+        return WorkflowExecutionSpec(runner=runner, target=target)
+
+    if has_tool:
+        if isinstance(existing, ToolExecutionSpec):
+            new_tool = tool if tool is not None else existing.tool
+            new_args = args if args is not None else existing.args
+        else:
+            if tool is None:
+                raise ValueError("tool is required when creating a new tool execution spec.")
+            new_tool = tool
+            new_args = args if args is not None else []
+        return ToolExecutionSpec(tool=new_tool, args=new_args)
+
+    return None
+
+
 def update_quality_config(
     spec: SimpleTaskSpec,
     config_type: Literal["linting", "type-checking", "testing", "security"],
@@ -65,17 +130,24 @@ def update_quality_config(
     enabled: bool | None = None,
     min_coverage: int | None = None,
     timeout: int | None = None,
+    workflow_runner: WorkflowRunner | None = None,
+    workflow_target: str | None = None,
 ) -> SimpleTaskSpec:
     """Update quality configuration in task spec.
+
+    Supports both tool-mode (tool/args) and workflow-mode (workflow_runner/workflow_target)
+    execution specs. The resulting config always uses the canonical nested execution form.
 
     Args:
         spec: Task specification to update
         config_type: Type of configuration to update
-        tool: Tool to use (optional)
-        args: Tool arguments (optional)
+        tool: Tool to use for tool-mode execution (optional)
+        args: Tool arguments for tool-mode execution (optional)
         enabled: Enable/disable status (optional)
         min_coverage: Minimum coverage for testing (optional)
         timeout: Timeout in seconds (optional)
+        workflow_runner: Workflow runner for workflow-mode execution (optional)
+        workflow_target: Workflow target/rule name (optional)
 
     Returns:
         Updated task specification
@@ -83,19 +155,20 @@ def update_quality_config(
     Raises:
         ValueError: If invalid configuration provided
     """
-    # Validate at least one option provided
     if (
         tool is None
         and args is None
         and enabled is None
         and min_coverage is None
         and timeout is None
+        and workflow_runner is None
+        and workflow_target is None
     ):
         raise ValueError(
-            "At least one option must be provided: tool, args, enabled, min_coverage, or timeout"
+            "At least one option must be provided: tool, args, enabled, min_coverage, "
+            "timeout, workflow_runner, or workflow_target"
         )
 
-    # Validate min_coverage only for testing
     if min_coverage is not None and config_type != "testing":
         raise ValueError("min_coverage can only be used with 'testing' config type")
 
@@ -103,65 +176,167 @@ def update_quality_config(
     if quality_reqs is None:
         raise ValueError("Task spec has no quality_requirements field")
 
-    # Build updates dict
-    updates: dict[str, Any] = {}
-    if tool is not None:
-        updates["tool"] = tool
-    if args is not None:
-        updates["args"] = args
-    if enabled is not None:
-        updates["enabled"] = enabled
-    if min_coverage is not None:
-        updates["min_coverage"] = min_coverage
-    if timeout is not None:
-        updates["timeout"] = timeout
+    quality_reqs = _apply_config_update(
+        quality_reqs,
+        config_type,
+        tool=tool,
+        args=args,
+        enabled=enabled,
+        min_coverage=min_coverage,
+        timeout=timeout,
+        workflow_runner=workflow_runner,
+        workflow_target=workflow_target,
+    )
 
-    # Apply updates based on config type
+    return spec.model_copy(update={"quality_requirements": quality_reqs})
+
+
+def _apply_config_update(
+    quality_reqs: QualityRequirements,
+    config_type: Literal["linting", "type-checking", "testing", "security"],
+    tool: ToolName | None,
+    args: list[str] | None,
+    enabled: bool | None,
+    min_coverage: int | None,
+    timeout: int | None,
+    workflow_runner: WorkflowRunner | None,
+    workflow_target: str | None,
+) -> QualityRequirements:
+    """Apply configuration updates to QualityRequirements.
+
+    Args:
+        quality_reqs: Existing quality requirements
+        config_type: Which config section to update
+        tool: Tool for tool-mode execution
+        args: Arguments for tool-mode execution
+        enabled: Enable/disable toggle
+        min_coverage: Minimum test coverage
+        timeout: Execution timeout
+        workflow_runner: Runner for workflow-mode execution
+        workflow_target: Target for workflow-mode execution
+
+    Returns:
+        Updated QualityRequirements
+
+    Raises:
+        ValueError: If configuration is invalid or incomplete
+    """
+    # Scalar-only updates (enabled, timeout, min_coverage)
+    scalar_updates: dict[str, Any] = {}
+    if enabled is not None:
+        scalar_updates["enabled"] = enabled
+    if timeout is not None:
+        scalar_updates["timeout"] = timeout
+    if min_coverage is not None:
+        scalar_updates["min_coverage"] = min_coverage
+
     if config_type == "linting":
-        quality_reqs = quality_reqs.model_copy(
-            update={"linting": quality_reqs.linting.model_copy(update=updates)}
+        existing_exec = quality_reqs.linting.execution
+        new_exec = _build_updated_execution_spec(
+            existing_exec, tool, args, workflow_runner, workflow_target
         )
-    elif config_type == "type-checking":
-        # Type checking is optional, create if doesn't exist
+        exec_updates: dict[str, Any] = {}
+        if new_exec is not None:
+            exec_updates["execution"] = new_exec
+            exec_updates["tool"] = None
+            exec_updates["args"] = []
+        return quality_reqs.model_copy(
+            update={
+                "linting": quality_reqs.linting.model_copy(
+                    update={**exec_updates, **scalar_updates}
+                )
+            }
+        )
+
+    if config_type == "type-checking":
         if quality_reqs.type_checking is None:
-            if tool is None:
-                raise ValueError("tool is required when creating a new type-checking configuration")
-            quality_reqs = quality_reqs.model_copy(
+            new_exec = _build_updated_execution_spec(
+                None, tool, args, workflow_runner, workflow_target
+            )
+            if new_exec is None:
+                raise ValueError(
+                    "tool or workflow_runner is required when creating a new type-checking configuration"
+                )
+            return quality_reqs.model_copy(
                 update={
                     "type_checking": TypeCheckConfig(
-                        enabled=True, tool=tool, args=args if args else []
+                        enabled=scalar_updates.get("enabled", False),
+                        execution=new_exec,
+                        timeout=scalar_updates.get("timeout", 300),
                     )
                 }
             )
-        else:
-            quality_reqs = quality_reqs.model_copy(
-                update={"type_checking": quality_reqs.type_checking.model_copy(update=updates)}
-            )
-    elif config_type == "testing":
-        quality_reqs = quality_reqs.model_copy(
-            update={"testing": quality_reqs.testing.model_copy(update=updates)}
+        existing_exec = quality_reqs.type_checking.execution
+        new_exec = _build_updated_execution_spec(
+            existing_exec, tool, args, workflow_runner, workflow_target
         )
-    elif config_type == "security":
-        # Security check is optional, create if doesn't exist
+        exec_updates = {}
+        if new_exec is not None:
+            exec_updates["execution"] = new_exec
+            exec_updates["tool"] = None
+            exec_updates["args"] = []
+        return quality_reqs.model_copy(
+            update={
+                "type_checking": quality_reqs.type_checking.model_copy(
+                    update={**exec_updates, **scalar_updates}
+                )
+            }
+        )
+
+    if config_type == "testing":
+        existing_exec = quality_reqs.testing.execution
+        new_exec = _build_updated_execution_spec(
+            existing_exec, tool, args, workflow_runner, workflow_target
+        )
+        exec_updates = {}
+        if new_exec is not None:
+            exec_updates["execution"] = new_exec
+            exec_updates["tool"] = None
+            exec_updates["args"] = []
+        return quality_reqs.model_copy(
+            update={
+                "testing": quality_reqs.testing.model_copy(
+                    update={**exec_updates, **scalar_updates}
+                )
+            }
+        )
+
+    if config_type == "security":
         if quality_reqs.security_check is None:
-            if tool is None:
-                raise ValueError("tool is required when creating a new security configuration")
-            quality_reqs = quality_reqs.model_copy(
+            new_exec = _build_updated_execution_spec(
+                None, tool, args, workflow_runner, workflow_target
+            )
+            if new_exec is None:
+                raise ValueError(
+                    "tool or workflow_runner is required when creating a new security configuration"
+                )
+            return quality_reqs.model_copy(
                 update={
                     "security_check": SecurityCheckConfig(
-                        enabled=True, tool=tool, args=args if args else []
+                        enabled=scalar_updates.get("enabled", False),
+                        execution=new_exec,
+                        timeout=scalar_updates.get("timeout", 300),
                     )
                 }
             )
-        else:
-            quality_reqs = quality_reqs.model_copy(
-                update={"security_check": quality_reqs.security_check.model_copy(update=updates)}
-            )
+        existing_exec = quality_reqs.security_check.execution
+        new_exec = _build_updated_execution_spec(
+            existing_exec, tool, args, workflow_runner, workflow_target
+        )
+        exec_updates = {}
+        if new_exec is not None:
+            exec_updates["execution"] = new_exec
+            exec_updates["tool"] = None
+            exec_updates["args"] = []
+        return quality_reqs.model_copy(
+            update={
+                "security_check": quality_reqs.security_check.model_copy(
+                    update={**exec_updates, **scalar_updates}
+                )
+            }
+        )
 
-    # Update spec with modified quality requirements
-    spec = spec.model_copy(update={"quality_requirements": quality_reqs})
-
-    return spec
+    raise ValueError(f"Unknown config_type: {config_type!r}")  # pragma: no cover
 
 
 def update_quality_requirements(
@@ -172,11 +347,15 @@ def update_quality_requirements(
     enabled: bool | None = None,
     min_coverage: int | None = None,
     timeout: int | None = None,
+    workflow_runner: WorkflowRunner | None = None,
+    workflow_target: str | None = None,
 ) -> QualityRequirements:
     """Update quality requirements without wrapping in a SimpleTaskSpec.
 
     Equivalent to update_quality_config but operates directly on QualityRequirements.
     Used by operations that manage quality outside a task file context (e.g. defaults.yml).
+    Supports both tool-mode (tool/args) and workflow-mode (workflow_runner/workflow_target)
+    execution specs.
 
     Args:
         existing: Existing quality requirements. When None, only 'linting' and 'testing'
@@ -184,11 +363,13 @@ def update_quality_requirements(
             QualityRequirements (apply a preset first) to avoid creating phantom placeholder
             linting/testing entries that would block future fill-gaps-only preset merges.
         config_type: Type of configuration to update
-        tool: Tool to use (optional)
-        args: Tool arguments (optional)
+        tool: Tool for tool-mode execution (optional)
+        args: Arguments for tool-mode execution (optional)
         enabled: Enable/disable status (optional)
         min_coverage: Minimum coverage for testing (optional)
         timeout: Timeout in seconds (optional)
+        workflow_runner: Runner for workflow-mode execution (optional)
+        workflow_target: Target/rule for workflow-mode execution (optional)
 
     Returns:
         Updated QualityRequirements
@@ -203,9 +384,12 @@ def update_quality_requirements(
         and enabled is None
         and min_coverage is None
         and timeout is None
+        and workflow_runner is None
+        and workflow_target is None
     ):
         raise ValueError(
-            "At least one option must be provided: tool, args, enabled, min_coverage, or timeout"
+            "At least one option must be provided: tool, args, enabled, min_coverage, "
+            "timeout, workflow_runner, or workflow_target"
         )
 
     if min_coverage is not None and config_type != "testing":
@@ -226,58 +410,17 @@ def update_quality_requirements(
             testing=TestingConfig(enabled=False, tool=ToolName.PYTEST, args=[], min_coverage=0),
         )
 
-    updates: dict[str, Any] = {}
-    if tool is not None:
-        updates["tool"] = tool
-    if args is not None:
-        updates["args"] = args
-    if enabled is not None:
-        updates["enabled"] = enabled
-    if min_coverage is not None:
-        updates["min_coverage"] = min_coverage
-    if timeout is not None:
-        updates["timeout"] = timeout
-
-    if config_type == "linting":
-        quality_reqs = quality_reqs.model_copy(
-            update={"linting": quality_reqs.linting.model_copy(update=updates)}
-        )
-    elif config_type == "type-checking":
-        if quality_reqs.type_checking is None:
-            if tool is None:
-                raise ValueError("tool is required when creating a new type-checking configuration")
-            quality_reqs = quality_reqs.model_copy(
-                update={
-                    "type_checking": TypeCheckConfig(
-                        enabled=True, tool=tool, args=args if args else []
-                    )
-                }
-            )
-        else:
-            quality_reqs = quality_reqs.model_copy(
-                update={"type_checking": quality_reqs.type_checking.model_copy(update=updates)}
-            )
-    elif config_type == "testing":
-        quality_reqs = quality_reqs.model_copy(
-            update={"testing": quality_reqs.testing.model_copy(update=updates)}
-        )
-    elif config_type == "security":
-        if quality_reqs.security_check is None:
-            if tool is None:
-                raise ValueError("tool is required when creating a new security configuration")
-            quality_reqs = quality_reqs.model_copy(
-                update={
-                    "security_check": SecurityCheckConfig(
-                        enabled=True, tool=tool, args=args if args else []
-                    )
-                }
-            )
-        else:
-            quality_reqs = quality_reqs.model_copy(
-                update={"security_check": quality_reqs.security_check.model_copy(update=updates)}
-            )
-
-    return quality_reqs
+    return _apply_config_update(
+        quality_reqs,
+        config_type,
+        tool=tool,
+        args=args,
+        enabled=enabled,
+        min_coverage=min_coverage,
+        timeout=timeout,
+        workflow_runner=workflow_runner,
+        workflow_target=workflow_target,
+    )
 
 
 def apply_quality_preset(

@@ -5,7 +5,7 @@ from typing import Annotated
 
 import typer
 
-from simpletask.core.models import ToolName
+from simpletask.core.models import ToolName, WorkflowRunner
 from simpletask.core.project import get_task_file_path
 from simpletask.core.quality_ops import update_quality_config
 from simpletask.core.yaml_parser import parse_task_file, write_task_file
@@ -38,6 +38,18 @@ def set_command(
             "--args", "-a", help="Tool arguments as comma-separated list (e.g., 'check,.,--fix')"
         ),
     ] = None,
+    runner: Annotated[
+        WorkflowRunner | None,
+        typer.Option("--runner", "-r", help="Workflow runner (make or earthly)"),
+    ] = None,
+    target: Annotated[
+        str | None,
+        typer.Option(
+            "--target",
+            "-T",
+            help="Workflow target or rule name (used with --runner)",
+        ),
+    ] = None,
     enable: Annotated[bool, typer.Option("--enable", help="Enable this quality check")] = False,
     disable: Annotated[bool, typer.Option("--disable", help="Disable this quality check")] = False,
     min_coverage: Annotated[
@@ -65,15 +77,29 @@ def set_command(
     """Set quality requirements configuration.
 
     Configure individual quality check settings including tools, arguments, enable/disable status,
-    coverage thresholds, and timeouts.
+    coverage thresholds, timeouts, and workflow runners.
 
-    Examples:
+    Tool-mode examples (direct tool execution):
         simpletask quality set linting --tool ruff --args "check,."
         simpletask quality set testing --enable --min-coverage 80 --timeout 600
         simpletask quality set type-checking --disable
-        simpletask quality set security --enable --tool bandit --args "-r,." --timeout 120
+
+    Workflow-mode examples (make or earthly):
+        simpletask quality set linting --runner make --target lint
+        simpletask quality set testing --runner earthly --target +test
     """
     try:
+        # Validate that tool/args and runner/target are not mixed
+        has_tool_args = tool is not None or args is not None
+        has_workflow = runner is not None or target is not None
+
+        if has_tool_args and has_workflow:
+            error(
+                "Cannot mix tool-mode and workflow-mode: provide either "
+                "(--tool/--args) or (--runner/--target), not both"
+            )
+            raise typer.Exit(1)
+
         # Parse args string into list if provided
         args_list: list[str] | None = None
         if args:
@@ -89,6 +115,7 @@ def set_command(
         # Validate enable/disable conflict
         if enable and disable:
             error("Cannot specify both --enable and --disable")
+            raise typer.Exit(1)
 
         # Parse task file
         file_path = get_task_file_path(branch)
@@ -97,22 +124,22 @@ def set_command(
         # Map ConfigType enum to string for quality_ops
         config_type_str = config_type.value  # "linting", "type-checking", "testing", "security"
 
-        # Convert ToolName enum value
-        tool_enum = tool  # Already a ToolName enum from Typer
-
         # Update using shared logic
         try:
             updated_spec = update_quality_config(
                 spec,
                 config_type_str,  # type: ignore
-                tool=tool_enum,
+                tool=tool,
                 args=args_list,
                 enabled=enabled_status,
                 min_coverage=min_coverage,
                 timeout=timeout,
+                workflow_runner=runner,
+                workflow_target=target,
             )
         except ValueError as e:
             error(str(e))
+            raise typer.Exit(1) from None
 
         # Write back to file
         write_task_file(file_path, updated_spec)
@@ -128,6 +155,10 @@ def set_command(
             changes.append(f"tool: {tool.value}")
         if args_list:
             changes.append(f"args: {', '.join(args_list)}")
+        if runner:
+            changes.append(f"runner: {runner.value}")
+        if target:
+            changes.append(f"target: {target}")
         if enabled_status is not None:
             changes.append(f"enabled: {str(enabled_status).lower()}")
         if min_coverage is not None:
@@ -140,5 +171,7 @@ def set_command(
 
     except FileNotFoundError as e:
         error(str(e))
+        raise typer.Exit(1) from None
     except Exception as e:
         error(f"Unexpected error: {e}")
+        raise typer.Exit(1) from None

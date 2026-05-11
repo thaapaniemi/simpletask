@@ -9,11 +9,15 @@ Tests cover:
 """
 
 import pytest
+import yaml
 from simpletask.core.models import (
     TaskStatus,
+    ToolName,
+    WorkflowRunner,
 )
 from simpletask.core.yaml_parser import (
     InvalidTaskFileError,
+    _bump_schema_version_if_canonical,
     parse_task_file,
     update_criterion_status,
     update_task_status,
@@ -120,6 +124,108 @@ class TestWriteTaskFile:
         assert parsed_spec.title == sample_spec.title
         assert len(parsed_spec.tasks) == len(sample_spec.tasks)
         assert len(parsed_spec.acceptance_criteria) == len(sample_spec.acceptance_criteria)
+
+
+class TestBumpSchemaVersion:
+    """Tests for _bump_schema_version_if_canonical — schema_version upgrade (AC3)."""
+
+    def test_bumps_schema_version_to_1_1_when_canonical_execution_present(self):
+        """schema_version is bumped to '1.1' when any section has canonical execution."""
+        data = {
+            "schema_version": "1.0",
+            "quality_requirements": {
+                "linting": {
+                    "enabled": True,
+                    "execution": {"kind": "tool", "tool": "ruff", "args": []},
+                }
+            },
+        }
+        result = _bump_schema_version_if_canonical(data)
+        assert result["schema_version"] == "1.1"
+
+    def test_does_not_bump_schema_version_when_no_execution(self):
+        """schema_version stays unchanged when no section uses canonical execution."""
+        data = {
+            "schema_version": "1.0",
+            "quality_requirements": {
+                "linting": {"enabled": True, "tool": "ruff", "args": ["check", "."]}
+            },
+        }
+        result = _bump_schema_version_if_canonical(data)
+        assert result["schema_version"] == "1.0"
+
+    def test_handles_missing_quality_requirements(self):
+        """Data without quality_requirements is returned unchanged."""
+        data = {"schema_version": "1.0", "branch": "test"}
+        result = _bump_schema_version_if_canonical(data)
+        assert result == {"schema_version": "1.0", "branch": "test"}
+
+    def test_handles_non_dict_quality_requirements(self):
+        """Non-dict quality_requirements value is returned unchanged."""
+        data = {"schema_version": "1.0", "quality_requirements": None}
+        result = _bump_schema_version_if_canonical(data)
+        assert result["schema_version"] == "1.0"
+
+
+class TestWriteTaskFileCanonicalOutput:
+    """Integration tests: write_task_file emits canonical YAML (AC3)."""
+
+    def test_write_strips_legacy_fields_and_bumps_schema_version(
+        self, tmp_path, sample_spec_filterable
+    ):
+        """write_task_file removes legacy tool/args and sets schema_version:1.1 when execution present.
+
+        sample_spec_filterable has quality_requirements built from legacy tool= kwargs, so after
+        normalization the model holds both execution and tool. write_task_file must emit
+        only canonical execution in the YAML.
+        """
+        task_file = tmp_path / "task.yml"
+        write_task_file(task_file, sample_spec_filterable)
+
+        data = yaml.safe_load(task_file.read_text())
+        linting = data["quality_requirements"]["linting"]
+
+        assert "execution" in linting, "canonical execution key must be present"
+        assert "tool" not in linting, "legacy tool key must be stripped"
+        assert "args" not in linting, "legacy args key must be stripped"
+        assert data["schema_version"] == "1.1"
+
+    def test_write_canonical_round_trip(self, tmp_path, sample_spec_filterable):
+        """Spec written in canonical form can be read back and still has execution spec."""
+        task_file = tmp_path / "task.yml"
+        write_task_file(task_file, sample_spec_filterable)
+
+        parsed = parse_task_file(task_file)
+        assert parsed.quality_requirements is not None
+        assert parsed.quality_requirements.linting.execution is not None
+        assert parsed.quality_requirements.linting.execution.tool == ToolName.RUFF
+        assert parsed.schema_version == "1.1"
+
+    def test_write_workflow_execution_strips_legacy_and_bumps_version(
+        self, tmp_path, sample_spec_filterable
+    ):
+        """Workflow execution spec also triggers legacy-field stripping and version bump."""
+        from simpletask.core.quality_ops import update_quality_config
+
+        updated = update_quality_config(
+            sample_spec_filterable,
+            "linting",
+            workflow_runner=WorkflowRunner.EARTHLY,
+            workflow_target="+lint",
+        )
+        task_file = tmp_path / "task.yml"
+        write_task_file(task_file, updated)
+
+        data = yaml.safe_load(task_file.read_text())
+        linting = data["quality_requirements"]["linting"]
+
+        assert "execution" in linting
+        assert linting["execution"]["kind"] == "workflow"
+        assert linting["execution"]["runner"] == "earthly"
+        assert linting["execution"]["target"] == "+lint"
+        assert "tool" not in linting
+        assert "args" not in linting
+        assert data["schema_version"] == "1.1"
 
 
 class TestUpdateTaskStatus:

@@ -405,8 +405,9 @@ class TestQualitySetCommand:
         assert result.quality_requirements is not None
         assert result.quality_requirements.linting is not None
         linting = result.quality_requirements.linting
-        assert linting.tool == ToolName.RUFF
         assert linting.enabled is True
+        assert linting.execution is not None
+        assert linting.execution.tool == ToolName.RUFF
 
     @patch("simpletask.commands.defaults.commands.ensure_project")
     def test_set_testing_with_coverage(self, mock_ensure, tmp_path):
@@ -429,9 +430,10 @@ class TestQualitySetCommand:
         assert result.quality_requirements is not None
         assert result.quality_requirements.testing is not None
         testing = result.quality_requirements.testing
-        assert testing.tool == ToolName.PYTEST
         assert testing.min_coverage == 80
         assert testing.timeout == 600
+        assert testing.execution is not None
+        assert testing.execution.tool == ToolName.PYTEST
 
 
 # ---------------------------------------------------------------------------
@@ -496,10 +498,11 @@ class TestQualityPresetCommand:
         result = load_defaults(mock_project)
         assert result is not None
         assert result.quality_requirements is not None
-        # Existing linting should be kept (args preserved)
+        # Existing linting should be kept (args preserved in execution spec)
         linting = result.quality_requirements.linting
         assert linting is not None
-        assert linting.args == ["check", "src/"]
+        assert linting.execution is not None
+        assert linting.execution.args == ["check", "src/"]
 
 
 # ---------------------------------------------------------------------------

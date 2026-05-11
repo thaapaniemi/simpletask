@@ -26,6 +26,7 @@ from simpletask.core.models import (
     SecurityRequirement,
     SimpleTaskSpec,
     TestingConfig,
+    ToolExecutionSpec,
     ToolName,
     TypeCheckConfig,
 )
@@ -51,10 +52,12 @@ class TestLintingConfig:
     """Test LintingConfig model."""
 
     def test_valid_config(self):
-        """Valid linting config validates correctly."""
+        """Valid linting config validates correctly; tool is normalized into execution spec."""
         config = LintingConfig(enabled=True, tool=ToolName.RUFF, args=["check", "."])
         assert config.enabled is True
-        assert config.tool == ToolName.RUFF
+        assert config.tool is None  # cleared by normalization
+        assert config.execution is not None
+        assert config.execution.tool == ToolName.RUFF
         assert config.args == ["check", "."]
 
     def test_empty_args(self):
@@ -99,10 +102,12 @@ class TestTypeCheckConfig:
     """Test TypeCheckConfig model."""
 
     def test_valid_config(self):
-        """Valid type check config validates correctly."""
+        """Valid type check config validates correctly; tool is normalized into execution spec."""
         config = TypeCheckConfig(enabled=True, tool=ToolName.MYPY, args=["cli/"])
         assert config.enabled is True
-        assert config.tool == ToolName.MYPY
+        assert config.tool is None  # cleared by normalization
+        assert config.execution is not None
+        assert config.execution.tool == ToolName.MYPY
         assert config.args == ["cli/"]
 
     def test_shell_metacharacters_rejected(self):
@@ -116,10 +121,12 @@ class TestTestingConfig:
     """Test TestingConfig model."""
 
     def test_valid_config_with_coverage(self):
-        """Valid test config with coverage validates correctly."""
+        """Valid test config with coverage validates correctly; tool normalized into execution spec."""
         config = TestingConfig(enabled=True, tool=ToolName.PYTEST, args=[], min_coverage=80)
         assert config.enabled is True
-        assert config.tool == ToolName.PYTEST
+        assert config.tool is None  # cleared by normalization
+        assert config.execution is not None
+        assert config.execution.tool == ToolName.PYTEST
         assert config.min_coverage == 80
 
     def test_valid_config_without_coverage(self):
@@ -151,10 +158,12 @@ class TestSecurityCheckConfig:
     """Test SecurityCheckConfig model."""
 
     def test_valid_config_enabled(self):
-        """Valid enabled security config validates correctly."""
+        """Valid enabled security config validates correctly; tool normalized into execution spec."""
         config = SecurityCheckConfig(enabled=True, tool=ToolName.BANDIT, args=["-r", "."])
         assert config.enabled is True
-        assert config.tool == ToolName.BANDIT
+        assert config.tool is None  # cleared by normalization
+        assert config.execution is not None
+        assert config.execution.tool == ToolName.BANDIT
         assert config.args == ["-r", "."]
 
     def test_valid_config_disabled(self):
@@ -437,7 +446,8 @@ class TestSimpleTaskSpecWithQualityAndDesign:
             ),
         )
         assert spec.quality_requirements is not None
-        assert spec.quality_requirements.linting.tool == ToolName.RUFF
+        assert spec.quality_requirements.linting.execution is not None
+        assert spec.quality_requirements.linting.execution.tool == ToolName.RUFF
         assert spec.quality_requirements.testing.min_coverage == 80
 
     def test_spec_with_design(self):
@@ -495,3 +505,69 @@ class TestSimpleTaskSpecWithQualityAndDesign:
             ),
         )
         assert spec.design is None
+
+
+class TestMixedLegacyAndCanonicalRejection:
+    """Verify that setting both 'execution' and 'tool' in the same config is rejected (AC5)."""
+
+    def test_linting_config_rejects_mixed_fields(self):
+        """LintingConfig raises ValidationError when both execution and tool are set."""
+        with pytest.raises(ValidationError, match=r"both 'execution'.*and 'tool'"):
+            LintingConfig(
+                enabled=True,
+                execution=ToolExecutionSpec(tool=ToolName.RUFF, args=["check", "."]),
+                tool=ToolName.MYPY,
+            )
+
+    def test_type_check_config_rejects_mixed_fields(self):
+        """TypeCheckConfig raises ValidationError when both execution and tool are set."""
+        with pytest.raises(ValidationError, match=r"both 'execution'.*and 'tool'"):
+            TypeCheckConfig(
+                enabled=True,
+                execution=ToolExecutionSpec(tool=ToolName.MYPY, args=[]),
+                tool=ToolName.RUFF,
+            )
+
+    def test_testing_config_rejects_mixed_fields(self):
+        """TestingConfig raises ValidationError when both execution and tool are set."""
+        with pytest.raises(ValidationError, match=r"both 'execution'.*and 'tool'"):
+            TestingConfig(
+                enabled=True,
+                execution=ToolExecutionSpec(tool=ToolName.PYTEST, args=[]),
+                tool=ToolName.PYTEST,
+            )
+
+    def test_security_check_config_rejects_mixed_fields(self):
+        """SecurityCheckConfig raises ValidationError when both execution and tool are set."""
+        with pytest.raises(ValidationError, match=r"both 'execution'.*and 'tool'"):
+            SecurityCheckConfig(
+                enabled=True,
+                execution=ToolExecutionSpec(tool=ToolName.RUFF, args=[]),
+                tool=ToolName.RUFF,
+            )
+
+    def test_error_message_identifies_config_type(self):
+        """Error message names the config class so the offending field is identifiable."""
+        with pytest.raises(ValidationError) as exc_info:
+            LintingConfig(
+                enabled=True,
+                execution=ToolExecutionSpec(tool=ToolName.RUFF, args=[]),
+                tool=ToolName.MYPY,
+            )
+        assert "LintingConfig" in str(exc_info.value)
+
+    def test_legacy_only_still_accepted(self):
+        """Legacy tool/args form without execution is still valid (backward compat)."""
+        cfg = LintingConfig(enabled=True, tool=ToolName.RUFF, args=["check", "."])
+        assert cfg.tool is None  # cleared by normalization
+        assert cfg.execution is not None
+        assert cfg.execution.tool == ToolName.RUFF
+
+    def test_canonical_only_still_accepted(self):
+        """Canonical execution-only form without tool is valid."""
+        cfg = LintingConfig(
+            enabled=True,
+            execution=ToolExecutionSpec(tool=ToolName.MYPY, args=["--strict"]),
+        )
+        assert cfg.execution.tool == ToolName.MYPY
+        assert cfg.tool is None

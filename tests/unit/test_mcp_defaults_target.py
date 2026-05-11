@@ -261,7 +261,8 @@ class TestQualityDefaultsTarget:
 
         assert response.quality_requirements is not None
         assert response.quality_requirements.linting is not None
-        assert response.quality_requirements.linting.tool.value == "ruff"
+        assert response.quality_requirements.linting.execution is not None
+        assert response.quality_requirements.linting.execution.tool.value == "ruff"
 
     def test_check_action_raises_for_defaults_target(self, defaults_project):
         _tasks_dir, mock_project = defaults_project
@@ -300,7 +301,8 @@ class TestQualityDefaultsTarget:
         assert response.quality_requirements is not None
         assert response.quality_requirements.linting is not None
         # Existing linting config (pylint) should be preserved
-        assert response.quality_requirements.linting.tool.value == "pylint"
+        assert response.quality_requirements.linting.execution is not None
+        assert response.quality_requirements.linting.execution.tool.value == "pylint"
 
     def test_summary_shows_defaults_branch(self, defaults_project):
         _tasks_dir, mock_project = defaults_project
@@ -372,7 +374,8 @@ class TestQualityDefaultsTarget:
         assert get_response is not None
         assert get_response.quality_requirements is not None
         assert get_response.quality_requirements.type_checking is not None
-        assert get_response.quality_requirements.type_checking.tool.value == "mypy"
+        assert get_response.quality_requirements.type_checking.execution is not None
+        assert get_response.quality_requirements.type_checking.execution.tool.value == "mypy"
 
 
 # ---------------------------------------------------------------------------

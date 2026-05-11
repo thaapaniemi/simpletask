@@ -21,62 +21,123 @@ from simpletask.core.models import (
     QualityRequirements,
     SecurityCheckConfig,
     TestingConfig,
+    ToolExecutionSpec,
     ToolName,
     TypeCheckConfig,
 )
 
 # Predefined quality presets for common tech stacks
+# These use canonical nested execution specs
+
 QUALITY_PRESETS: dict[str, QualityRequirements] = {
     "python": QualityRequirements(
-        linting=LintingConfig(enabled=True, tool=ToolName.RUFF, args=["check", "."]),
-        type_checking=TypeCheckConfig(enabled=True, tool=ToolName.MYPY, args=["cli/"]),
-        testing=TestingConfig(enabled=True, tool=ToolName.PYTEST, args=[], min_coverage=80),
-        security_check=SecurityCheckConfig(enabled=False, tool=None, args=[]),
+        linting=LintingConfig(
+            enabled=True,
+            execution=ToolExecutionSpec(tool=ToolName.RUFF, args=["check", "."]),
+        ),
+        type_checking=TypeCheckConfig(
+            enabled=True, execution=ToolExecutionSpec(tool=ToolName.MYPY, args=["cli/"])
+        ),
+        testing=TestingConfig(
+            enabled=True,
+            execution=ToolExecutionSpec(tool=ToolName.PYTEST, args=[]),
+            min_coverage=80,
+        ),
+        security_check=SecurityCheckConfig(enabled=False),
     ),
     "typescript": QualityRequirements(
-        linting=LintingConfig(enabled=True, tool=ToolName.ESLINT, args=[".", "--ext", ".ts,.tsx"]),
-        type_checking=TypeCheckConfig(enabled=True, tool=ToolName.TSC, args=["--noEmit"]),
-        testing=TestingConfig(enabled=True, tool=ToolName.NPM, args=["test"], min_coverage=80),
-        security_check=SecurityCheckConfig(enabled=False, tool=None, args=[]),
+        linting=LintingConfig(
+            enabled=True,
+            execution=ToolExecutionSpec(tool=ToolName.ESLINT, args=[".", "--ext", ".ts,.tsx"]),
+        ),
+        type_checking=TypeCheckConfig(
+            enabled=True, execution=ToolExecutionSpec(tool=ToolName.TSC, args=["--noEmit"])
+        ),
+        testing=TestingConfig(
+            enabled=True,
+            execution=ToolExecutionSpec(tool=ToolName.NPM, args=["test"]),
+            min_coverage=80,
+        ),
+        security_check=SecurityCheckConfig(enabled=False),
     ),
     "node": QualityRequirements(
-        linting=LintingConfig(enabled=True, tool=ToolName.ESLINT, args=["."]),
+        linting=LintingConfig(
+            enabled=True, execution=ToolExecutionSpec(tool=ToolName.ESLINT, args=["."])
+        ),
         type_checking=None,
-        testing=TestingConfig(enabled=True, tool=ToolName.NPM, args=["test"], min_coverage=75),
-        security_check=SecurityCheckConfig(enabled=True, tool=ToolName.NPM, args=["audit"]),
+        testing=TestingConfig(
+            enabled=True,
+            execution=ToolExecutionSpec(tool=ToolName.NPM, args=["test"]),
+            min_coverage=75,
+        ),
+        security_check=SecurityCheckConfig(
+            enabled=True, execution=ToolExecutionSpec(tool=ToolName.NPM, args=["audit"])
+        ),
     ),
     "go": QualityRequirements(
-        linting=LintingConfig(enabled=True, tool=ToolName.GOLANGCI_LINT, args=["run"]),
+        linting=LintingConfig(
+            enabled=True,
+            execution=ToolExecutionSpec(tool=ToolName.GOLANGCI_LINT, args=["run"]),
+        ),
         type_checking=None,  # Go has built-in type checking at compile time
         testing=TestingConfig(
-            enabled=True, tool=ToolName.GO, args=["test", "./..."], min_coverage=80
+            enabled=True,
+            execution=ToolExecutionSpec(tool=ToolName.GO, args=["test", "./..."]),
+            min_coverage=80,
         ),
-        security_check=SecurityCheckConfig(enabled=True, tool=ToolName.GOSEC, args=["./..."]),
+        security_check=SecurityCheckConfig(
+            enabled=True, execution=ToolExecutionSpec(tool=ToolName.GOSEC, args=["./..."])
+        ),
     ),
     "rust": QualityRequirements(
         linting=LintingConfig(
-            enabled=True, tool=ToolName.CARGO, args=["clippy", "--", "-D", "warnings"]
+            enabled=True,
+            execution=ToolExecutionSpec(
+                tool=ToolName.CARGO, args=["clippy", "--", "-D", "warnings"]
+            ),
         ),
         type_checking=None,  # Rust has built-in type checking at compile time
-        testing=TestingConfig(enabled=True, tool=ToolName.CARGO, args=["test"], min_coverage=75),
-        security_check=SecurityCheckConfig(enabled=True, tool=ToolName.CARGO, args=["audit"]),
+        testing=TestingConfig(
+            enabled=True,
+            execution=ToolExecutionSpec(tool=ToolName.CARGO, args=["test"]),
+            min_coverage=75,
+        ),
+        security_check=SecurityCheckConfig(
+            enabled=True, execution=ToolExecutionSpec(tool=ToolName.CARGO, args=["audit"])
+        ),
     ),
     "java-maven": QualityRequirements(
-        linting=LintingConfig(enabled=True, tool=ToolName.MVN, args=["checkstyle:check"]),
+        linting=LintingConfig(
+            enabled=True,
+            execution=ToolExecutionSpec(tool=ToolName.MVN, args=["checkstyle:check"]),
+        ),
         type_checking=None,  # Java has built-in type checking at compile time
-        testing=TestingConfig(enabled=True, tool=ToolName.MVN, args=["test"], min_coverage=80),
+        testing=TestingConfig(
+            enabled=True,
+            execution=ToolExecutionSpec(tool=ToolName.MVN, args=["test"]),
+            min_coverage=80,
+        ),
         security_check=SecurityCheckConfig(
-            enabled=True, tool=ToolName.MVN, args=["dependency-check:check"]
+            enabled=True,
+            execution=ToolExecutionSpec(tool=ToolName.MVN, args=["dependency-check:check"]),
         ),
     ),
     "java-gradle": QualityRequirements(
         linting=LintingConfig(
-            enabled=True, tool=ToolName.GRADLE, args=["checkstyleMain", "checkstyleTest"]
+            enabled=True,
+            execution=ToolExecutionSpec(
+                tool=ToolName.GRADLE, args=["checkstyleMain", "checkstyleTest"]
+            ),
         ),
         type_checking=None,  # Java has built-in type checking at compile time
-        testing=TestingConfig(enabled=True, tool=ToolName.GRADLE, args=["test"], min_coverage=80),
+        testing=TestingConfig(
+            enabled=True,
+            execution=ToolExecutionSpec(tool=ToolName.GRADLE, args=["test"]),
+            min_coverage=80,
+        ),
         security_check=SecurityCheckConfig(
-            enabled=True, tool=ToolName.GRADLE, args=["dependencyCheckAnalyze"]
+            enabled=True,
+            execution=ToolExecutionSpec(tool=ToolName.GRADLE, args=["dependencyCheckAnalyze"]),
         ),
     ),
 }

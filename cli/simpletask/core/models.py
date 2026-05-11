@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator, model_serializer, model_validator
 
 
 class TaskStatus(str, Enum):
@@ -57,6 +57,21 @@ class ToolName(str, Enum):
 
     # Other tools
     MAKE = "make"
+    EARTHLY = "earthly"
+
+
+class ExecutionKind(str, Enum):
+    """Type of execution for quality checks."""
+
+    TOOL = "tool"
+    WORKFLOW = "workflow"
+
+
+class WorkflowRunner(str, Enum):
+    """Supported workflow runners for quality checks."""
+
+    MAKE = "make"
+    EARTHLY = "earthly"
 
 
 class AcceptanceCriterion(BaseModel):
@@ -88,6 +103,32 @@ class CodeExample(BaseModel):
     code: str = Field(..., description="The actual code")
 
 
+class ToolExecutionSpec(BaseModel):
+    """Execution specification for tool-based quality checks."""
+
+    model_config = {"extra": "forbid"}
+
+    kind: ExecutionKind = Field(ExecutionKind.TOOL, description="Execution kind")
+    tool: ToolName = Field(..., description="Tool to execute")
+    args: list[str] = Field(default_factory=list, description="Tool arguments")
+
+
+class WorkflowExecutionSpec(BaseModel):
+    """Execution specification for workflow-based quality checks."""
+
+    model_config = {"extra": "forbid"}
+
+    kind: ExecutionKind = Field(ExecutionKind.WORKFLOW, description="Execution kind")
+    runner: WorkflowRunner = Field(..., description="Workflow runner to use")
+    target: str = Field(..., description="Workflow target or rule name")
+    no_cache: bool = Field(
+        default=False, description="Pass --no-cache to Earthly runner (ignored for make)"
+    )
+    extra_args: list[str] = Field(
+        default_factory=list, description="Additional flags passed to the runner before the target"
+    )
+
+
 def validate_no_shell_metacharacters(args: list[str]) -> list[str]:
     """Shared validator for rejecting dangerous shell metacharacters.
 
@@ -117,83 +158,117 @@ def validate_no_shell_metacharacters(args: list[str]) -> list[str]:
     return args
 
 
-class LintingConfig(BaseModel):
+def normalize_legacy_to_execution(
+    tool: ToolName | None,
+    args: list[str] | None,
+    execution: ToolExecutionSpec | WorkflowExecutionSpec | None,
+) -> ToolExecutionSpec | WorkflowExecutionSpec | None:
+    """Normalize legacy tool/args to canonical execution spec if needed.
+
+    If execution is already set, return it as-is.
+    If tool is set, convert tool and args to ToolExecutionSpec.
+    Otherwise return None.
+
+    Args:
+        tool: Legacy tool name if using legacy form
+        args: Legacy arguments if using legacy form
+        execution: Already-set execution spec if using canonical form
+
+    Returns:
+        Execution spec in canonical form, or None if neither form provided
+    """
+    if execution is not None:
+        return execution
+
+    if tool is not None:
+        return ToolExecutionSpec(tool=tool, args=args or [])
+
+    return None
+
+
+class BaseQualityConfig(BaseModel):
+    """Shared base for all quality check configuration types.
+
+    Holds the common execution, legacy-compat, and timeout fields used by
+    LintingConfig, TypeCheckConfig, TestingConfig, and SecurityCheckConfig.
+    Subclasses add only the fields that differ (e.g. min_coverage, enabled default).
+    """
+
+    model_config = {"extra": "forbid"}
+
+    enabled: bool = Field(..., description="Whether this check is enabled")
+    execution: ToolExecutionSpec | WorkflowExecutionSpec | None = Field(
+        None, description="Nested execution specification (canonical form)"
+    )
+    tool: ToolName | None = Field(None, description="(Legacy) Tool to run the check")
+    args: list[str] = Field(
+        default_factory=list, description="(Legacy) Arguments to pass to the tool"
+    )
+    timeout: int | None = Field(
+        default=300, ge=1, description="Timeout in seconds for the check (default: 300)"
+    )
+
+    @field_validator("args")
+    @classmethod
+    def validate_args(cls, v: list[str]) -> list[str]:
+        """Validate that arguments don't contain dangerous shell metacharacters."""
+        return validate_no_shell_metacharacters(v)
+
+    @model_validator(mode="after")
+    def normalize_execution(self) -> "BaseQualityConfig":
+        """Normalize legacy tool/args to canonical execution spec."""
+        config_type = type(self).__name__
+        if self.execution is not None and self.tool is not None:
+            raise ValueError(
+                f"{config_type} has both 'execution' (canonical form) and 'tool' (legacy form) "
+                "set; remove the legacy 'tool'/'args' fields or the canonical 'execution' block"
+            )
+        self.execution = normalize_legacy_to_execution(
+            tool=self.tool, args=self.args, execution=self.execution
+        )
+        self.tool = None
+        return self
+
+    @model_validator(mode="after")
+    def ensure_execution_when_enabled(self) -> "BaseQualityConfig":
+        """Ensure either execution spec or tool is configured when enabled."""
+        config_type = type(self).__name__
+        if self.enabled and self.execution is None and self.tool is None:
+            raise ValueError(
+                f"{config_type} must have either 'execution' (canonical form) or "
+                "'tool' (legacy form) when enabled, but neither is provided"
+            )
+        return self
+
+    @model_serializer(mode="wrap")
+    def _serialize_strip_legacy(self, handler: Any) -> dict[str, Any]:
+        """Exclude legacy args field when canonical execution spec is present."""
+        data: dict[str, Any] = handler(self)
+        if data.get("execution") is not None:
+            data.pop("args", None)
+        return data
+
+
+class LintingConfig(BaseQualityConfig):
     """Configuration for code linting checks."""
 
-    model_config = {"extra": "forbid"}
 
-    enabled: bool = Field(..., description="Whether linting is enabled")
-    tool: ToolName = Field(..., description="Tool to run linting check")
-    args: list[str] = Field(default_factory=list, description="Arguments to pass to the tool")
-    timeout: int | None = Field(
-        default=300, ge=1, description="Timeout in seconds for linting check (default: 300)"
-    )
-
-    @field_validator("args")
-    @classmethod
-    def validate_args(cls, v: list[str]) -> list[str]:
-        """Validate that arguments don't contain dangerous shell metacharacters."""
-        return validate_no_shell_metacharacters(v)
-
-
-class TypeCheckConfig(BaseModel):
+class TypeCheckConfig(BaseQualityConfig):
     """Configuration for type checking."""
 
-    model_config = {"extra": "forbid"}
 
-    enabled: bool = Field(..., description="Whether type checking is enabled")
-    tool: ToolName = Field(..., description="Tool to run type check")
-    args: list[str] = Field(default_factory=list, description="Arguments to pass to the tool")
-    timeout: int | None = Field(
-        default=300, ge=1, description="Timeout in seconds for type checking (default: 300)"
-    )
-
-    @field_validator("args")
-    @classmethod
-    def validate_args(cls, v: list[str]) -> list[str]:
-        """Validate that arguments don't contain dangerous shell metacharacters."""
-        return validate_no_shell_metacharacters(v)
-
-
-class TestingConfig(BaseModel):
+class TestingConfig(BaseQualityConfig):
     """Configuration for test execution."""
 
-    model_config = {"extra": "forbid"}
-
-    enabled: bool = Field(..., description="Whether testing is enabled")
-    tool: ToolName = Field(..., description="Tool to run tests")
-    args: list[str] = Field(default_factory=list, description="Arguments to pass to the tool")
     min_coverage: int | None = Field(
         None, ge=0, le=100, description="Minimum test coverage percentage (0-100)"
     )
-    timeout: int | None = Field(
-        default=300, ge=1, description="Timeout in seconds for test execution (default: 300)"
-    )
-
-    @field_validator("args")
-    @classmethod
-    def validate_args(cls, v: list[str]) -> list[str]:
-        """Validate that arguments don't contain dangerous shell metacharacters."""
-        return validate_no_shell_metacharacters(v)
 
 
-class SecurityCheckConfig(BaseModel):
+class SecurityCheckConfig(BaseQualityConfig):
     """Configuration for security checks."""
 
-    model_config = {"extra": "forbid"}
-
     enabled: bool = Field(default=False, description="Whether security checks are enabled")
-    tool: ToolName | None = Field(None, description="Tool to run security check")
-    args: list[str] = Field(default_factory=list, description="Arguments to pass to the tool")
-    timeout: int | None = Field(
-        default=300, ge=1, description="Timeout in seconds for security check (default: 300)"
-    )
-
-    @field_validator("args")
-    @classmethod
-    def validate_args(cls, v: list[str]) -> list[str]:
-        """Validate that arguments don't contain dangerous shell metacharacters."""
-        return validate_no_shell_metacharacters(v)
 
 
 class DesignReference(BaseModel):
@@ -379,13 +454,15 @@ class SimpleTaskSpec(BaseModel):
     This represents the complete structure of a task definition file
     stored in ./.tasks/<branch>.yml
 
-    Current schema version: 1.0
+    Supported schema versions: 1.0, 1.1
+    Current write version: 1.1
     """
 
     model_config = {"extra": "forbid"}
 
     schema_version: str = Field(
-        default="1.0", description="Schema version for compatibility tracking"
+        default="1.0",
+        description="Schema version for compatibility tracking (supports 1.0 and 1.1)",
     )
     branch: str = Field(
         ..., description="Branch name / unique task identifier (also git branch name)"
@@ -413,6 +490,18 @@ class SimpleTaskSpec(BaseModel):
     iterations: list[Iteration] | None = Field(
         None, description="Development iterations for grouping tasks"
     )
+
+    @field_validator("schema_version")
+    @classmethod
+    def validate_schema_version(cls, v: str) -> str:
+        """Ensure schema version is supported (1.0 or 1.1)."""
+        valid_versions = {"1.0", "1.1"}
+        if v not in valid_versions:
+            raise ValueError(
+                f"Unsupported schema version '{v}'. "
+                f"Supported versions: {', '.join(sorted(valid_versions))}"
+            )
+        return v
 
     @field_validator("tasks")
     @classmethod
@@ -516,6 +605,7 @@ __all__ = [
     "CodeExample",
     "Design",
     "DesignReference",
+    "ExecutionKind",
     "FileAction",
     "Iteration",
     "LintingConfig",
@@ -527,6 +617,9 @@ __all__ = [
     "Task",
     "TaskStatus",
     "TestingConfig",
+    "ToolExecutionSpec",
     "ToolName",
     "TypeCheckConfig",
+    "WorkflowExecutionSpec",
+    "WorkflowRunner",
 ]
