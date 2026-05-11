@@ -92,8 +92,41 @@ def build_write_response(action: str, message: str, spec, file_path: str, **extr
     return response
 
 
+def _serialize_execution_spec(execution) -> dict | None:
+    """Serialize a ToolExecutionSpec or WorkflowExecutionSpec to a dict.
+
+    Args:
+        execution: ToolExecutionSpec or WorkflowExecutionSpec instance, or None.
+
+    Returns:
+        Dict representation or None if execution is None.
+    """
+    from simpletask.core.models import ToolExecutionSpec, WorkflowExecutionSpec
+
+    if execution is None:
+        return None
+
+    if isinstance(execution, ToolExecutionSpec):
+        return {
+            "kind": execution.kind.value,
+            "tool": execution.tool.value,
+            "args": execution.args,
+        }
+
+    if isinstance(execution, WorkflowExecutionSpec):
+        return {
+            "kind": execution.kind.value,
+            "runner": execution.runner.value,
+            "target": execution.target,
+        }
+
+    return None
+
+
 def serialize_quality_reqs(quality_reqs) -> dict:
     """Serialize a QualityRequirements object to a JSON-serializable dict.
+
+    Uses the canonical nested execution specs.
 
     Args:
         quality_reqs: QualityRequirements instance to serialize.
@@ -104,18 +137,14 @@ def serialize_quality_reqs(quality_reqs) -> dict:
     return {
         "linting": {
             "enabled": quality_reqs.linting.enabled,
-            "tool": quality_reqs.linting.tool.value if quality_reqs.linting.tool else None,
-            "args": quality_reqs.linting.args,
+            "execution": _serialize_execution_spec(quality_reqs.linting.execution),
+            "timeout": quality_reqs.linting.timeout,
         },
         "type_checking": (
             {
                 "enabled": quality_reqs.type_checking.enabled,
-                "tool": (
-                    quality_reqs.type_checking.tool.value
-                    if quality_reqs.type_checking.tool
-                    else None
-                ),
-                "args": quality_reqs.type_checking.args,
+                "execution": _serialize_execution_spec(quality_reqs.type_checking.execution),
+                "timeout": quality_reqs.type_checking.timeout,
             }
             if quality_reqs.type_checking
             else None
@@ -123,9 +152,9 @@ def serialize_quality_reqs(quality_reqs) -> dict:
         "testing": (
             {
                 "enabled": quality_reqs.testing.enabled,
-                "tool": quality_reqs.testing.tool.value if quality_reqs.testing.tool else None,
-                "args": quality_reqs.testing.args,
+                "execution": _serialize_execution_spec(quality_reqs.testing.execution),
                 "min_coverage": quality_reqs.testing.min_coverage,
+                "timeout": quality_reqs.testing.timeout,
             }
             if quality_reqs.testing
             else None
@@ -133,12 +162,8 @@ def serialize_quality_reqs(quality_reqs) -> dict:
         "security_check": (
             {
                 "enabled": quality_reqs.security_check.enabled,
-                "tool": (
-                    quality_reqs.security_check.tool.value
-                    if quality_reqs.security_check.tool
-                    else None
-                ),
-                "args": quality_reqs.security_check.args,
+                "execution": _serialize_execution_spec(quality_reqs.security_check.execution),
+                "timeout": quality_reqs.security_check.timeout,
             }
             if quality_reqs.security_check
             else None

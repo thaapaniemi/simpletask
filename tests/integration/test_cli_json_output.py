@@ -261,13 +261,15 @@ class TestQualityShowJsonOutput:
         parsed = json.loads(result.output)
         linting = parsed["linting"]
         assert "enabled" in linting
-        assert "tool" in linting
-        assert "args" in linting
+        assert "execution" in linting
+        assert "timeout" in linting
+        assert "tool" in linting["execution"]
+        assert "args" in linting["execution"]
 
     def test_linting_values_correct(self, json_project):
         result = runner.invoke(app, ["quality", "show", "--format", "json"])
         parsed = json.loads(result.output)
-        assert parsed["linting"]["tool"] == "ruff"
+        assert parsed["linting"]["execution"]["tool"] == "ruff"
         assert parsed["linting"]["enabled"] is True
 
     def test_no_ansi_codes(self, json_project):

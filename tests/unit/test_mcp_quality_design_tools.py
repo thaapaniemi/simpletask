@@ -99,7 +99,8 @@ class TestQualityToolGet:
 
         assert result.action == "quality_get"
         assert result.quality_requirements is not None
-        assert result.quality_requirements.linting.tool == ToolName.RUFF
+        assert result.quality_requirements.linting.execution is not None
+        assert result.quality_requirements.linting.execution.tool == ToolName.RUFF
         assert result.quality_requirements.testing.min_coverage == 80
         assert result.check_results is None
         assert result.all_passed is None
@@ -204,8 +205,9 @@ class TestQualityToolSet:
 
         # Verify write was called
         written_spec = mock_write.call_args[0][1]
-        assert written_spec.quality_requirements.linting.tool == ToolName.ESLINT
-        assert written_spec.quality_requirements.linting.args == [".", "--fix"]
+        assert written_spec.quality_requirements.linting.execution is not None
+        assert written_spec.quality_requirements.linting.execution.tool == ToolName.ESLINT
+        assert written_spec.quality_requirements.linting.execution.args == [".", "--fix"]
 
     @patch("simpletask.mcp.server.write_task_file")
     @patch("simpletask.mcp.server.parse_task_file")
@@ -306,7 +308,8 @@ class TestQualityToolPreset:
         # Verify type checking was added
         written_spec = mock_write.call_args[0][1]
         assert written_spec.quality_requirements.type_checking is not None
-        assert written_spec.quality_requirements.type_checking.tool == ToolName.MYPY
+        assert written_spec.quality_requirements.type_checking.execution is not None
+        assert written_spec.quality_requirements.type_checking.execution.tool == ToolName.MYPY
 
     @patch("simpletask.mcp.server.parse_task_file")
     @patch("simpletask.mcp.server.get_current_task_file_path")

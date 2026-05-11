@@ -237,7 +237,8 @@ class TestSetCommand:
         # Verify write_task_file was called
         mock_write.assert_called_once()
         updated_spec = mock_write.call_args[0][1]
-        assert updated_spec.quality_requirements.linting.tool == ToolName.PYLINT
+        assert updated_spec.quality_requirements.linting.execution is not None
+        assert updated_spec.quality_requirements.linting.execution.tool == ToolName.PYLINT
 
     @patch("simpletask.commands.quality.set.write_task_file")
     @patch("simpletask.commands.quality.set.parse_task_file")
@@ -289,7 +290,8 @@ class TestSetCommand:
 
         mock_write.assert_called_once()
         updated_spec = mock_write.call_args[0][1]
-        assert updated_spec.quality_requirements.linting.args == ["check", "src", "--fix"]
+        assert updated_spec.quality_requirements.linting.execution is not None
+        assert updated_spec.quality_requirements.linting.execution.args == ["check", "src", "--fix"]
 
     @patch("simpletask.commands.quality.set.get_task_file_path")
     def test_set_coverage_non_testing_error(self, mock_get_path):
@@ -370,7 +372,8 @@ class TestPresetCommand:
         updated_spec = mock_write.call_args[0][1]
         # Type checking should be filled from preset
         assert updated_spec.quality_requirements.type_checking is not None
-        assert updated_spec.quality_requirements.type_checking.tool == ToolName.MYPY
+        assert updated_spec.quality_requirements.type_checking.execution is not None
+        assert updated_spec.quality_requirements.type_checking.execution.tool == ToolName.MYPY
 
     @patch("simpletask.commands.quality.preset.write_task_file")
     @patch("simpletask.commands.quality.preset.parse_task_file")
@@ -381,14 +384,15 @@ class TestPresetCommand:
         """Applying preset preserves existing configurations."""
         mock_get_path.return_value = Path(".tasks/test-feature.yml")
         mock_parse.return_value = sample_spec_with_quality
-        original_tool = sample_spec_with_quality.quality_requirements.linting.tool
+        original_tool = sample_spec_with_quality.quality_requirements.linting.execution.tool
 
         preset_command(preset_name="python")
 
         mock_write.assert_called_once()
         updated_spec = mock_write.call_args[0][1]
         # Linting should be preserved (not replaced)
-        assert updated_spec.quality_requirements.linting.tool == original_tool
+        assert updated_spec.quality_requirements.linting.execution is not None
+        assert updated_spec.quality_requirements.linting.execution.tool == original_tool
 
     @patch("simpletask.commands.quality.preset.load_all_presets")
     @patch("simpletask.commands.quality.preset.QUALITY_PRESETS")

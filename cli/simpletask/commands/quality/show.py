@@ -5,7 +5,7 @@ from typing import Annotated
 import typer
 from rich.table import Table
 
-from simpletask.core.models import ToolName
+from simpletask.core.models import ToolExecutionSpec, WorkflowExecutionSpec
 from simpletask.core.project import get_task_file_path
 from simpletask.core.yaml_parser import parse_task_file
 from simpletask.utils.console import console, error
@@ -18,15 +18,27 @@ from simpletask.utils.output import (
 )
 
 
-def _format_tool_command(tool: ToolName | None, args: list[str]) -> str:
-    """Format tool and args into a human-readable command string."""
-    if tool is None:
+def _format_execution_spec(execution) -> str:
+    """Format execution spec into a human-readable command string.
+
+    Args:
+        execution: ToolExecutionSpec or WorkflowExecutionSpec instance, or None.
+
+    Returns:
+        Human-readable command string.
+    """
+    if execution is None:
         return ""
 
-    if not args:
-        return tool.value
+    if isinstance(execution, ToolExecutionSpec):
+        if not execution.args:
+            return execution.tool.value
+        return f"{execution.tool.value} {' '.join(execution.args)}"
 
-    return f"{tool.value} {' '.join(args)}"
+    if isinstance(execution, WorkflowExecutionSpec):
+        return f"{execution.runner.value} {execution.target}"
+
+    return ""
 
 
 def _print_json_quality_show(quality_reqs, file_path: str) -> None:
@@ -98,7 +110,7 @@ def show_command(
         table.add_row(
             "Linting",
             enabled_icon,
-            _format_tool_command(quality_reqs.linting.tool, quality_reqs.linting.args),
+            _format_execution_spec(quality_reqs.linting.execution),
             "",
         )
 
@@ -110,9 +122,7 @@ def show_command(
             table.add_row(
                 "Type Checking",
                 enabled_icon,
-                _format_tool_command(
-                    quality_reqs.type_checking.tool, quality_reqs.type_checking.args
-                ),
+                _format_execution_spec(quality_reqs.type_checking.execution),
                 "",
             )
         else:
@@ -126,7 +136,7 @@ def show_command(
         table.add_row(
             "Testing",
             enabled_icon,
-            _format_tool_command(quality_reqs.testing.tool, quality_reqs.testing.args),
+            _format_execution_spec(quality_reqs.testing.execution),
             options,
         )
 
@@ -135,9 +145,7 @@ def show_command(
             enabled_icon = (
                 "[green]✓[/green]" if quality_reqs.security_check.enabled else "[red]✗[/red]"
             )
-            cmd = _format_tool_command(
-                quality_reqs.security_check.tool, quality_reqs.security_check.args
-            )
+            cmd = _format_execution_spec(quality_reqs.security_check.execution)
             table.add_row(
                 "Security Check",
                 enabled_icon,

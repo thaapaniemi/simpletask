@@ -22,6 +22,7 @@ from simpletask.core.models import (
     SecurityCategory,
     SecurityRequirement,
     ToolName,
+    WorkflowRunner,
 )
 from simpletask.core.presets import (
     QUALITY_PRESETS,
@@ -422,6 +423,18 @@ def quality_set_command(
             "--args", "-a", help="Tool arguments as comma-separated list (e.g., 'check,.,--fix')"
         ),
     ] = None,
+    runner: Annotated[
+        WorkflowRunner | None,
+        typer.Option("--runner", "-r", help="Workflow runner (make or earthly)"),
+    ] = None,
+    target: Annotated[
+        str | None,
+        typer.Option(
+            "--target",
+            "-T",
+            help="Workflow target or rule name (used with --runner)",
+        ),
+    ] = None,
     enable: Annotated[bool, typer.Option("--enable", help="Enable this quality check")] = False,
     disable: Annotated[bool, typer.Option("--disable", help="Disable this quality check")] = False,
     min_coverage: Annotated[
@@ -440,20 +453,35 @@ def quality_set_command(
 ) -> None:
     """Set a quality configuration in project defaults.
 
-    Examples:
+    Tool-mode examples (direct tool execution):
         simpletask defaults quality set linting --tool ruff --args "check,."
         simpletask defaults quality set testing --tool pytest --min-coverage 80
         simpletask defaults quality set type-checking --tool mypy --enable
+
+    Workflow-mode examples (make or earthly):
+        simpletask defaults quality set linting --runner make --target lint
+        simpletask defaults quality set testing --runner earthly --target +test
     """
     try:
+        # Validate that tool/args and runner/target are not mixed
+        has_tool_args = tool is not None or args is not None
+        has_workflow = runner is not None or target is not None
+
+        if has_tool_args and has_workflow:
+            error(
+                "Cannot mix tool-mode and workflow-mode: provide either "
+                "(--tool/--args) or (--runner/--target), not both"
+            )
+            return
+
         if enable and disable:
             error("Cannot specify both --enable and --disable")
+            return
 
         project = ensure_project()
         defaults = _load_or_empty(project)
 
-        # update_quality_requirements operates directly on QualityRequirements.
-
+        # Parse arguments
         args_list: list[str] | None = None
         if args:
             args_list = [a.strip() for a in args.split(",")]
@@ -475,6 +503,8 @@ def quality_set_command(
             enabled=enabled_status,
             min_coverage=min_coverage,
             timeout=timeout,
+            workflow_runner=runner,
+            workflow_target=target,
         )
         defaults.quality_requirements = updated_reqs
         save_defaults(project, defaults)
@@ -488,6 +518,10 @@ def quality_set_command(
             changes.append(f"tool: {tool.value}")
         if args_list:
             changes.append(f"args: {', '.join(args_list)}")
+        if runner:
+            changes.append(f"runner: {runner.value}")
+        if target:
+            changes.append(f"target: {target}")
         if enabled_status is not None:
             changes.append(f"enabled: {str(enabled_status).lower()}")
         if min_coverage is not None:

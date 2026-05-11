@@ -10,6 +10,7 @@ Tests cover:
 """
 
 import pytest
+import yaml
 from simpletask.core.models import (
     LintingConfig,
     QualityRequirements,
@@ -39,70 +40,102 @@ class TestQualityPresets:
             assert preset_name in QUALITY_PRESETS
 
     def test_python_preset(self):
-        """Python preset has correct configuration."""
+        """Python preset has correct configuration with nested execution specs."""
         preset = QUALITY_PRESETS["python"]
         assert preset.linting.enabled is True
-        assert preset.linting.tool == ToolName.RUFF
-        assert preset.linting.args == ["check", "."]
+        assert preset.linting.execution is not None
+        assert preset.linting.execution.kind.value == "tool"
+        assert preset.linting.execution.tool == ToolName.RUFF
+        assert preset.linting.execution.args == ["check", "."]
         assert preset.type_checking is not None
-        assert preset.type_checking.tool == ToolName.MYPY
+        assert preset.type_checking.execution is not None
+        assert preset.type_checking.execution.tool == ToolName.MYPY
         assert preset.testing.enabled is True
-        assert preset.testing.tool == ToolName.PYTEST
+        assert preset.testing.execution is not None
+        assert preset.testing.execution.tool == ToolName.PYTEST
         assert preset.testing.min_coverage == 80
         assert preset.security_check.enabled is False
 
     def test_typescript_preset(self):
         """TypeScript preset has correct configuration."""
         preset = QUALITY_PRESETS["typescript"]
-        assert preset.linting.tool == ToolName.ESLINT
+        assert preset.linting.enabled is True
+        assert preset.linting.execution is not None
+        assert preset.linting.execution.tool == ToolName.ESLINT
         assert preset.type_checking is not None
-        assert preset.type_checking.tool == ToolName.TSC
-        assert preset.testing.tool == ToolName.NPM
-        assert preset.testing.args == ["test"]
+        assert preset.type_checking.execution is not None
+        assert preset.type_checking.execution.tool == ToolName.TSC
+        assert preset.testing.enabled is True
+        assert preset.testing.execution is not None
+        assert preset.testing.execution.tool == ToolName.NPM
+        assert preset.testing.execution.args == ["test"]
 
     def test_node_preset(self):
         """Node preset has correct configuration."""
         preset = QUALITY_PRESETS["node"]
-        assert preset.linting.tool == ToolName.ESLINT
+        assert preset.linting.enabled is True
+        assert preset.linting.execution is not None
+        assert preset.linting.execution.tool == ToolName.ESLINT
         assert preset.type_checking is None  # No type checking for plain Node
-        assert preset.testing.tool == ToolName.NPM
+        assert preset.testing.enabled is True
+        assert preset.testing.execution is not None
+        assert preset.testing.execution.tool == ToolName.NPM
         assert preset.security_check.enabled is True
-        assert preset.security_check.tool == ToolName.NPM
-        assert preset.security_check.args == ["audit"]
+        assert preset.security_check.execution is not None
+        assert preset.security_check.execution.tool == ToolName.NPM
+        assert preset.security_check.execution.args == ["audit"]
 
     def test_go_preset(self):
         """Go preset has correct configuration."""
         preset = QUALITY_PRESETS["go"]
-        assert preset.linting.tool == ToolName.GOLANGCI_LINT
+        assert preset.linting.enabled is True
+        assert preset.linting.execution is not None
+        assert preset.linting.execution.tool == ToolName.GOLANGCI_LINT
         assert preset.type_checking is None  # Built-in at compile time
-        assert preset.testing.tool == ToolName.GO
+        assert preset.testing.enabled is True
+        assert preset.testing.execution is not None
+        assert preset.testing.execution.tool == ToolName.GO
         assert preset.security_check.enabled is True
-        assert preset.security_check.tool == ToolName.GOSEC
+        assert preset.security_check.execution is not None
+        assert preset.security_check.execution.tool == ToolName.GOSEC
 
     def test_rust_preset(self):
         """Rust preset has correct configuration."""
         preset = QUALITY_PRESETS["rust"]
-        assert preset.linting.tool == ToolName.CARGO
-        assert "clippy" in preset.linting.args
+        assert preset.linting.enabled is True
+        assert preset.linting.execution is not None
+        assert preset.linting.execution.tool == ToolName.CARGO
+        assert "clippy" in preset.linting.execution.args
         assert preset.type_checking is None  # Built-in at compile time
-        assert preset.testing.tool == ToolName.CARGO
+        assert preset.testing.enabled is True
+        assert preset.testing.execution is not None
+        assert preset.testing.execution.tool == ToolName.CARGO
         assert preset.security_check.enabled is True
-        assert preset.security_check.tool == ToolName.CARGO
+        assert preset.security_check.execution is not None
+        assert preset.security_check.execution.tool == ToolName.CARGO
 
     def test_java_maven_preset(self):
         """Java Maven preset has correct configuration."""
         preset = QUALITY_PRESETS["java-maven"]
-        assert preset.linting.tool == ToolName.MVN
-        assert "checkstyle:check" in preset.linting.args
+        assert preset.linting.enabled is True
+        assert preset.linting.execution is not None
+        assert preset.linting.execution.tool == ToolName.MVN
+        assert "checkstyle:check" in preset.linting.execution.args
         assert preset.type_checking is None  # Built-in at compile time
-        assert preset.testing.tool == ToolName.MVN
+        assert preset.testing.enabled is True
+        assert preset.testing.execution is not None
+        assert preset.testing.execution.tool == ToolName.MVN
         assert preset.security_check.enabled is True
 
     def test_java_gradle_preset(self):
         """Java Gradle preset has correct configuration."""
         preset = QUALITY_PRESETS["java-gradle"]
-        assert preset.linting.tool == ToolName.GRADLE
-        assert preset.testing.tool == ToolName.GRADLE
+        assert preset.linting.enabled is True
+        assert preset.linting.execution is not None
+        assert preset.linting.execution.tool == ToolName.GRADLE
+        assert preset.testing.enabled is True
+        assert preset.testing.execution is not None
+        assert preset.testing.execution.tool == ToolName.GRADLE
         assert preset.security_check.enabled is True
 
 
@@ -113,7 +146,8 @@ class TestGetPreset:
         """Getting a valid preset returns QualityRequirements."""
         preset = get_preset("python")
         assert isinstance(preset, QualityRequirements)
-        assert preset.linting.tool == ToolName.RUFF
+        assert preset.linting.execution is not None
+        assert preset.linting.execution.tool == ToolName.RUFF
 
     def test_get_invalid_preset(self):
         """Getting an invalid preset raises ValueError."""
@@ -154,10 +188,13 @@ class TestApplyPreset:
     def test_apply_to_none(self):
         """Applying preset to None uses preset directly."""
         merged, applied = apply_preset(None, "python")
-        assert merged.linting.tool == ToolName.RUFF
+        assert merged.linting.execution is not None
+        assert merged.linting.execution.tool == ToolName.RUFF
         assert merged.type_checking is not None
-        assert merged.type_checking.tool == ToolName.MYPY
-        assert merged.testing.tool == ToolName.PYTEST
+        assert merged.type_checking.execution is not None
+        assert merged.type_checking.execution.tool == ToolName.MYPY
+        assert merged.testing.execution is not None
+        assert merged.testing.execution.tool == ToolName.PYTEST
         assert applied["linting"] is True
         assert applied["type_checking"] is True
         assert applied["testing"] is True
@@ -176,16 +213,19 @@ class TestApplyPreset:
         merged, applied = apply_preset(existing, "python")
 
         # Linting should NOT be replaced (user's PYLINT preserved)
-        assert merged.linting.tool == ToolName.PYLINT
+        assert merged.linting.execution is not None
+        assert merged.linting.execution.tool == ToolName.PYLINT
         assert applied["linting"] is False
 
         # Type checking should be filled from preset (MYPY)
         assert merged.type_checking is not None
-        assert merged.type_checking.tool == ToolName.MYPY
+        assert merged.type_checking.execution is not None
+        assert merged.type_checking.execution.tool == ToolName.MYPY
         assert applied["type_checking"] is True
 
         # Testing should NOT be replaced (user's config preserved)
-        assert merged.testing.tool == ToolName.PYTEST
+        assert merged.testing.execution is not None
+        assert merged.testing.execution.tool == ToolName.PYTEST
         assert applied["testing"] is False
 
         # Security check should NOT be replaced (user's config preserved)
@@ -207,11 +247,14 @@ class TestApplyPreset:
         merged, applied = apply_preset(existing, "python")
 
         # All fields should be preserved
-        assert merged.linting.tool == ToolName.RUFF
-        assert merged.linting.args == ["check", "src/"]
-        assert merged.type_checking.args == ["src/"]
+        assert merged.linting.execution is not None
+        assert merged.linting.execution.tool == ToolName.RUFF
+        assert merged.linting.execution.args == ["check", "src/"]
+        assert merged.type_checking.execution is not None
+        assert merged.type_checking.execution.args == ["src/"]
         assert merged.testing.min_coverage == 90
-        assert merged.security_check.tool == ToolName.BANDIT
+        assert merged.security_check.execution is not None
+        assert merged.security_check.execution.tool == ToolName.BANDIT
         assert applied["linting"] is False
         assert applied["type_checking"] is False
         assert applied["testing"] is False
@@ -229,7 +272,8 @@ class TestApplyPreset:
         merged, applied = apply_preset(existing, "python")
 
         assert merged.type_checking is not None
-        assert merged.type_checking.tool == ToolName.MYPY
+        assert merged.type_checking.execution is not None
+        assert merged.type_checking.execution.tool == ToolName.MYPY
         assert applied["type_checking"] is True
         assert applied["linting"] is False
         assert applied["testing"] is False
@@ -319,8 +363,9 @@ custom-python:
         assert "custom-python" in presets
         preset = presets["custom-python"]
         assert preset.linting.enabled is True
-        assert preset.linting.tool == ToolName.RUFF
-        assert preset.linting.args == ["check", "src/"]
+        assert preset.linting.execution is not None
+        assert preset.linting.execution.tool == ToolName.RUFF
+        assert preset.linting.execution.args == ["check", "src/"]
         assert preset.testing.min_coverage == 90
 
     def test_load_file_not_found(self, tmp_path):
@@ -394,8 +439,10 @@ preset2:
         assert len(presets) == 2
         assert "preset1" in presets
         assert "preset2" in presets
-        assert presets["preset1"].linting.tool == ToolName.RUFF
-        assert presets["preset2"].linting.tool == ToolName.ESLINT
+        assert presets["preset1"].linting.execution is not None
+        assert presets["preset1"].linting.execution.tool == ToolName.RUFF
+        assert presets["preset2"].linting.execution is not None
+        assert presets["preset2"].linting.execution.tool == ToolName.ESLINT
 
 
 class TestLoadAllPresets:
@@ -437,5 +484,71 @@ python:
 
         # Custom 'python' preset should override built-in
         assert "python" in all_presets
-        assert all_presets["python"].linting.args == ["check", "custom/"]
+        assert all_presets["python"].linting.execution is not None
+        assert all_presets["python"].linting.execution.args == ["check", "custom/"]
         assert all_presets["python"].testing.min_coverage == 95
+
+
+class TestPresetWriteYamlIntegration:
+    """Integration tests verifying that preset → write_task_file emits canonical YAML bytes."""
+
+    def test_preset_apply_then_write_emits_canonical_execution(self, tmp_path, sample_spec):
+        """AC3: after apply_preset + write_task_file, YAML must use only nested execution."""
+        from simpletask.core.yaml_parser import write_task_file
+
+        sample_spec.quality_requirements = None
+        merged, _ = apply_preset(None, "python")
+        sample_spec.quality_requirements = merged
+
+        task_file = tmp_path / "test.yml"
+        write_task_file(task_file, sample_spec)
+        data = yaml.safe_load(task_file.read_text())
+
+        linting = data["quality_requirements"]["linting"]
+        assert "execution" in linting, "linting must have nested execution block"
+        assert "tool" not in linting, "legacy 'tool' must not be present"
+        assert "args" not in linting, "legacy 'args' must not be present"
+        assert data["schema_version"] == "1.1"
+
+    def test_preset_write_preserves_execution_kind_and_tool(self, tmp_path, sample_spec):
+        """Nested execution tool and kind survive the write/read round trip."""
+        from simpletask.core.yaml_parser import parse_task_file, write_task_file
+
+        sample_spec.quality_requirements = None
+        merged, _ = apply_preset(None, "python")
+        sample_spec.quality_requirements = merged
+
+        task_file = tmp_path / "test.yml"
+        write_task_file(task_file, sample_spec)
+        parsed = parse_task_file(task_file)
+
+        assert parsed.quality_requirements is not None
+        assert parsed.quality_requirements.linting.execution is not None
+        assert parsed.quality_requirements.linting.execution.tool == ToolName.RUFF
+        assert parsed.quality_requirements.type_checking is not None
+        assert parsed.quality_requirements.type_checking.execution is not None
+        assert parsed.quality_requirements.type_checking.execution.tool == ToolName.MYPY
+
+    def test_preset_fill_gaps_write_canonical_yaml(self, tmp_path, sample_spec):
+        """Filling only type_checking from preset still produces canonical YAML."""
+        from simpletask.core.yaml_parser import write_task_file
+
+        sample_spec.quality_requirements = QualityRequirements(
+            linting=LintingConfig(enabled=True, tool=ToolName.RUFF, args=["check", "."]),
+            type_checking=None,
+            testing=TestingConfig(enabled=True, tool=ToolName.PYTEST, args=[]),
+            security_check=SecurityCheckConfig(enabled=False),
+        )
+        merged, applied = apply_preset(sample_spec.quality_requirements, "python")
+        assert applied["type_checking"] is True
+        sample_spec.quality_requirements = merged
+
+        task_file = tmp_path / "test.yml"
+        write_task_file(task_file, sample_spec)
+        data = yaml.safe_load(task_file.read_text())
+
+        type_checking = data["quality_requirements"]["type_checking"]
+        assert "execution" in type_checking
+        assert "tool" not in type_checking
+        assert "args" not in type_checking
+        assert data["schema_version"] == "1.1"
