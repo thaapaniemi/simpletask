@@ -840,7 +840,7 @@ Returns enriched task data with pre-computed status counts. By default, filters 
 - `file_path`: Path to task YAML file
 - `summary`: Pre-computed `StatusSummary` with **unfiltered** counts — always reflects the complete task file:
   - `branch`, `title`
-  - `overall_status`: Computed from task states (blocked > paused > in_progress > completed > not_started)
+  - `overall_status`: Computed from task states (blocked > in_progress > paused > completed > not_started)
   - `criteria_total`, `criteria_completed`
   - `tasks_total`, `tasks_completed`, `tasks_in_progress`, `tasks_not_started`, `tasks_blocked`, `tasks_paused`
 - `filters_applied` (dict or null): When filtering is active (`full=False`), contains:
