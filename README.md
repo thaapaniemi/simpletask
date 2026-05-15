@@ -100,15 +100,32 @@ The recommended workflow uses slash commands in supported AI editors. These guid
 
 **Supported AI tools:**
 
-- **[OpenCode](https://opencode.ai)**, **[Qwen](https://github.com/QwenLM/qwen-code)**, **[Gemini CLI](https://github.com/google-gemini/gemini-cli)**, and **[Mistral Vibe](https://mistral.ai/news/vibe-coding)** - Install workflow commands:
+- **[OpenCode](https://opencode.ai)**, **[Qwen](https://github.com/QwenLM/qwen-code)**, **[Gemini CLI](https://github.com/google-gemini/gemini-cli)**, and **[Mistral Vibe](https://mistral.ai/news/vibe-coding)** - Install full workflow commands:
   ```sh
-  simpletask ai install              # All four editors
+  simpletask ai install              # All four full integrations
   simpletask ai install --opencode   # OpenCode only
   simpletask ai install --qwen       # Qwen only
   simpletask ai install --gemini     # Gemini CLI only
   simpletask ai install --vibe       # Mistral Vibe only
   simpletask ai install --local      # Project-local installation
   ```
+
+- **[Pi](https://pi.dev/)** - Install all 4 Pi prompts:
+  ```sh
+  simpletask ai install --pi         # Global Pi prompts install
+  simpletask ai install --pi --local # Project-local Pi prompts install
+  ```
+
+  Pi uses a CLI-only workflow (no MCP tools) that works with Pi's local or remote models.
+  All 4 workflow prompts are available after a single install:
+  - `/simpletask-plan` — Create task specification and implementation plan
+  - `/simpletask-split` — Analyze codebase and split complex tasks into atomic subtasks
+  - `/simpletask-implement` — Execute tasks step-by-step with quality checks
+  - `/simpletask-review` — Review implementation against acceptance criteria
+
+  Install locations:
+  - Global: `~/.pi/agent/prompts/`
+  - Local: `.pi/prompts/`
 
 The workflow commands are:
 - `/simpletask.plan` - Create specification and implementation plan
@@ -254,6 +271,9 @@ ajv validate -s schema/simpletask.schema.json -d .tasks/my-task.yml --spec=draft
 ### MCP Server for AI Editors
 
 simpletask includes a Model Context Protocol (MCP) server for integration with AI editors like OpenCode, Qwen-CLI, Gemini CLI, and Mistral Vibe. The MCP server exposes task file operations as structured tools that AI assistants can use to read task definitions, check status, and understand project context.
+
+Pi uses a CLI-only workflow (no MCP tools) and works with Pi's local or remote models. All 4
+workflow prompts are installed with a single `simpletask ai install --pi` command.
 
 **Benefits:**
 - **Structured responses**: AI gets typed JSON instead of parsing CLI output

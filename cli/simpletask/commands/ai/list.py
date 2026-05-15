@@ -1,4 +1,4 @@
-"""List OpenCode, Qwen, Gemini, and Vibe CLI command templates."""
+"""List OpenCode, Qwen, Gemini, Pi, and Vibe AI templates."""
 
 from pathlib import Path
 
@@ -9,6 +9,7 @@ from simpletask.core.ai_templates import (
     get_agents_installed_status,
     get_bundled_agents,
     get_bundled_gemini_templates,
+    get_bundled_pi_templates,
     get_bundled_qwen_templates,
     get_bundled_templates,
     get_bundled_vibe_templates,
@@ -16,14 +17,17 @@ from simpletask.core.ai_templates import (
     get_global_agents_dir,
     get_global_commands_dir,
     get_global_gemini_commands_dir,
+    get_global_pi_commands_dir,
     get_global_qwen_commands_dir,
     get_global_vibe_commands_dir,
     get_installed_status,
     get_local_agents_dir,
     get_local_commands_dir,
     get_local_gemini_commands_dir,
+    get_local_pi_commands_dir,
     get_local_qwen_commands_dir,
     get_local_vibe_commands_dir,
+    get_pi_installed_status,
     get_qwen_installed_status,
     get_vibe_installed_status,
 )
@@ -66,7 +70,7 @@ def _render_editor_table(
 
 
 def list_command() -> None:
-    """List available and installed OpenCode, Qwen, Gemini, and Vibe CLI commands.
+    """List available and installed OpenCode, Qwen, Gemini, Pi, and Vibe resources.
 
     Shows which command templates are bundled with simpletask
     and whether they are installed globally or locally.
@@ -91,6 +95,10 @@ def list_command() -> None:
         gemini_templates = get_bundled_gemini_templates()
         gemini_status = get_gemini_installed_status()
 
+        # Get Pi prompt templates
+        pi_templates = get_bundled_pi_templates()
+        pi_status = get_pi_installed_status()
+
         # Get Vibe skills
         vibe_templates = get_bundled_vibe_templates()
         vibe_status = get_vibe_installed_status()
@@ -100,6 +108,7 @@ def list_command() -> None:
             and not opencode_agents
             and not qwen_templates
             and not gemini_templates
+            and not pi_templates
             and not vibe_templates
         ):
             console.print("[dim]No templates or agents found[/dim]")
@@ -157,6 +166,19 @@ def list_command() -> None:
             console.print(f"\n[bold]{EDITOR_CONFIGS['gemini'].display_name} Locations:[/bold]")
             console.print(f"  Global: {get_global_gemini_commands_dir()}")
             console.print(f"  Local:  {get_local_gemini_commands_dir()}\n")
+
+        # Pi prompts table
+        if pi_templates:
+            _render_editor_table(
+                title="Pi Prompts",
+                editor_name=EDITOR_CONFIGS["pi"].display_name,
+                templates=pi_templates,
+                status=pi_status,
+                name_label="Prompt",
+            )
+            console.print(f"\n[bold]{EDITOR_CONFIGS['pi'].display_name} Locations:[/bold]")
+            console.print(f"  Global: {get_global_pi_commands_dir()}")
+            console.print(f"  Local:  {get_local_pi_commands_dir()}\n")
 
         # Vibe skills table
         if vibe_templates:

@@ -22,26 +22,30 @@ class TestAiInstallCLI:
     @patch("simpletask.commands.ai.install.get_global_commands_dir")
     @patch("simpletask.commands.ai.install.get_global_qwen_commands_dir")
     @patch("simpletask.commands.ai.install.get_global_gemini_commands_dir")
+    @patch("simpletask.commands.ai.install.get_global_pi_commands_dir")
     @patch("simpletask.commands.ai.install.get_global_vibe_commands_dir")
     @patch("simpletask.commands.ai.install.get_global_agents_dir")
-    def test_default_installs_all_four_editors(
+    def test_default_installs_all_five_editors(
         self,
         mock_agents_dir,
         mock_vibe_dir,
+        mock_pi_dir,
         mock_gemini_dir,
         mock_qwen_dir,
         mock_opencode_dir,
         tmp_path: Path,
     ):
-        """Should install all four editors (OpenCode, Qwen, Gemini, Vibe) by default."""
+        """Should install all five editors (OpenCode, Qwen, Gemini, Pi, Vibe) by default."""
         opencode_dir = tmp_path / "opencode"
         qwen_dir = tmp_path / "qwen"
         gemini_dir = tmp_path / "gemini"
+        pi_dir = tmp_path / "pi"
         vibe_dir = tmp_path / "vibe"
         agents_dir = tmp_path / "agents"
         mock_opencode_dir.return_value = opencode_dir
         mock_qwen_dir.return_value = qwen_dir
         mock_gemini_dir.return_value = gemini_dir
+        mock_pi_dir.return_value = pi_dir
         mock_vibe_dir.return_value = vibe_dir
         mock_agents_dir.return_value = agents_dir
 
@@ -51,9 +55,10 @@ class TestAiInstallCLI:
         assert "Installing OpenCode commands" in result.stdout
         assert "Installing Qwen commands" in result.stdout
         assert "Installing Gemini CLI commands" in result.stdout
+        assert "Installing Pi prompts" in result.stdout
         assert "Installing Mistral Vibe skills" in result.stdout
 
-        # Verify all four sets of files were created
+        # Verify all five sets of files were created
         assert (opencode_dir / "simpletask.plan.md").exists()
         assert (opencode_dir / "simpletask.implement.md").exists()
         assert (opencode_dir / "simpletask.review.md").exists()
@@ -63,6 +68,10 @@ class TestAiInstallCLI:
         assert (gemini_dir / "simpletask.plan.toml").exists()
         assert (gemini_dir / "simpletask.implement.toml").exists()
         assert (gemini_dir / "simpletask.review.toml").exists()
+        assert (pi_dir / "simpletask-implement.md").exists()
+        assert (pi_dir / "simpletask-plan.md").exists()
+        assert (pi_dir / "simpletask-split.md").exists()
+        assert (pi_dir / "simpletask-review.md").exists()
         assert (vibe_dir / "simpletask-plan").is_dir()
         assert (vibe_dir / "simpletask-plan" / "SKILL.md").exists()
 
@@ -332,14 +341,16 @@ class TestAiInstallAgentsCLI:
         assert (agents_dir / "simpletask-plan.md").exists()
 
     @patch("simpletask.commands.ai.install.get_global_commands_dir")
+    @patch("simpletask.commands.ai.install.get_global_pi_commands_dir")
     @patch("simpletask.commands.ai.install.get_global_agents_dir")
     def test_default_install_includes_agents(
-        self, mock_agents_dir, mock_commands_dir, tmp_path: Path
+        self, mock_agents_dir, mock_pi_dir, mock_commands_dir, tmp_path: Path
     ):
         """Should install OpenCode agents by default when no flags specified."""
         commands_dir = tmp_path / "commands"
         agents_dir = tmp_path / "agents"
         mock_commands_dir.return_value = commands_dir
+        mock_pi_dir.return_value = tmp_path / "pi"
         mock_agents_dir.return_value = agents_dir
 
         result = runner.invoke(app, ["ai", "install"])
@@ -453,26 +464,30 @@ class TestAiInstallVibeCLI:
     @patch("simpletask.commands.ai.install.get_global_commands_dir")
     @patch("simpletask.commands.ai.install.get_global_qwen_commands_dir")
     @patch("simpletask.commands.ai.install.get_global_gemini_commands_dir")
+    @patch("simpletask.commands.ai.install.get_global_pi_commands_dir")
     @patch("simpletask.commands.ai.install.get_global_vibe_commands_dir")
     @patch("simpletask.commands.ai.install.get_global_agents_dir")
-    def test_default_installs_all_four_editors(
+    def test_default_installs_all_five_editors(
         self,
         mock_agents_dir,
         mock_vibe_dir,
+        mock_pi_dir,
         mock_gemini_dir,
         mock_qwen_dir,
         mock_opencode_dir,
         tmp_path: Path,
     ):
-        """Should install all four editors (including Vibe) by default."""
+        """Should install all five editors (including Pi and Vibe) by default."""
         opencode_dir = tmp_path / "opencode"
         qwen_dir = tmp_path / "qwen"
         gemini_dir = tmp_path / "gemini"
+        pi_dir = tmp_path / "pi"
         vibe_dir = tmp_path / "vibe"
         agents_dir = tmp_path / "agents"
         mock_opencode_dir.return_value = opencode_dir
         mock_qwen_dir.return_value = qwen_dir
         mock_gemini_dir.return_value = gemini_dir
+        mock_pi_dir.return_value = pi_dir
         mock_vibe_dir.return_value = vibe_dir
         mock_agents_dir.return_value = agents_dir
 
@@ -482,9 +497,12 @@ class TestAiInstallVibeCLI:
         assert "Installing OpenCode commands" in result.stdout
         assert "Installing Qwen commands" in result.stdout
         assert "Installing Gemini CLI commands" in result.stdout
+        assert "Installing Pi prompts" in result.stdout
         assert "Installing Mistral Vibe skills" in result.stdout
 
-        # Verify Vibe skill directories were created
+        # Verify Pi and Vibe files were created
+        assert (pi_dir / "simpletask-implement.md").exists()
+        assert (pi_dir / "simpletask-plan.md").exists()
         assert (vibe_dir / "simpletask-plan").is_dir()
         assert (vibe_dir / "simpletask-plan" / "SKILL.md").exists()
 
@@ -563,12 +581,14 @@ class TestInstallEditorDetection:
     @patch("simpletask.commands.ai.install.get_global_qwen_commands_dir")
     @patch("simpletask.commands.ai.install.get_global_gemini_commands_dir")
     @patch("simpletask.commands.ai.install.get_global_vibe_commands_dir")
+    @patch("simpletask.commands.ai.install.get_global_pi_commands_dir")
     @patch("simpletask.commands.ai.install.get_global_agents_dir")
     @patch("simpletask.commands.ai.install.is_editor_installed", return_value=False)
     def test_default_skips_missing_editors(
         self,
         mock_installed,
         mock_agents_dir,
+        mock_pi_dir,
         mock_vibe_dir,
         mock_gemini_dir,
         mock_qwen_dir,
@@ -581,6 +601,7 @@ class TestInstallEditorDetection:
             (mock_qwen_dir, "qwen"),
             (mock_gemini_dir, "gemini"),
             (mock_vibe_dir, "vibe"),
+            (mock_pi_dir, "pi"),
             (mock_agents_dir, "agents"),
         ]:
             mock.return_value = tmp_path / name
@@ -594,6 +615,7 @@ class TestInstallEditorDetection:
         assert not (tmp_path / "qwen").exists()
         assert not (tmp_path / "gemini").exists()
         assert not (tmp_path / "vibe").exists()
+        assert not (tmp_path / "pi").exists()
 
     @patch("simpletask.commands.ai.install.get_global_commands_dir")
     @patch("simpletask.commands.ai.install.get_global_agents_dir")
@@ -638,12 +660,14 @@ class TestInstallEditorDetection:
     @patch("simpletask.commands.ai.install.get_local_qwen_commands_dir")
     @patch("simpletask.commands.ai.install.get_local_gemini_commands_dir")
     @patch("simpletask.commands.ai.install.get_local_vibe_commands_dir")
+    @patch("simpletask.commands.ai.install.get_local_pi_commands_dir")
     @patch("simpletask.commands.ai.install.get_local_agents_dir")
     @patch("simpletask.commands.ai.install.is_editor_installed", return_value=False)
     def test_local_flag_bypasses_detection(
         self,
         mock_installed,
         mock_agents_dir,
+        mock_pi_dir,
         mock_vibe_dir,
         mock_gemini_dir,
         mock_qwen_dir,
@@ -656,6 +680,7 @@ class TestInstallEditorDetection:
             (mock_qwen_dir, "qwen"),
             (mock_gemini_dir, "gemini"),
             (mock_vibe_dir, "vibe"),
+            (mock_pi_dir, "pi"),
             (mock_agents_dir, "agents"),
         ]:
             mock.return_value = tmp_path / name
@@ -667,17 +692,20 @@ class TestInstallEditorDetection:
         assert (tmp_path / "qwen" / "simpletask.plan.md").exists()
         assert (tmp_path / "gemini" / "simpletask.plan.toml").exists()
         assert (tmp_path / "vibe" / "simpletask-plan").is_dir()
+        assert (tmp_path / "pi" / "simpletask-plan.md").exists()
 
     @patch("simpletask.commands.ai.install.get_global_commands_dir")
     @patch("simpletask.commands.ai.install.get_global_qwen_commands_dir")
     @patch("simpletask.commands.ai.install.get_global_gemini_commands_dir")
     @patch("simpletask.commands.ai.install.get_global_vibe_commands_dir")
+    @patch("simpletask.commands.ai.install.get_global_pi_commands_dir")
     @patch("simpletask.commands.ai.install.get_global_agents_dir")
     @patch("simpletask.commands.ai.install.is_editor_installed", return_value=True)
     def test_default_installs_all_detected_editors(
         self,
         mock_installed,
         mock_agents_dir,
+        mock_pi_dir,
         mock_vibe_dir,
         mock_gemini_dir,
         mock_qwen_dir,
@@ -690,6 +718,7 @@ class TestInstallEditorDetection:
             (mock_qwen_dir, "qwen"),
             (mock_gemini_dir, "gemini"),
             (mock_vibe_dir, "vibe"),
+            (mock_pi_dir, "pi"),
             (mock_agents_dir, "agents"),
         ]:
             mock.return_value = tmp_path / name
@@ -701,3 +730,126 @@ class TestInstallEditorDetection:
         assert (tmp_path / "qwen" / "simpletask.plan.md").exists()
         assert (tmp_path / "gemini" / "simpletask.plan.toml").exists()
         assert (tmp_path / "vibe" / "simpletask-plan").is_dir()
+        assert (tmp_path / "pi" / "simpletask-plan.md").exists()
+
+
+class TestAiInstallPiCLI:
+    """Integration tests for Pi prompt installation via 'simpletask ai install'."""
+
+    @patch("simpletask.commands.ai.install.get_global_pi_commands_dir")
+    def test_pi_flag_only(self, mock_pi_dir, tmp_path: Path):
+        """Should install only Pi prompt with --pi flag."""
+        pi_dir = tmp_path / "pi"
+        mock_pi_dir.return_value = pi_dir
+
+        result = runner.invoke(app, ["ai", "install", "--pi"])
+
+        assert result.exit_code == 0
+        assert "Installing Pi prompts" in result.stdout
+        assert "Installing OpenCode commands" not in result.stdout
+        assert "Installing Qwen commands" not in result.stdout
+        assert "Installing Gemini CLI commands" not in result.stdout
+        assert "Installing Mistral Vibe skills" not in result.stdout
+        assert "Installing OpenCode agents" not in result.stdout
+
+        assert (pi_dir / "simpletask-implement.md").exists()
+        assert (pi_dir / "simpletask-plan.md").exists()
+        assert (pi_dir / "simpletask-split.md").exists()
+        assert (pi_dir / "simpletask-review.md").exists()
+
+    @patch("simpletask.commands.ai.install.get_local_pi_commands_dir")
+    def test_pi_local_flag(self, mock_pi_dir, tmp_path: Path):
+        """Should install Pi prompt to local directory with --local flag."""
+        pi_dir = tmp_path / "pi_local"
+        mock_pi_dir.return_value = pi_dir
+
+        result = runner.invoke(app, ["ai", "install", "--pi", "--local"])
+
+        assert result.exit_code == 0
+        assert "Installing Pi prompts" in result.stdout
+        assert str(pi_dir) in result.stdout
+        assert (pi_dir / "simpletask-implement.md").exists()
+        assert (pi_dir / "simpletask-plan.md").exists()
+        assert (pi_dir / "simpletask-split.md").exists()
+        assert (pi_dir / "simpletask-review.md").exists()
+
+    @patch("simpletask.commands.ai.install.get_global_pi_commands_dir")
+    def test_pi_no_overwrite_skips_existing(self, mock_pi_dir, tmp_path: Path):
+        """Should skip existing Pi prompt when --no-overwrite is used."""
+        pi_dir = tmp_path / "pi"
+        pi_dir.mkdir(parents=True)
+        mock_pi_dir.return_value = pi_dir
+
+        existing = pi_dir / "simpletask-implement.md"
+        existing.write_text("old content")
+
+        result = runner.invoke(app, ["ai", "install", "--pi", "--no-overwrite"])
+
+        assert result.exit_code == 0
+        assert "Skipped (already exists): simpletask-implement.md" in result.stdout
+        assert existing.read_text() == "old content"
+
+    @patch("simpletask.commands.ai.install.get_global_pi_commands_dir")
+    def test_pi_overwrite_default(self, mock_pi_dir, tmp_path: Path):
+        """Should overwrite existing Pi prompt by default."""
+        pi_dir = tmp_path / "pi"
+        pi_dir.mkdir(parents=True)
+        mock_pi_dir.return_value = pi_dir
+
+        existing = pi_dir / "simpletask-implement.md"
+        existing.write_text("old content")
+
+        result = runner.invoke(app, ["ai", "install", "--pi"])
+
+        assert result.exit_code == 0
+        assert "Overwriting: simpletask-implement.md" in result.stdout
+        assert existing.read_text() != "old content"
+
+    @patch("simpletask.commands.ai.list.get_bundled_pi_templates")
+    @patch("simpletask.commands.ai.list.get_pi_installed_status")
+    @patch("simpletask.commands.ai.list.get_global_pi_commands_dir")
+    @patch("simpletask.commands.ai.list.get_local_pi_commands_dir")
+    def test_ai_list_shows_pi_section(
+        self,
+        mock_local_pi_dir,
+        mock_global_pi_dir,
+        mock_pi_status,
+        mock_pi_templates,
+        tmp_path: Path,
+    ):
+        """ai list should render Pi prompt status and locations."""
+        pi_template = tmp_path / "simpletask-implement.md"
+        pi_template.write_text("content")
+
+        mock_pi_templates.return_value = [pi_template]
+        mock_pi_status.return_value = {"simpletask-implement.md": {"global": True, "local": False}}
+        mock_global_pi_dir.return_value = tmp_path / "global_pi"
+        mock_local_pi_dir.return_value = tmp_path / "local_pi"
+
+        result = runner.invoke(app, ["ai", "list"])
+
+        assert result.exit_code == 0
+        assert "Pi Prompts" in result.stdout
+        assert "simpletask-implement" in result.stdout
+        assert str(tmp_path / "global_pi") in result.stdout
+        assert str(tmp_path / "local_pi") in result.stdout
+
+
+class TestPiInstallBehavior:
+    """Tests verifying Pi install behavior and path resolution."""
+
+    @patch("simpletask.commands.ai.install.get_global_pi_commands_dir")
+    def test_pi_flag_installs_pi_only(self, mock_pi_dir, tmp_path: Path):
+        """--pi flag installs only Pi templates, not other editors."""
+        pi_dir = tmp_path / "pi"
+        mock_pi_dir.return_value = pi_dir
+
+        result = runner.invoke(app, ["ai", "install", "--pi"])
+
+        assert result.exit_code == 0
+        assert "Installing Pi prompts" in result.stdout
+        assert pi_dir.exists()
+        assert (pi_dir / "simpletask-implement.md").exists()
+        # No OpenCode/Qwen/Gemini dirs created
+        assert not (tmp_path / "opencode").exists()
+        assert not (tmp_path / "qwen").exists()

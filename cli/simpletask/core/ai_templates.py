@@ -1,4 +1,4 @@
-"""AI template management for OpenCode, Qwen, Gemini, and Vibe CLI command files."""
+"""AI template management for OpenCode, Qwen, Gemini, Pi, and Vibe resources."""
 
 import importlib.resources
 import shutil
@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-EditorType = Literal["opencode", "qwen", "gemini", "vibe"]
+EditorType = Literal["opencode", "qwen", "gemini", "pi", "vibe"]
 
 
 @dataclass(frozen=True)
@@ -51,6 +51,17 @@ EDITOR_CONFIGS: dict[EditorType, EditorConfig] = {
         local_config_dir=(".gemini", "commands"),
         global_base_dir=(".gemini",),
     ),
+    "pi": EditorConfig(
+        display_name="Pi",
+        template_subdir="pi",
+        file_extension=".md",
+        # Global Pi uses ~/.pi/agent/prompts/ (3 segments) because Pi organises its global
+        # prompt library under an 'agent' sub-level. Local project installs use the
+        # shorter .pi/prompts/ path (2 segments) — Pi resolves project-local prompts there.
+        global_config_dir=(".pi", "agent", "prompts"),
+        local_config_dir=(".pi", "prompts"),
+        global_base_dir=(".pi",),
+    ),
     "vibe": EditorConfig(
         display_name="Mistral Vibe",
         template_subdir="vibe",
@@ -67,7 +78,7 @@ def _get_templates_dir(editor: EditorType) -> Path:
     """Get path to bundled templates directory for an editor.
 
     Args:
-        editor: Editor type ("opencode", "qwen", "gemini", or "vibe")
+        editor: Editor type ("opencode", "qwen", "gemini", "pi", or "vibe")
 
     Returns:
         Path to the templates directory within the package.
@@ -94,7 +105,7 @@ def _get_bundled_templates(editor: EditorType) -> list[Path]:
     skill directory paths (each containing a SKILL.md).
 
     Args:
-        editor: Editor type ("opencode", "qwen", "gemini", or "vibe")
+        editor: Editor type ("opencode", "qwen", "gemini", "pi", or "vibe")
 
     Returns:
         List of Path objects for each template file or skill directory.
@@ -116,7 +127,7 @@ def _get_global_commands_dir(editor: EditorType) -> Path:
     """Get global commands directory for an editor.
 
     Args:
-        editor: Editor type ("opencode", "qwen", "gemini", or "vibe")
+        editor: Editor type ("opencode", "qwen", "gemini", "pi", or "vibe")
 
     Returns:
         Path to global commands directory.
@@ -129,7 +140,7 @@ def _get_local_commands_dir(editor: EditorType) -> Path:
     """Get local commands directory for an editor.
 
     Args:
-        editor: Editor type ("opencode", "qwen", "gemini", or "vibe")
+        editor: Editor type ("opencode", "qwen", "gemini", "pi", or "vibe")
 
     Returns:
         Path to local commands directory in current working directory.
@@ -145,7 +156,7 @@ def get_editor_base_dir(editor: EditorType) -> Path:
     editor is installed on the machine (e.g. ~/.config/opencode for OpenCode).
 
     Args:
-        editor: Editor type ("opencode", "qwen", "gemini", or "vibe")
+        editor: Editor type ("opencode", "qwen", "gemini", "pi", or "vibe")
 
     Returns:
         Path to the editor's global base directory.
@@ -160,7 +171,7 @@ def is_editor_installed(editor: EditorType) -> bool:
     An editor is considered installed if its global base directory exists.
 
     Args:
-        editor: Editor type ("opencode", "qwen", "gemini", or "vibe")
+        editor: Editor type ("opencode", "qwen", "gemini", "pi", or "vibe")
 
     Returns:
         True if the editor's global base directory exists, False otherwise.
@@ -263,7 +274,7 @@ def _install_templates(
     _install_skill_dirs() for directory-based editors.
 
     Args:
-        editor: Editor type ("opencode", "qwen", "gemini", or "vibe")
+        editor: Editor type ("opencode", "qwen", "gemini", "pi", or "vibe")
         target_dir: Directory to install templates into
         no_overwrite: If True, skip existing files/directories instead of overwriting
 
@@ -292,7 +303,7 @@ def _get_installed_status(editor: EditorType) -> dict[str, dict[str, bool]]:
     file existence.
 
     Args:
-        editor: Editor type ("opencode", "qwen", "gemini", or "vibe")
+        editor: Editor type ("opencode", "qwen", "gemini", "pi", or "vibe")
 
     Returns:
         Dict mapping template name to {"global": bool, "local": bool}
@@ -427,6 +438,115 @@ def _get_agents_installed_status(editor: EditorType) -> dict[str, dict[str, bool
     }
 
 
+class EditorAPI:
+    """Unified API for all editor-specific operations.
+
+    Wraps the private generic functions so new editors only need an entry
+    in ``EDITOR_CONFIGS`` — no new public wrapper functions are required.
+
+    Usage::
+
+        api = get_editor_api("pi")
+        api.templates_dir()
+        api.bundled_templates()
+        api.global_commands_dir()
+        api.local_commands_dir()
+        api.install(target_dir)
+        api.installed_status()
+        api.bundled_agents()
+        api.global_agents_dir()
+        api.local_agents_dir()
+        api.install_agents(target_dir)
+        api.agents_installed_status()
+    """
+
+    def __init__(self, editor: EditorType) -> None:
+        self._editor = editor
+
+    def templates_dir(self) -> Path:
+        """Return the bundled templates directory for this editor."""
+        return _get_templates_dir(self._editor)
+
+    def bundled_templates(self) -> list[Path]:
+        """Return bundled template files or skill dirs for this editor."""
+        return _get_bundled_templates(self._editor)
+
+    def global_commands_dir(self) -> Path:
+        """Return the global commands directory for this editor."""
+        return _get_global_commands_dir(self._editor)
+
+    def local_commands_dir(self) -> Path:
+        """Return the local commands directory for this editor."""
+        return _get_local_commands_dir(self._editor)
+
+    def install(
+        self, target_dir: Path, no_overwrite: bool = False
+    ) -> tuple[list[str], list[str], list[str]]:
+        """Install templates to *target_dir*.
+
+        Returns:
+            Tuple of (installed, skipped, overwritten) names.
+        """
+        return _install_templates(self._editor, target_dir, no_overwrite)
+
+    def installed_status(self) -> dict[str, dict[str, bool]]:
+        """Return installation status of each template for this editor."""
+        return _get_installed_status(self._editor)
+
+    def bundled_agents(self) -> list[Path]:
+        """Return bundled agent files for this editor (empty list if unsupported)."""
+        return _get_bundled_agents(self._editor)
+
+    def global_agents_dir(self) -> Path:
+        """Return the global agents directory for this editor.
+
+        Raises:
+            ValueError: If this editor does not support agents.
+        """
+        return _get_global_agents_dir(self._editor)
+
+    def local_agents_dir(self) -> Path:
+        """Return the local agents directory for this editor.
+
+        Raises:
+            ValueError: If this editor does not support agents.
+        """
+        return _get_local_agents_dir(self._editor)
+
+    def install_agents(
+        self, target_dir: Path, no_overwrite: bool = False
+    ) -> tuple[list[str], list[str], list[str]]:
+        """Install agents to *target_dir*.
+
+        Returns:
+            Tuple of (installed, skipped, overwritten) file names.
+
+        Raises:
+            FileNotFoundError: If no agents found or editor has no agent support.
+        """
+        return _install_agents(self._editor, target_dir, no_overwrite)
+
+    def agents_installed_status(self) -> dict[str, dict[str, bool]]:
+        """Return installation status of each agent for this editor."""
+        return _get_agents_installed_status(self._editor)
+
+
+def get_editor_api(editor: EditorType) -> EditorAPI:
+    """Return an :class:`EditorAPI` for the given editor.
+
+    This is the preferred way to interact with an editor's templates and
+    agents.  Adding a new editor only requires an entry in
+    :data:`EDITOR_CONFIGS` — no new public wrapper functions are needed.
+
+    Args:
+        editor: Editor type ("opencode", "qwen", "gemini", "pi", or "vibe").
+
+    Returns:
+        An :class:`EditorAPI` instance for *editor*.
+    """
+    return EditorAPI(editor)
+
+
 def get_templates_dir() -> Path:
     """Get path to bundled OpenCode templates directory.
 
@@ -452,6 +572,15 @@ def get_gemini_templates_dir() -> Path:
         Path to the templates/gemini directory within the package.
     """
     return _get_templates_dir("gemini")
+
+
+def get_pi_templates_dir() -> Path:
+    """Get path to bundled Pi templates directory.
+
+    Returns:
+        Path to the templates/pi directory within the package.
+    """
+    return _get_templates_dir("pi")
 
 
 def get_bundled_templates() -> list[Path]:
@@ -481,6 +610,15 @@ def get_bundled_gemini_templates() -> list[Path]:
     return _get_bundled_templates("gemini")
 
 
+def get_bundled_pi_templates() -> list[Path]:
+    """Get list of Pi prompt template files bundled with the package.
+
+    Returns:
+        List of Path objects for each prompt template file.
+    """
+    return _get_bundled_templates("pi")
+
+
 def get_global_commands_dir() -> Path:
     """Get global OpenCode commands directory.
 
@@ -508,6 +646,15 @@ def get_global_gemini_commands_dir() -> Path:
     return _get_global_commands_dir("gemini")
 
 
+def get_global_pi_commands_dir() -> Path:
+    """Get global Pi prompts directory.
+
+    Returns:
+        Path to ~/.pi/agent/prompts/
+    """
+    return _get_global_commands_dir("pi")
+
+
 def get_local_commands_dir() -> Path:
     """Get local OpenCode commands directory.
 
@@ -533,6 +680,15 @@ def get_local_gemini_commands_dir() -> Path:
         Path to .gemini/commands/ in current directory.
     """
     return _get_local_commands_dir("gemini")
+
+
+def get_local_pi_commands_dir() -> Path:
+    """Get local Pi prompts directory.
+
+    Returns:
+        Path to .pi/prompts/ in current directory.
+    """
+    return _get_local_commands_dir("pi")
 
 
 def install_templates(
@@ -592,6 +748,25 @@ def install_gemini_templates(
     return _install_templates("gemini", target_dir, no_overwrite)
 
 
+def install_pi_templates(
+    target_dir: Path,
+    no_overwrite: bool = False,
+) -> tuple[list[str], list[str], list[str]]:
+    """Install Pi prompt templates to target directory.
+
+    Args:
+        target_dir: Directory to install prompts into
+        no_overwrite: If True, skip existing files instead of overwriting
+
+    Returns:
+        Tuple of (installed, skipped, overwritten) file names.
+
+    Raises:
+        FileNotFoundError: If templates directory doesn't exist
+    """
+    return _install_templates("pi", target_dir, no_overwrite)
+
+
 def get_installed_status() -> dict[str, dict[str, bool]]:
     """Get installation status of each OpenCode template.
 
@@ -617,6 +792,15 @@ def get_gemini_installed_status() -> dict[str, dict[str, bool]]:
         Dict mapping template name to {"global": bool, "local": bool}
     """
     return _get_installed_status("gemini")
+
+
+def get_pi_installed_status() -> dict[str, dict[str, bool]]:
+    """Get installation status of each Pi prompt template.
+
+    Returns:
+        Dict mapping prompt template name to {"global": bool, "local": bool}
+    """
+    return _get_installed_status("pi")
 
 
 def get_bundled_agents() -> list[Path]:

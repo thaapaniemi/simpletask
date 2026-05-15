@@ -7,6 +7,7 @@ from simpletask.core.ai_templates import (
     get_agents_installed_status,
     get_bundled_agents,
     get_bundled_gemini_templates,
+    get_bundled_pi_templates,
     get_bundled_qwen_templates,
     get_bundled_templates,
     get_bundled_vibe_templates,
@@ -15,18 +16,22 @@ from simpletask.core.ai_templates import (
     get_global_agents_dir,
     get_global_commands_dir,
     get_global_gemini_commands_dir,
+    get_global_pi_commands_dir,
     get_global_qwen_commands_dir,
     get_global_vibe_commands_dir,
     get_installed_status,
     get_local_agents_dir,
     get_local_commands_dir,
     get_local_gemini_commands_dir,
+    get_local_pi_commands_dir,
     get_local_qwen_commands_dir,
     get_local_vibe_commands_dir,
+    get_pi_installed_status,
     get_qwen_installed_status,
     get_vibe_installed_status,
     install_agents,
     install_gemini_templates,
+    install_pi_templates,
     install_qwen_templates,
     install_templates,
     install_vibe_templates,
@@ -566,6 +571,35 @@ class TestGetBundledGeminiTemplates:
         assert template_names == expected
 
 
+class TestGetBundledPiTemplates:
+    """Tests for get_bundled_pi_templates function."""
+
+    def test_returns_list_of_paths(self):
+        """Should return a list of Path objects."""
+        templates = get_bundled_pi_templates()
+        assert isinstance(templates, list)
+        for template in templates:
+            assert isinstance(template, Path)
+
+    def test_returns_only_md_files(self):
+        """Should return only .md files."""
+        templates = get_bundled_pi_templates()
+        for template in templates:
+            assert template.suffix == ".md"
+
+    def test_returns_expected_templates(self):
+        """Should return all 4 bundled Pi prompt templates."""
+        templates = get_bundled_pi_templates()
+        template_names = {t.name for t in templates}
+
+        assert template_names == {
+            "simpletask-implement.md",
+            "simpletask-plan.md",
+            "simpletask-split.md",
+            "simpletask-review.md",
+        }
+
+
 class TestGetGlobalGeminiCommandsDir:
     """Tests for get_global_gemini_commands_dir function."""
 
@@ -593,6 +627,36 @@ class TestGetLocalGeminiCommandsDir:
         """Should return .gemini/commands/ in current directory."""
         result = get_local_gemini_commands_dir()
         expected = Path.cwd() / ".gemini" / "commands"
+        assert result == expected
+
+
+class TestGetGlobalPiCommandsDir:
+    """Tests for get_global_pi_commands_dir function."""
+
+    def test_returns_path_object(self):
+        """Should return a Path object."""
+        result = get_global_pi_commands_dir()
+        assert isinstance(result, Path)
+
+    def test_returns_expected_location(self):
+        """Should return ~/.pi/agent/prompts/."""
+        result = get_global_pi_commands_dir()
+        expected = Path.home() / ".pi" / "agent" / "prompts"
+        assert result == expected
+
+
+class TestGetLocalPiCommandsDir:
+    """Tests for get_local_pi_commands_dir function."""
+
+    def test_returns_path_object(self):
+        """Should return a Path object."""
+        result = get_local_pi_commands_dir()
+        assert isinstance(result, Path)
+
+    def test_returns_expected_location(self):
+        """Should return .pi/prompts/ in current directory."""
+        result = get_local_pi_commands_dir()
+        expected = Path.cwd() / ".pi" / "prompts"
         assert result == expected
 
 
@@ -780,6 +844,188 @@ class TestGetGeminiInstalledStatus:
         for _template_name, locations in status.items():
             assert locations["global"] is True
             assert locations["local"] is True
+
+
+class TestInstallPiTemplates:
+    """Tests for install_pi_templates function."""
+
+    def test_install_to_empty_directory(self, tmp_path: Path):
+        """Should successfully install all 4 Pi prompts to empty directory."""
+        target_dir = tmp_path / "prompts"
+
+        installed, skipped, overwritten = install_pi_templates(target_dir, no_overwrite=False)
+
+        assert target_dir.exists()
+        assert set(installed) == {
+            "simpletask-implement.md",
+            "simpletask-plan.md",
+            "simpletask-split.md",
+            "simpletask-review.md",
+        }
+        assert skipped == []
+        assert overwritten == []
+        assert (target_dir / "simpletask-implement.md").exists()
+        assert (target_dir / "simpletask-plan.md").exists()
+        assert (target_dir / "simpletask-split.md").exists()
+        assert (target_dir / "simpletask-review.md").exists()
+
+    def test_overwrite_existing_files(self, tmp_path: Path):
+        """Should overwrite existing Pi prompt when no_overwrite=False."""
+        target_dir = tmp_path / "prompts"
+        target_dir.mkdir(parents=True)
+
+        existing_file = target_dir / "simpletask-implement.md"
+        existing_file.write_text("old content")
+
+        installed, _skipped, overwritten = install_pi_templates(target_dir, no_overwrite=False)
+
+        assert "simpletask-implement.md" in overwritten
+        assert "simpletask-implement.md" not in installed
+        assert existing_file.read_text() != "old content"
+        # Other 3 templates are freshly installed
+        assert set(installed) == {
+            "simpletask-plan.md",
+            "simpletask-split.md",
+            "simpletask-review.md",
+        }
+
+    def test_no_overwrite_skips_existing(self, tmp_path: Path):
+        """Should skip existing Pi prompt when no_overwrite=True."""
+        target_dir = tmp_path / "prompts"
+        target_dir.mkdir(parents=True)
+
+        existing_file = target_dir / "simpletask-implement.md"
+        existing_file.write_text("old content")
+
+        installed, skipped, overwritten = install_pi_templates(target_dir, no_overwrite=True)
+
+        assert "simpletask-implement.md" in skipped
+        assert overwritten == []
+        assert existing_file.read_text() == "old content"
+        # Other 3 templates are freshly installed
+        assert set(installed) == {
+            "simpletask-plan.md",
+            "simpletask-split.md",
+            "simpletask-review.md",
+        }
+
+    def test_creates_target_directory(self, tmp_path: Path):
+        """Should create target directory if it doesn't exist."""
+        target_dir = tmp_path / "nested" / "path" / "prompts"
+
+        assert not target_dir.exists()
+
+        install_pi_templates(target_dir, no_overwrite=False)
+
+        assert target_dir.exists()
+        assert target_dir.is_dir()
+
+
+class TestGetPiInstalledStatus:
+    """Tests for get_pi_installed_status function."""
+
+    def test_no_installations(self, tmp_path: Path, monkeypatch):
+        """Should report nothing installed when directories don't exist."""
+        fake_global = tmp_path / "global"
+        fake_local = tmp_path / "local"
+
+        monkeypatch.setattr(
+            "simpletask.core.ai_templates._get_global_commands_dir",
+            lambda editor: fake_global,
+        )
+        monkeypatch.setattr(
+            "simpletask.core.ai_templates._get_local_commands_dir",
+            lambda editor: fake_local,
+        )
+
+        status = get_pi_installed_status()
+
+        assert status == {
+            "simpletask-implement.md": {"global": False, "local": False},
+            "simpletask-plan.md": {"global": False, "local": False},
+            "simpletask-split.md": {"global": False, "local": False},
+            "simpletask-review.md": {"global": False, "local": False},
+        }
+
+    def test_global_only(self, tmp_path: Path, monkeypatch):
+        """Should detect Pi prompt in global directory only."""
+        fake_global = tmp_path / "global"
+        fake_global.mkdir(parents=True)
+        fake_local = tmp_path / "local"
+
+        install_pi_templates(fake_global, no_overwrite=False)
+
+        monkeypatch.setattr(
+            "simpletask.core.ai_templates._get_global_commands_dir",
+            lambda editor: fake_global,
+        )
+        monkeypatch.setattr(
+            "simpletask.core.ai_templates._get_local_commands_dir",
+            lambda editor: fake_local,
+        )
+
+        status = get_pi_installed_status()
+
+        assert status == {
+            "simpletask-implement.md": {"global": True, "local": False},
+            "simpletask-plan.md": {"global": True, "local": False},
+            "simpletask-split.md": {"global": True, "local": False},
+            "simpletask-review.md": {"global": True, "local": False},
+        }
+
+    def test_local_only(self, tmp_path: Path, monkeypatch):
+        """Should detect Pi prompt in local directory only."""
+        fake_global = tmp_path / "global"
+        fake_local = tmp_path / "local"
+        fake_local.mkdir(parents=True)
+
+        install_pi_templates(fake_local, no_overwrite=False)
+
+        monkeypatch.setattr(
+            "simpletask.core.ai_templates._get_global_commands_dir",
+            lambda editor: fake_global,
+        )
+        monkeypatch.setattr(
+            "simpletask.core.ai_templates._get_local_commands_dir",
+            lambda editor: fake_local,
+        )
+
+        status = get_pi_installed_status()
+
+        assert status == {
+            "simpletask-implement.md": {"global": False, "local": True},
+            "simpletask-plan.md": {"global": False, "local": True},
+            "simpletask-split.md": {"global": False, "local": True},
+            "simpletask-review.md": {"global": False, "local": True},
+        }
+
+    def test_both_locations(self, tmp_path: Path, monkeypatch):
+        """Should detect Pi prompt in both directories."""
+        fake_global = tmp_path / "global"
+        fake_global.mkdir(parents=True)
+        fake_local = tmp_path / "local"
+        fake_local.mkdir(parents=True)
+
+        install_pi_templates(fake_global, no_overwrite=False)
+        install_pi_templates(fake_local, no_overwrite=False)
+
+        monkeypatch.setattr(
+            "simpletask.core.ai_templates._get_global_commands_dir",
+            lambda editor: fake_global,
+        )
+        monkeypatch.setattr(
+            "simpletask.core.ai_templates._get_local_commands_dir",
+            lambda editor: fake_local,
+        )
+
+        status = get_pi_installed_status()
+
+        assert status == {
+            "simpletask-implement.md": {"global": True, "local": True},
+            "simpletask-plan.md": {"global": True, "local": True},
+            "simpletask-split.md": {"global": True, "local": True},
+            "simpletask-review.md": {"global": True, "local": True},
+        }
 
 
 class TestGeminiAndQwenTemplateDifferences:
@@ -1177,6 +1423,141 @@ class TestCrossEditorConsistency:
         assert "branch=None" not in opencode_content, "OpenCode has branch=None"
         assert "branch=None" not in qwen_content, "Qwen has branch=None"
         assert "branch=None" not in gemini_content, "Gemini has branch=None"
+
+
+class TestPiTemplateContent:
+    """Validate Pi template content structure and CLI-first instructions."""
+
+    def test_pi_implement_template_has_frontmatter(self):
+        """Pi implement template should have markdown frontmatter."""
+        templates = get_bundled_pi_templates()
+        impl_template = next((t for t in templates if t.name == "simpletask-implement.md"), None)
+        assert impl_template is not None
+
+        content = impl_template.read_text()
+
+        assert content.startswith("---\n")
+        assert "description:" in content
+        assert "argument-hint:" in content
+        assert "\n---\n" in content
+
+    def test_pi_implement_template_references_cli_commands(self):
+        """Pi implement template should drive simpletask through CLI commands."""
+        templates = get_bundled_pi_templates()
+        impl_template = next((t for t in templates if t.name == "simpletask-implement.md"), None)
+        assert impl_template is not None
+
+        content = impl_template.read_text()
+
+        required_commands = [
+            "simpletask show",
+            "simpletask task list --flat",
+            "simpletask criteria list",
+            "simpletask quality show",
+            "simpletask task update T001 --status in_progress",
+            "simpletask quality check --format json",
+            "simpletask criteria complete AC1",
+            "simpletask schema validate",
+        ]
+
+        for command in required_commands:
+            assert command in content, f"Missing CLI command reference: {command}"
+
+    def test_pi_implement_template_does_not_reference_mcp_tools(self):
+        """Pi implement template should not rely on MCP tool references."""
+        templates = get_bundled_pi_templates()
+        impl_template = next((t for t in templates if t.name == "simpletask-implement.md"), None)
+        assert impl_template is not None
+
+        content = impl_template.read_text()
+
+        mcp_tools = [
+            "simpletask_get",
+            "simpletask_task",
+            "simpletask_criteria",
+            "simpletask_note",
+            "simpletask_quality",
+        ]
+
+        for tool in mcp_tools:
+            assert tool not in content, f"Unexpected MCP tool reference: {tool}"
+
+    def test_pi_implement_template_uses_show_for_task_detail(self):
+        """Pi implement template should use simpletask show --format json for full task detail."""
+        templates = get_bundled_pi_templates()
+        impl_template = next((t for t in templates if t.name == "simpletask-implement.md"), None)
+        assert impl_template is not None
+
+        content = impl_template.read_text()
+
+        assert "simpletask show --format json" in content
+        assert "full task detail" in content
+
+    def test_pi_implement_template_treats_invocation_as_work_request(self):
+        """Pi implement template should treat the prompt invocation as the implementation request."""
+        templates = get_bundled_pi_templates()
+        impl_template = next((t for t in templates if t.name == "simpletask-implement.md"), None)
+        assert impl_template is not None
+
+        content = impl_template.read_text()
+
+        assert "Invoking `/simpletask-implement` is itself the user's request" in content
+        assert "treat the current branch task file as the work to" in content
+        assert 'Do not wait for the user to provide a "first task"' in content
+
+    def test_pi_implement_template_forbids_acknowledgement_only_replies(self):
+        """Pi implement template should forbid acknowledgement-only replies."""
+        templates = get_bundled_pi_templates()
+        impl_template = next((t for t in templates if t.name == "simpletask-implement.md"), None)
+        assert impl_template is not None
+
+        content = impl_template.read_text()
+
+        assert "Do not reply with an acknowledgement-only message" in content
+        assert '"Understood"' in content
+        assert '"please provide the first task"' in content
+
+    def test_pi_implement_template_handles_read_only_plan_mode(self):
+        """Pi implement template should tell Pi what to do when a plan-mode extension is active."""
+        templates = get_bundled_pi_templates()
+        impl_template = next((t for t in templates if t.name == "simpletask-implement.md"), None)
+        assert impl_template is not None
+
+        content = impl_template.read_text()
+
+        assert "If a system reminder says plan mode or read-only mode is active" in content
+        assert "respond with `Plan:` followed by a" in content
+        assert "Choose Execute the plan to continue." in content
+        assert "do not insist on `simpletask` CLI if it is blocked" in content
+
+
+class TestEditorConfigPiEntry:
+    """Tests for Pi entry in EDITOR_CONFIGS."""
+
+    def test_pi_config_exists(self):
+        """Pi should have an entry in EDITOR_CONFIGS."""
+        from simpletask.core.ai_templates import EDITOR_CONFIGS
+
+        assert "pi" in EDITOR_CONFIGS
+
+    def test_pi_is_not_directory_based(self):
+        """Pi config should be treated as flat-file prompts."""
+        from simpletask.core.ai_templates import EDITOR_CONFIGS
+
+        assert EDITOR_CONFIGS["pi"].is_directory_based is False
+
+    def test_pi_display_name(self):
+        """Pi should have correct display name."""
+        from simpletask.core.ai_templates import EDITOR_CONFIGS
+
+        assert EDITOR_CONFIGS["pi"].display_name == "Pi"
+
+    def test_pi_has_no_agent_support(self):
+        """Pi should not have agent directories configured."""
+        from simpletask.core.ai_templates import EDITOR_CONFIGS
+
+        assert EDITOR_CONFIGS["pi"].global_agents_dir is None
+        assert EDITOR_CONFIGS["pi"].local_agents_dir is None
 
     def test_all_split_templates_reference_same_mcp_tools(self):
         """All split templates should reference the same core MCP tools."""
