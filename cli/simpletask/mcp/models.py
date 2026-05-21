@@ -522,7 +522,7 @@ def _increment_status_counts(counts: dict[str, int], status: TaskStatus) -> None
 def _derive_overall_status(global_counts: dict[str, int], tasks_total: int) -> TaskStatus:
     """Derive the overall task status from per-status counts.
 
-    Priority chain: blocked > paused > in_progress > completed > not_started.
+    Priority chain: blocked > in_progress > paused > completed > not_started.
 
     Args:
         global_counts: Dict with keys tasks_blocked, tasks_paused, tasks_in_progress,
@@ -534,10 +534,10 @@ def _derive_overall_status(global_counts: dict[str, int], tasks_total: int) -> T
     """
     if global_counts["tasks_blocked"] > 0:
         return TaskStatus.BLOCKED
-    if global_counts["tasks_paused"] > 0:
-        return TaskStatus.PAUSED
     if global_counts["tasks_in_progress"] > 0:
         return TaskStatus.IN_PROGRESS
+    if global_counts["tasks_paused"] > 0:
+        return TaskStatus.PAUSED
     if tasks_total > 0 and global_counts["tasks_completed"] == tasks_total:
         return TaskStatus.COMPLETED
     return TaskStatus.NOT_STARTED
