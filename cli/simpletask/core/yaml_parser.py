@@ -13,6 +13,52 @@ class InvalidTaskFileError(Exception):
     """Raised when task file format is invalid or doesn't match schema."""
 
 
+def parse_task_file_from_text(text: str, source_path: Path | None = None) -> SimpleTaskSpec:
+    """Parse task YAML from a pre-read string without filesystem I/O.
+
+    Args:
+        text: Raw YAML content to parse.
+        source_path: Optional path used only for error message context.
+
+    Returns:
+        SimpleTaskSpec instance.
+
+    Raises:
+        InvalidTaskFileError: If YAML is invalid or doesn't match schema.
+    """
+    path_label = str(source_path) if source_path else "<string>"
+
+    try:
+        data = yaml.safe_load(text)
+    except yaml.YAMLError as e:
+        raise InvalidTaskFileError(f"Invalid YAML syntax:\n{e!s}\n\nFile: {path_label}") from e
+
+    if not isinstance(data, dict):
+        raise InvalidTaskFileError(
+            f"Invalid YAML content: Expected a dictionary/object, got {type(data).__name__}.\n"
+            f"File: {path_label}"
+        )
+
+    try:
+        spec = SimpleTaskSpec.model_validate(data)
+    except ValidationError as e:
+        error_messages = []
+        for error in e.errors():
+            field = ".".join(str(x) for x in error["loc"])
+            message = error["msg"]
+            error_type = error["type"]
+            error_messages.append(f"  • {field}: {message} (type: {error_type})")
+
+        raise InvalidTaskFileError(
+            "Invalid task file schema - YAML content doesn't match expected format:\n\n"
+            + "\n".join(error_messages)
+            + f"\n\nFile: {path_label}\n\n"
+            f"See documentation for correct schema format."
+        ) from e
+
+    return spec
+
+
 def parse_task_file(path: Path) -> SimpleTaskSpec:
     """Parse task YAML file.
 
@@ -29,41 +75,7 @@ def parse_task_file(path: Path) -> SimpleTaskSpec:
     if not path.exists():
         raise FileNotFoundError(f"Task file not found: {path}")
 
-    content = path.read_text(encoding="utf-8")
-
-    # Parse YAML
-    try:
-        data = yaml.safe_load(content)
-    except yaml.YAMLError as e:
-        raise InvalidTaskFileError(f"Invalid YAML syntax:\n{e!s}\n\nFile: {path}") from e
-
-    # Validate that YAML parsed to a dict
-    if not isinstance(data, dict):
-        raise InvalidTaskFileError(
-            f"Invalid YAML content: Expected a dictionary/object, got {type(data).__name__}.\n"
-            f"File: {path}"
-        )
-
-    # Validate against Pydantic schema
-    try:
-        spec = SimpleTaskSpec.model_validate(data)
-    except ValidationError as e:
-        # Format validation errors nicely
-        error_messages = []
-        for error in e.errors():
-            field = ".".join(str(x) for x in error["loc"])
-            message = error["msg"]
-            error_type = error["type"]
-            error_messages.append(f"  • {field}: {message} (type: {error_type})")
-
-        raise InvalidTaskFileError(
-            "Invalid task file schema - YAML content doesn't match expected format:\n\n"
-            + "\n".join(error_messages)
-            + f"\n\nFile: {path}\n\n"
-            f"See documentation for correct schema format."
-        ) from e
-
-    return spec
+    return parse_task_file_from_text(path.read_text(encoding="utf-8"), path)
 
 
 def parse_task_file_lenient(path: Path) -> dict[str, Any]:
@@ -129,6 +141,30 @@ def _bump_schema_version_if_canonical(data: dict[str, Any]) -> dict[str, Any]:
     return data
 
 
+def serialize_task_file(spec: SimpleTaskSpec) -> str:
+    """Serialize a task spec to canonical YAML string without touching the filesystem.
+
+    Produces the same output as write_task_file() without any I/O. Used by
+    fmt --check to compare in-memory canonical form against current file content.
+
+    Args:
+        spec: SimpleTaskSpec instance to serialize
+
+    Returns:
+        Canonical YAML string
+    """
+    data = spec.model_dump(mode="json", exclude_none=True)
+    data = _bump_schema_version_if_canonical(data)
+    return yaml.dump(
+        data,
+        default_flow_style=False,
+        sort_keys=False,
+        allow_unicode=True,
+        width=100,
+        indent=2,
+    )
+
+
 def write_task_file(path: Path, spec: SimpleTaskSpec) -> None:
     """Write task YAML file.
 
@@ -159,24 +195,8 @@ def write_task_file(path: Path, spec: SimpleTaskSpec) -> None:
     # Ensure parent directory exists
     path.parent.mkdir(parents=True, exist_ok=True)
 
-    # Convert spec to dict (mode='json' for datetime serialization)
-    data = spec.model_dump(mode="json", exclude_none=True)
-
-    # Bump schema_version for files using canonical execution specs
-    data = _bump_schema_version_if_canonical(data)
-
-    # Generate YAML with nice formatting
-    yaml_content = yaml.dump(
-        data,
-        default_flow_style=False,
-        sort_keys=False,
-        allow_unicode=True,
-        width=100,  # Wrap long lines at 100 chars
-        indent=2,
-    )
-
-    # Write to file
-    path.write_text(yaml_content, encoding="utf-8")
+    # Serialize and write
+    path.write_text(serialize_task_file(spec), encoding="utf-8")
 
 
 def update_task_status(path: Path, task_id: str, new_status: TaskStatus) -> None:
@@ -250,7 +270,9 @@ def update_criterion_status(path: Path, criterion_id: str, completed: bool) -> N
 __all__ = [
     "InvalidTaskFileError",
     "parse_task_file",
+    "parse_task_file_from_text",
     "parse_task_file_lenient",
+    "serialize_task_file",
     "update_criterion_status",
     "update_task_status",
     "write_task_file",

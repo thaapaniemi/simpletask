@@ -1,6 +1,6 @@
 """simpletask: A Python CLI for managing AI-friendly task definition YAML files."""
 
-__version__ = "0.37.9"
+__version__ = "0.38.0"
 
 import typer
 
@@ -23,6 +23,7 @@ from .commands import (
     task,
 )
 from .commands import list as list_cmd
+from .commands.fmt import commands as fmt_commands
 
 
 def version_callback(value: bool):
@@ -60,6 +61,7 @@ app.command(name="new")(new.new)
 app.command(name="list")(list_cmd.list_tasks)
 app.command(name="show")(show.show)
 app.command(name="serve")(serve.serve)
+app.command(name="fmt")(fmt_commands.fmt_command)
 
 # Register subcommand groups
 app.add_typer(schema.app, name="schema")
