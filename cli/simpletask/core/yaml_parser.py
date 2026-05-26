@@ -116,7 +116,10 @@ _QUALITY_CONFIG_KEYS = ("linting", "type_checking", "testing", "security_check")
 
 
 def _bump_schema_version_if_canonical(data: dict[str, Any]) -> dict[str, Any]:
-    """Upgrade schema_version to '1.1' when any quality section uses canonical execution.
+    """Upgrade schema_version when structural features require a higher version.
+
+    - Bumps to '1.1' when any quality section uses canonical execution format.
+    - Bumps to '1.2' when audit_history is present (takes precedence over 1.1).
 
     The model serializer already strips legacy 'args' from canonical sections;
     this function only handles the version bump that belongs to the writer layer.
@@ -125,18 +128,24 @@ def _bump_schema_version_if_canonical(data: dict[str, Any]) -> dict[str, Any]:
         data: Serialized task spec dict (from model_dump)
 
     Returns:
-        Mutated dict with schema_version bumped to '1.1' when canonical execution is present
+        Mutated dict with schema_version bumped as appropriate
     """
     quality_reqs = data.get("quality_requirements")
-    if not isinstance(quality_reqs, dict):
-        return data
+    if isinstance(quality_reqs, dict):
+        has_canonical = any(
+            isinstance(quality_reqs.get(key), dict) and "execution" in quality_reqs[key]
+            for key in _QUALITY_CONFIG_KEYS
+        )
+    else:
+        has_canonical = False
 
-    has_canonical = any(
-        isinstance(quality_reqs.get(key), dict) and "execution" in quality_reqs[key]
-        for key in _QUALITY_CONFIG_KEYS
-    )
+    candidates = ["1.0"]
     if has_canonical:
-        data["schema_version"] = "1.1"
+        candidates.append("1.1")
+    audit_history = data.get("audit_history")
+    if isinstance(audit_history, list) and len(audit_history) > 0:
+        candidates.append("1.2")
+    data["schema_version"] = max(candidates, key=lambda v: tuple(int(x) for x in v.split(".")))
 
     return data
 

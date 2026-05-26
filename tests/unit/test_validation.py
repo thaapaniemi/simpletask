@@ -168,3 +168,237 @@ tasks:
         validate_task_file(bad_prereq)
         # This test documents the current behavior - adjust expectations
         # based on whether prerequisite validation is in schema or model
+
+
+class TestAuditHistorySchemaValidation:
+    """Tests for audit_history JSON schema validation (T043)."""
+
+    def _make_valid_yaml(self, base_sha: str) -> str:
+        return f"""schema_version: '1.2'
+branch: test
+title: Test
+original_prompt: Test
+created: '2024-01-15T14:30:00Z'
+acceptance_criteria:
+  - id: AC1
+    description: Done
+    completed: false
+audit_history:
+  - iteration: 1
+    base_sha: '{base_sha}'
+    head_sha: '{base_sha}'
+    findings:
+      - id: F-001
+        file: cli/foo.py
+        original_severity: high
+        original_category: correctness
+        verdict: confirmed
+        summary: A finding
+"""
+
+    def test_valid_7_char_sha_passes(self, tmp_path):
+        """7-char hex SHA should pass schema validation."""
+        f = tmp_path / "task.yml"
+        f.write_text(self._make_valid_yaml("abc1234"))
+        errors = validate_task_file(f)
+        assert errors == [], errors
+
+    def test_valid_40_char_sha_passes(self, tmp_path):
+        """40-char hex SHA should pass schema validation."""
+        f = tmp_path / "task.yml"
+        f.write_text(self._make_valid_yaml("e80d2978b776c7e886d220a168479ab24aa2160b"))
+        errors = validate_task_file(f)
+        assert errors == [], errors
+
+    def test_non_hex_sha_fails(self, tmp_path):
+        """Non-hex base_sha should fail schema validation."""
+        f = tmp_path / "task.yml"
+        f.write_text(self._make_valid_yaml("not-a-sha"))
+        errors = validate_task_file(f)
+        assert len(errors) > 0
+
+    def test_too_short_sha_fails(self, tmp_path):
+        """base_sha shorter than 7 chars should fail schema validation."""
+        f = tmp_path / "task.yml"
+        f.write_text(self._make_valid_yaml("abc123"))  # 6 chars
+        errors = validate_task_file(f)
+        assert len(errors) > 0
+
+    def test_missing_head_sha_fails(self, tmp_path):
+        """Audit runs missing head_sha should fail schema validation."""
+        f = tmp_path / "task.yml"
+        f.write_text(
+            """schema_version: '1.2'
+branch: test
+title: Test
+original_prompt: Test
+created: '2024-01-15T14:30:00Z'
+acceptance_criteria:
+  - id: AC1
+    description: Done
+    completed: false
+audit_history:
+  - iteration: 1
+    base_sha: abc1234
+    findings:
+      - id: F-001
+        file: cli/foo.py
+        original_severity: high
+        original_category: correctness
+        verdict: confirmed
+        summary: A finding
+"""
+        )
+        errors = validate_task_file(f)
+        assert len(errors) > 0
+
+
+class TestAuditFindingVerdictConditionals:
+    """Tests for verdict-dependent corrected_severity/corrected_category in JSON schema (T050).
+
+    AC5: when verdict=reclassified, corrected_severity and corrected_category are required
+    and must be non-null; for all other verdict values these fields are rejected (must be null
+    or absent).
+    """
+
+    _BASE_YAML = """schema_version: '1.2'
+branch: test
+title: Test
+original_prompt: Test
+created: '2024-01-15T14:30:00Z'
+acceptance_criteria:
+  - id: AC1
+    description: Done
+    completed: false
+audit_history:
+  - iteration: 1
+    base_sha: abc1234
+    head_sha: def5678
+    findings:
+      - {finding_block}
+"""
+
+    def _make_yaml(self, finding_lines: str) -> str:
+        # Indent each line of the finding block to match the YAML list item
+        indented = "\n        ".join(finding_lines.strip().splitlines())
+        return self._BASE_YAML.format(finding_block=indented)
+
+    def test_reclassified_with_both_corrected_fields_passes(self, tmp_path):
+        """verdict=reclassified with both corrected fields should pass schema validation."""
+        f = tmp_path / "task.yml"
+        f.write_text(
+            self._make_yaml(
+                "id: F-001\n"
+                "file: cli/foo.py\n"
+                "original_severity: high\n"
+                "original_category: correctness\n"
+                "verdict: reclassified\n"
+                "corrected_severity: low\n"
+                "corrected_category: style\n"
+                "summary: A finding"
+            )
+        )
+        errors = validate_task_file(f)
+        assert errors == [], errors
+
+    def test_reclassified_missing_corrected_severity_fails(self, tmp_path):
+        """verdict=reclassified without corrected_severity should fail schema validation."""
+        f = tmp_path / "task.yml"
+        f.write_text(
+            self._make_yaml(
+                "id: F-001\n"
+                "file: cli/foo.py\n"
+                "original_severity: high\n"
+                "original_category: correctness\n"
+                "verdict: reclassified\n"
+                "corrected_category: style\n"
+                "summary: A finding"
+            )
+        )
+        errors = validate_task_file(f)
+        assert len(errors) > 0
+
+    def test_reclassified_missing_corrected_category_fails(self, tmp_path):
+        """verdict=reclassified without corrected_category should fail schema validation."""
+        f = tmp_path / "task.yml"
+        f.write_text(
+            self._make_yaml(
+                "id: F-001\n"
+                "file: cli/foo.py\n"
+                "original_severity: high\n"
+                "original_category: correctness\n"
+                "verdict: reclassified\n"
+                "corrected_severity: low\n"
+                "summary: A finding"
+            )
+        )
+        errors = validate_task_file(f)
+        assert len(errors) > 0
+
+    def test_confirmed_with_corrected_severity_fails(self, tmp_path):
+        """verdict=confirmed with corrected_severity set should fail schema validation."""
+        f = tmp_path / "task.yml"
+        f.write_text(
+            self._make_yaml(
+                "id: F-001\n"
+                "file: cli/foo.py\n"
+                "original_severity: high\n"
+                "original_category: correctness\n"
+                "verdict: confirmed\n"
+                "corrected_severity: low\n"
+                "summary: A finding"
+            )
+        )
+        errors = validate_task_file(f)
+        assert len(errors) > 0
+
+    def test_false_positive_with_corrected_category_fails(self, tmp_path):
+        """verdict=false_positive with corrected_category set should fail schema validation."""
+        f = tmp_path / "task.yml"
+        f.write_text(
+            self._make_yaml(
+                "id: F-001\n"
+                "file: cli/foo.py\n"
+                "original_severity: high\n"
+                "original_category: correctness\n"
+                "verdict: false_positive\n"
+                "corrected_category: style\n"
+                "summary: A finding"
+            )
+        )
+        errors = validate_task_file(f)
+        assert len(errors) > 0
+
+    def test_uncertain_without_corrected_fields_passes(self, tmp_path):
+        """verdict=uncertain without any corrected fields should pass schema validation."""
+        f = tmp_path / "task.yml"
+        f.write_text(
+            self._make_yaml(
+                "id: F-001\n"
+                "file: cli/foo.py\n"
+                "original_severity: medium\n"
+                "original_category: testing\n"
+                "verdict: uncertain\n"
+                "summary: A finding"
+            )
+        )
+        errors = validate_task_file(f)
+        assert errors == [], errors
+
+    def test_confirmed_with_null_corrected_fields_passes(self, tmp_path):
+        """verdict=confirmed with corrected fields explicitly null should pass schema validation."""
+        f = tmp_path / "task.yml"
+        f.write_text(
+            self._make_yaml(
+                "id: F-001\n"
+                "file: cli/foo.py\n"
+                "original_severity: high\n"
+                "original_category: correctness\n"
+                "verdict: confirmed\n"
+                "corrected_severity: null\n"
+                "corrected_category: null\n"
+                "summary: A finding"
+            )
+        )
+        errors = validate_task_file(f)
+        assert errors == [], errors

@@ -3,6 +3,9 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# OpenCode session files
+session-*.md
+
 # C extensions
 *.so
 
@@ -48,6 +51,9 @@ htmlcov/
 
 # Task files (local only)
 .tasks/
+
+# Local planning/scratch directories
+.pi/
 
 # AI editor local installations
 .opencode/

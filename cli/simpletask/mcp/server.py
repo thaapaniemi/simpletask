@@ -40,8 +40,16 @@ WithJsonSchema Usage (Architectural Debt):
 import builtins  # noqa: I001
 from typing import Literal, cast
 
+from pydantic import ValidationError
+
 from mcp.server.fastmcp import FastMCP
 
+from ..core.audit_ops import (
+    add_audit_run,
+    get_audit_run,
+    get_dismissed_findings,
+    list_audit_runs,
+)
 from ..core.constraint_ops import add_constraint, list_constraints, remove_constraint
 from ..core.context_ops import remove_context, set_context, show_context
 from ..core.criteria_ops import (
@@ -59,6 +67,7 @@ from ..core.iteration_ops import (
 )
 from ..core.models import (
     ArchitecturalPattern,
+    AuditFinding,
     CodeExample,
     Design,
     DesignReference,
@@ -93,11 +102,13 @@ from ..core.task_ops import (
 from ..core.validation import validate_task_file
 from ..core.yaml_parser import parse_task_file, write_task_file
 from .models import (
+    AuditRunSummary,
     BatchTaskOperation,  # noqa: F401 — required in module namespace for Pydantic forward-ref resolution at @mcp.tool() registration
     CompactStatusSummary,
     CriterionIdAnnotation,
     OperationsAnnotation,
     QualityCheckResult,
+    SimpleTaskAuditResponse,
     SimpleTaskBatchResponse,
     SimpleTaskConstraintResponse,
     SimpleTaskContextResponse,
@@ -183,6 +194,7 @@ def _defaults_compact_summary(_path: object = None) -> CompactStatusSummary:
 mcp = FastMCP("simpletask")
 
 __all__ = [
+    "audit",
     "criteria",
     "design",
     "get",
@@ -205,6 +217,7 @@ def get(
     include_completed: bool = False,
     include_design: bool = False,
     include_quality: bool = False,
+    include_audit: bool = False,
     full: bool = False,
 ) -> SimpleTaskGetResponse:
     """Get complete task specification with status summary.
@@ -237,10 +250,12 @@ def get(
                         When False, spec.design is set to None to reduce payload size.
         include_quality: Include quality_requirements in the response (default: False).
                          When False, spec.quality_requirements is set to None.
+        include_audit: Include audit_history in the response (default: False).
+                       When False, spec.audit_history is set to None to reduce payload size.
         full: Return the complete unfiltered spec (default: False).
               When True, all other filter parameters are ignored and filters_applied is None.
-              Equivalent to include_completed=True, include_design=True, include_quality=True
-              with no iteration or status filter.
+              Equivalent to include_completed=True, include_design=True, include_quality=True,
+              include_audit=True with no iteration or status filter.
 
     Returns:
         SimpleTaskGetResponse with spec, file_path, summary, validation, and filters_applied.
@@ -319,6 +334,7 @@ def get(
                 "tasks": filtered_tasks,
                 "design": spec.design if include_design else None,
                 "quality_requirements": spec.quality_requirements if include_quality else None,
+                "audit_history": spec.audit_history if include_audit else None,
             }
         )
 
@@ -326,6 +342,7 @@ def get(
             "include_completed": include_completed,
             "include_design": include_design,
             "include_quality": include_quality,
+            "include_audit": include_audit,
             "tasks_returned": tasks_returned,
             "tasks_excluded": tasks_excluded,
         }
@@ -808,7 +825,7 @@ def quality(
         min_coverage: Minimum coverage for 'set' action with testing type
         timeout: Timeout in seconds for 'set' action (default: 300)
         preset_name: Preset name for 'preset' action
-        workflow_runner: Workflow runner for 'set' action (make or earthly)
+        workflow_runner: Workflow runner for 'set' action (make, earthly, or moonly)
         workflow_target: Workflow target for 'set' action (used with workflow_runner)
         lint_only: Only run linting check (for 'check' action). Raises ValueError
             if combined with a non-check action or combined with another filter flag.
@@ -1813,6 +1830,132 @@ def iteration(
                 file_path=str(file_path),
                 summary=summary,
                 new_item_ids=[],
+            )
+
+
+@mcp.tool()
+def audit(
+    action: Literal["add_run", "list_runs", "get_run", "get_dismissed"],
+    iteration: int | str | None = None,
+    base_sha: str | None = None,
+    head_sha: str | None = None,
+    findings: _list[dict[str, object]] | None = None,
+) -> SimpleTaskAuditResponse:
+    """Manage code audit history for the current task.
+
+    Provides four actions for persisting and querying audit findings:
+    - add_run: Add a new audit run with findings to the task's audit_history.
+    - list_runs: List all audit run summaries (iteration, base_sha, verdict counts).
+    - get_run: Get the full details of a specific audit run.
+    - get_dismissed: Get all dismissed findings (false_positive or uncertain) across all runs.
+
+    See commands/audit/__init__.py for CLI vs MCP naming convention rationale.
+
+    Args:
+        action: Operation to perform ('add_run', 'list_runs', 'get_run', 'get_dismissed').
+        iteration: Audit iteration number (required for add_run and get_run).
+                   Accepts int or string integer for Qwen CLI compatibility.
+        base_sha: Git SHA of the base commit audited (required for add_run).
+        head_sha: Git SHA of the HEAD commit audited (required for add_run).
+        findings: List of finding dicts for add_run. Each dict must have: id, file,
+                  original_severity, original_category, verdict, summary. When
+                  verdict=reclassified, corrected_severity and corrected_category are
+                  also required.
+
+    Returns:
+        SimpleTaskAuditResponse with action, audit_runs/dismissed_findings, file_path, summary.
+
+    Raises:
+        ValueError: If required parameters are missing or invalid.
+        FileNotFoundError: If task file doesn't exist for the current branch.
+    """
+    # Coerce iteration string to int (Qwen CLI compat)
+    iteration_int: int | None = None
+    if iteration is not None:
+        try:
+            iteration_int = int(iteration)
+        except (ValueError, TypeError):
+            raise ValueError(f"'iteration' must be an integer, got: {iteration!r}") from None
+
+    file_path = get_current_task_file_path()
+    spec = parse_task_file(file_path)
+
+    match action:
+        case "add_run":
+            if iteration_int is None:
+                raise ValueError("'iteration' is required for action='add_run'")
+            if not base_sha:
+                raise ValueError("'base_sha' is required for action='add_run'")
+            if not head_sha:
+                raise ValueError("'head_sha' is required for action='add_run'")
+            if not findings:
+                raise ValueError(
+                    "'findings' is required and must be non-empty for action='add_run'"
+                )
+
+            parsed_findings: _list[AuditFinding] = []
+            # Manual dict unpacking is intentional: passing list[dict] from MCP callers
+            # requires per-item construction so we can catch ValidationError per finding
+            # index and surface a clear "Invalid finding at index N: ..." message.
+            # Other tools accept typed parameters directly, but findings arrive as raw dicts.
+            for idx, f in enumerate(findings):  # type: ignore[arg-type]
+                try:
+                    parsed_findings.append(AuditFinding(**f))  # type: ignore[arg-type]
+                except ValidationError as exc:
+                    raise ValueError(f"Invalid finding at index {idx}: {exc}") from exc
+            spec = add_audit_run(spec, iteration_int, base_sha, head_sha, parsed_findings)
+            write_task_file(file_path, spec)
+            summary = compute_compact_status_summary(spec)
+            return SimpleTaskAuditResponse(
+                action="audit_run_added",
+                audit_run_summaries=None,
+                audit_run_detail=None,
+                dismissed_findings=None,
+                file_path=str(file_path),
+                summary=summary,
+            )
+
+        case "list_runs":
+            runs = list_audit_runs(spec)
+            summary = compute_compact_status_summary(spec)
+            return SimpleTaskAuditResponse(
+                action="audit_list_runs",
+                audit_run_summaries=[AuditRunSummary.model_validate(r) for r in runs],
+                audit_run_detail=None,
+                dismissed_findings=None,
+                file_path=str(file_path),
+                summary=summary,
+            )
+
+        case "get_run":
+            if iteration_int is None:
+                raise ValueError("'iteration' is required for action='get_run'")
+            run = get_audit_run(spec, iteration_int)
+            summary = compute_compact_status_summary(spec)
+            return SimpleTaskAuditResponse(
+                action="audit_get_run",
+                audit_run_summaries=None,
+                audit_run_detail=run,
+                dismissed_findings=None,
+                file_path=str(file_path),
+                summary=summary,
+            )
+
+        case "get_dismissed":
+            dismissed = get_dismissed_findings(spec)
+            summary = compute_compact_status_summary(spec)
+            return SimpleTaskAuditResponse(
+                action="audit_get_dismissed",
+                audit_run_summaries=None,
+                audit_run_detail=None,
+                dismissed_findings=dismissed,
+                file_path=str(file_path),
+                summary=summary,
+            )
+
+        case _:
+            raise ValueError(
+                f"Unknown action '{action}'. Valid actions: add_run, list_runs, get_run, get_dismissed"
             )
 
 

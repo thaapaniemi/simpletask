@@ -22,6 +22,8 @@ from pydantic import BaseModel, Field, WithJsonSchema, field_validator, model_va
 
 from ..core.models import (
     AcceptanceCriterion,
+    AuditFinding,
+    AuditRun,
     CodeExample,
     Design,
     FileAction,
@@ -34,11 +36,15 @@ from ..core.models import (
 )
 
 __all__ = [
+    "AuditFinding",
+    "AuditRun",
+    "AuditRunSummary",
     "BatchTaskOperation",
     "CriterionIdAnnotation",
     "IterationSummary",
     "OperationsAnnotation",
     "QualityCheckResult",
+    "SimpleTaskAuditResponse",
     "SimpleTaskBatchResponse",
     "SimpleTaskConstraintResponse",
     "SimpleTaskContextResponse",
@@ -297,6 +303,14 @@ class StatusSummary(BaseModel):
     tasks_blocked: int = Field(0, description="Blocked tasks")
     tasks_paused: int = Field(0, description="Paused tasks")
     notes_total: int = Field(0, description="Total notes (root + task-level)")
+    audit_runs_total: int = Field(0, description="Total number of audit runs")
+    latest_audit_base_sha: str | None = Field(
+        None, description="Diff base SHA from the most recent audit run (None if no audits exist)"
+    )
+    latest_audit_head_sha: str | None = Field(
+        None,
+        description="Audited HEAD SHA from the most recent audit run (None if no audits exist)",
+    )
     iteration_summaries: list["IterationSummary"] | None = Field(
         None, description="Per-iteration task counts (None if no iterations defined)"
     )
@@ -499,6 +513,51 @@ class SimpleTaskIterationResponse(BaseModel):
     )
 
 
+class AuditRunSummary(BaseModel):
+    """Summary of a single audit run (returned by list_runs action)."""
+
+    model_config = {"extra": "forbid"}
+
+    iteration: int = Field(..., description="Audit iteration number")
+    base_sha: str = Field(..., description="Git SHA of the base commit audited")
+    head_sha: str = Field(..., description="Git SHA of the HEAD commit audited")
+    findings_total: int = Field(..., description="Total number of findings in this run")
+    verdict_counts: dict[str, int] = Field(..., description="Per-verdict finding counts")
+
+
+class SimpleTaskAuditResponse(BaseModel):
+    """Response model for simpletask_audit tool."""
+
+    model_config = {"extra": "forbid"}
+
+    action: str = Field(
+        ..., description="Action performed (e.g., 'audit_run_added', 'audit_list_runs')"
+    )
+    audit_run_summaries: list[AuditRunSummary] | None = Field(
+        None, description="Audit run summaries (for list_runs action)"
+    )
+    audit_run_detail: AuditRun | None = Field(
+        # Intentional: AuditRun is a domain model re-used directly in the response.
+        # No separate response-layer model is introduced because AuditRun already has
+        # extra="forbid", is fully typed, and there is no transform between the stored
+        # representation and what callers need.  The same pattern applies to
+        # dismissed_findings below.  If the MCP response shape ever needs to diverge
+        # from the stored representation, introduce a dedicated response model at that point.
+        None,
+        description="Full audit run detail (for get_run action)",
+    )
+    dismissed_findings: list[AuditFinding] | None = Field(
+        # Intentional: AuditFinding domain model reused directly - same rationale as
+        # audit_run_detail above.  No response-layer wrapper until shapes diverge.
+        None,
+        description="Dismissed findings across all runs (for get_dismissed action)",
+    )
+    file_path: str = Field(..., description="Path to task file")
+    summary: StatusSummary | CompactStatusSummary = Field(
+        ..., description="Pre-computed status summary"
+    )
+
+
 def _increment_status_counts(counts: dict[str, int], status: TaskStatus) -> None:
     """Increment the appropriate status counter in a counts dict.
 
@@ -610,6 +669,16 @@ def compute_status_summary(spec: SimpleTaskSpec) -> StatusSummary:
             for it in spec.iterations
         ]
 
+    # Compute audit summary fields
+    audit_runs_total = 0
+    latest_audit_base_sha: str | None = None
+    latest_audit_head_sha: str | None = None
+    if spec.audit_history:
+        audit_runs_total = len(spec.audit_history)
+        latest_run = max(spec.audit_history, key=lambda r: r.iteration)
+        latest_audit_base_sha = latest_run.base_sha
+        latest_audit_head_sha = latest_run.head_sha
+
     return StatusSummary(
         branch=spec.branch,
         title=spec.title,
@@ -618,6 +687,9 @@ def compute_status_summary(spec: SimpleTaskSpec) -> StatusSummary:
         criteria_completed=criteria_completed,
         tasks_total=tasks_total,
         notes_total=notes_total,
+        audit_runs_total=audit_runs_total,
+        latest_audit_base_sha=latest_audit_base_sha,
+        latest_audit_head_sha=latest_audit_head_sha,
         iteration_summaries=iteration_summaries,
         **global_counts,
     )

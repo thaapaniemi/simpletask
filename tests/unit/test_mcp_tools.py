@@ -224,8 +224,9 @@ class TestMCPServerRegistration:
         tools = await mcp.list_tools()
         registered_tools = {tool.name for tool in tools}
 
-        # Verify all 11 tools are registered with simple names
+        # Verify all 12 tools are registered with simple names
         expected_tools = {
+            "audit",
             "get",
             "list",
             "new",
@@ -524,6 +525,7 @@ class TestMCPIterationTool:
         mock_spec.tasks = []
         mock_spec.notes = []
         mock_spec.iterations = None
+        mock_spec.audit_history = None
         return task_file, mock_spec
 
     def test_quality_check_no_filters(self, tmp_project_with_task):

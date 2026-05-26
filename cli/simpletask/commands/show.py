@@ -5,10 +5,12 @@ from typing import Annotated
 import typer
 
 from ..core.models import (
+    AuditRun,
     Design,
     QualityRequirements,
     Task,
     ToolExecutionSpec,
+    Verdict,
     WorkflowExecutionSpec,
 )
 from ..core.project import ensure_project, get_task_file_path
@@ -164,6 +166,33 @@ def _count_task_notes(tasks: list[Task] | None) -> tuple[int, int]:
     return total_notes, tasks_with_notes
 
 
+def _format_audit_summary(audit_history: list[AuditRun]) -> list[str]:
+    """Format audit history as summary + per-run breakdown lines.
+
+    Args:
+        audit_history: Non-empty list of audit runs
+
+    Returns:
+        List of lines: summary line followed by one line per run
+    """
+    run_count = len(audit_history)
+    latest_run = max(audit_history, key=lambda r: r.iteration)
+
+    lines: list[str] = [
+        f"  {run_count} {'run' if run_count == 1 else 'runs'} · latest range: {latest_run.base_sha}..{latest_run.head_sha}",
+    ]
+
+    for run in sorted(audit_history, key=lambda r: r.iteration):
+        counts: dict[str, int] = {v.value: 0 for v in Verdict}
+        for finding in run.findings:
+            counts[finding.verdict.value] += 1
+        verdict_parts = [f"{v}: {c}" for v, c in counts.items() if c > 0]
+        verdicts_str = " · ".join(verdict_parts) if verdict_parts else "none"
+        lines.append(f"  run {run.iteration} · {run.base_sha}..{run.head_sha} · {verdicts_str}")
+
+    return lines
+
+
 def _task_status_parts(task: Task) -> tuple[str, str]:
     """Return (status_icon, status_color) for a task.
 
@@ -276,6 +305,36 @@ def _print_json_show(spec, file_path: str) -> None:
             else []
         ),
         "context": spec.context or {},
+        "audit_history": (
+            [
+                {
+                    "iteration": run.iteration,
+                    "base_sha": run.base_sha,
+                    "head_sha": run.head_sha,
+                    "findings": [
+                        {
+                            "id": f.id,
+                            "file": f.file,
+                            "original_severity": f.original_severity.value,
+                            "original_category": f.original_category.value,
+                            "verdict": f.verdict.value,
+                            "corrected_severity": (
+                                f.corrected_severity.value if f.corrected_severity else None
+                            ),
+                            "corrected_category": (
+                                f.corrected_category.value if f.corrected_category else None
+                            ),
+                            "task_id": f.task_id,
+                            "summary": f.summary,
+                        }
+                        for f in run.findings
+                    ],
+                }
+                for run in spec.audit_history
+            ]
+            if spec.audit_history
+            else None
+        ),
     }
     json_success(output)
 
@@ -299,6 +358,7 @@ def show(
     - Design summary (if configured)
     - Original prompt (truncated to 160 chars)
     - Notes (if present): root notes with bullets, task notes as count summary
+    - Audit History (if present): run count, latest base SHA, per-run verdict breakdown
 
     Examples:
         simpletask show                    # Uses current git branch
@@ -440,6 +500,13 @@ def show(
                     f"  [bold]Tasks:[/bold] {task_note_count} {note_word} across {task_with_notes_count} {task_word}"
                 )
                 console.print("  [dim]→ Details:[/dim] simpletask note list")
+
+        # Audit History
+        if spec.audit_history:
+            console.print("\n[bold cyan]Audit History:[/bold cyan]")
+            for line in _format_audit_summary(spec.audit_history):
+                console.print(line)
+            console.print("  [dim]→ Details:[/dim] simpletask audit list")
 
         console.print()
 
