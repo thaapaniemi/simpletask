@@ -35,7 +35,7 @@ jobs:
       # Use a non-GITHUB_TOKEN credential here. Pushes made with GITHUB_TOKEN do not
       # trigger downstream push/workflow_run workflows, which would break CI -> Release.
       - name: Checkout main
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           ref: ${{ github.event.pull_request.base.ref }}
           fetch-depth: 0
