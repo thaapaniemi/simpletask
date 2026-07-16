@@ -1,6 +1,6 @@
 """simpletask: A Python CLI for managing AI-friendly task definition YAML files."""
 
-__version__ = "0.39.8"
+__version__ = "0.39.9"
 
 import typer
 

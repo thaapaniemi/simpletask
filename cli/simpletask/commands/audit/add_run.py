@@ -24,8 +24,6 @@ def add_run_command(
             "--findings",
             "-f",
             help="Path to JSON file containing audit findings array",
-            exists=True,
-            readable=True,
         ),
     ],
     branch: str | None = typer.Option(
