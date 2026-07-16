@@ -95,20 +95,23 @@ cli/simpletask/           # Main CLI package
 ├── templates/            # AI workflow templates
 │   ├── opencode/         # OpenCode slash commands (.md)
 │   │   ├── simpletask.plan.md
-│   │   ├── simpletask.split.md      # NEW: Task splitting command
+│   │   ├── simpletask.split.md      # Task splitting command
 │   │   ├── simpletask.implement.md
+│   │   ├── simpletask.audit.md
 │   │   ├── simpletask.review.md
 │   │   └── agents/                  # OpenCode agents (.md)
 │   │       └── simpletask-plan.md   # NEW: Auto-planning agent
 │   ├── qwen/             # Qwen slash commands (.md)
 │   │   ├── simpletask.plan.md
-│   │   ├── simpletask.split.md      # NEW: Task splitting command
+│   │   ├── simpletask.split.md      # Task splitting command
 │   │   ├── simpletask.implement.md
+│   │   ├── simpletask.audit.md
 │   │   └── simpletask.review.md
 │   └── gemini/           # Gemini CLI slash commands (.toml)
 │       ├── simpletask.plan.toml
-│       ├── simpletask.split.toml    # NEW: Task splitting command
+│       ├── simpletask.split.toml    # Task splitting command
 │       ├── simpletask.implement.toml
+│       ├── simpletask.audit.toml
 │       └── simpletask.review.toml
 └── schema/
     └── task_schema.json  # JSON schema for validation
@@ -144,7 +147,7 @@ The `normalize_branch_name()` function in `cli/simpletask/core/project.py` conve
 
 ## AI Workflow Templates (Slash Commands)
 
-simpletask provides AI-assisted workflow templates (slash commands) for OpenCode, Qwen CLI, and Gemini CLI. These templates guide AI models through structured development workflows.
+simpletask provides AI-assisted workflow templates for OpenCode, Qwen CLI, Gemini CLI, Pi, and Vibe. These templates guide AI models through structured development workflows.
 
 ### Available Slash Commands
 
@@ -153,6 +156,7 @@ simpletask provides AI-assisted workflow templates (slash commands) for OpenCode
 | `/simpletask.plan` | Create lightweight task specification from feature description | Start of a new feature branch |
 | `/simpletask.split` | Analyze codebase, enrich tasks with design guidance, and split complex tasks into atomic subtasks | After planning, before implementation |
 | `/simpletask.implement` | Execute tasks step-by-step with best practices | Implementation phase |
+| `/simpletask.audit` | Run an unrestricted audit, verify findings, and turn approved issues into tracked fix tasks | After implementation, before final review |
 | `/simpletask.review` | Review completed tasks and generate summary | After all tasks completed |
 
 ### `/simpletask.split` - Task Splitting
@@ -186,7 +190,10 @@ A task is split if it has ANY of:
 # 3. Implement atomic tasks
 /simpletask.implement
 
-# 4. Review completed work
+# 4. Audit the branch and create approved fix tasks
+/simpletask.audit
+
+# 5. Review completed work
 /simpletask.review
 ```
 
@@ -210,7 +217,7 @@ The split command recognizes and handles these patterns:
 Install templates for your AI editor:
 
 ```bash
-# Install for all editors (OpenCode, Qwen, Gemini)
+# Install for all editors (OpenCode, Qwen, Gemini, Pi, Vibe)
 simpletask ai install
 
 # Install for specific editor only
@@ -242,6 +249,16 @@ simpletask ai list
 - Commands: `cli/simpletask/templates/gemini/*.toml`
   - Installed to: `~/.gemini/commands/` or `.gemini/commands/`
 - Agents: Not supported (OpenCode-only feature)
+
+**Pi** (Markdown prompts):
+- Commands: `cli/simpletask/templates/pi/*.md`
+  - Installed to: `~/.pi/agent/prompts/` or `.pi/prompts/`
+- Agents: Not supported
+
+**Mistral Vibe** (skill directories):
+- Commands: `cli/simpletask/templates/vibe/*/SKILL.md`
+  - Installed to: `~/.vibe/skills/` or `.vibe/skills/`
+- Agents: Not supported
 
 ### AI Agents
 
@@ -283,7 +300,7 @@ This installs both:
 | **Branch name generation** | Automatic (no user confirmation) | Asks user for branch name |
 | **Execution** | Runs autonomously, returns structured output | Interactive, guides user step-by-step |
 | **Use case** | Batch automation, programmatic delegation | Interactive exploration and learning |
-| **Support** | OpenCode only | OpenCode, Qwen, Gemini |
+| **Support** | OpenCode only | OpenCode, Qwen, Gemini, Pi, Vibe |
 
 ## Commands
 

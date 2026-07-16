@@ -55,7 +55,7 @@ class TestGetBundledTemplates:
             assert template.suffix == ".md"
 
     def test_returns_expected_templates(self):
-        """Should return the four bundled templates."""
+        """Should return the five bundled templates."""
         templates = get_bundled_templates()
         template_names = {t.name for t in templates}
 
@@ -63,6 +63,7 @@ class TestGetBundledTemplates:
             "simpletask.plan.md",
             "simpletask.split.md",
             "simpletask.implement.md",
+            "simpletask.audit.md",
             "simpletask.review.md",
         }
 
@@ -111,8 +112,8 @@ class TestInstallTemplates:
         # Should create target directory
         assert target_dir.exists()
 
-        # Should install all four templates
-        assert len(installed) == 4
+        # Should install all five templates
+        assert len(installed) == 5
         assert len(skipped) == 0
         assert len(overwritten) == 0
 
@@ -138,8 +139,8 @@ class TestInstallTemplates:
         # Should not report overwritten files as newly installed
         assert "simpletask.plan.md" not in installed
 
-        # Should install the other three files
-        assert len(installed) == 3
+        # Should install the other four files
+        assert len(installed) == 4
 
         # File should have new content (not "old content")
         assert existing_file.read_text() != "old content"
@@ -164,8 +165,8 @@ class TestInstallTemplates:
         # Should not report as overwritten
         assert len(overwritten) == 0
 
-        # Should install the other three
-        assert len(installed) == 3
+        # Should install the other four
+        assert len(installed) == 4
 
         # Original file should be unchanged
         assert existing_file.read_text() == old_content
@@ -310,7 +311,7 @@ class TestGetBundledQwenTemplates:
             assert template.suffix == ".md"
 
     def test_returns_expected_templates(self):
-        """Should return the four bundled Qwen templates."""
+        """Should return the five bundled Qwen templates."""
         templates = get_bundled_qwen_templates()
         template_names = {t.name for t in templates}
 
@@ -318,6 +319,7 @@ class TestGetBundledQwenTemplates:
             "simpletask.plan.md",
             "simpletask.split.md",
             "simpletask.implement.md",
+            "simpletask.audit.md",
             "simpletask.review.md",
         }
 
@@ -366,8 +368,8 @@ class TestInstallQwenTemplates:
         # Should create target directory
         assert target_dir.exists()
 
-        # Should install all four templates
-        assert len(installed) == 4
+        # Should install all five templates
+        assert len(installed) == 5
         assert len(skipped) == 0
         assert len(overwritten) == 0
 
@@ -393,8 +395,8 @@ class TestInstallQwenTemplates:
         # Should not report overwritten files as newly installed
         assert "simpletask.plan.md" not in installed
 
-        # Should install the other three files
-        assert len(installed) == 3
+        # Should install the other four files
+        assert len(installed) == 4
 
         # File should have new content (not "old content")
         assert existing_file.read_text() != "old content"
@@ -419,8 +421,8 @@ class TestInstallQwenTemplates:
         # Should not report as overwritten
         assert len(overwritten) == 0
 
-        # Should install the other three
-        assert len(installed) == 3
+        # Should install the other four
+        assert len(installed) == 4
 
         # Original file should be unchanged
         assert existing_file.read_text() == old_content
@@ -557,7 +559,7 @@ class TestGetBundledGeminiTemplates:
             assert template.suffix == ".toml"
 
     def test_returns_expected_templates(self):
-        """Should return the four bundled Gemini templates."""
+        """Should return the five bundled Gemini templates."""
         templates = get_bundled_gemini_templates()
         template_names = {t.name for t in templates}
 
@@ -565,6 +567,7 @@ class TestGetBundledGeminiTemplates:
             "simpletask.plan.toml",
             "simpletask.split.toml",
             "simpletask.implement.toml",
+            "simpletask.audit.toml",
             "simpletask.review.toml",
         }
 
@@ -588,12 +591,13 @@ class TestGetBundledPiTemplates:
             assert template.suffix == ".md"
 
     def test_returns_expected_templates(self):
-        """Should return all 4 bundled Pi prompt templates."""
+        """Should return all 5 bundled Pi prompt templates."""
         templates = get_bundled_pi_templates()
         template_names = {t.name for t in templates}
 
         assert template_names == {
             "simpletask-implement.md",
+            "simpletask-audit.md",
             "simpletask-plan.md",
             "simpletask-split.md",
             "simpletask-review.md",
@@ -672,8 +676,8 @@ class TestInstallGeminiTemplates:
         # Should create target directory
         assert target_dir.exists()
 
-        # Should install all four templates
-        assert len(installed) == 4
+        # Should install all five templates
+        assert len(installed) == 5
         assert len(skipped) == 0
         assert len(overwritten) == 0
 
@@ -699,8 +703,8 @@ class TestInstallGeminiTemplates:
         # Should not report overwritten files as newly installed
         assert "simpletask.plan.toml" not in installed
 
-        # Should install the other three files
-        assert len(installed) == 3
+        # Should install the other four files
+        assert len(installed) == 4
 
         # File should have new content (not "old content")
         assert existing_file.read_text() != "old content"
@@ -725,8 +729,8 @@ class TestInstallGeminiTemplates:
         # Should not report as overwritten
         assert len(overwritten) == 0
 
-        # Should install the other three
-        assert len(installed) == 3
+        # Should install the other four
+        assert len(installed) == 4
 
         # Original file should be unchanged
         assert existing_file.read_text() == old_content
@@ -858,12 +862,14 @@ class TestInstallPiTemplates:
         assert target_dir.exists()
         assert set(installed) == {
             "simpletask-implement.md",
+            "simpletask-audit.md",
             "simpletask-plan.md",
             "simpletask-split.md",
             "simpletask-review.md",
         }
         assert skipped == []
         assert overwritten == []
+        assert (target_dir / "simpletask-audit.md").exists()
         assert (target_dir / "simpletask-implement.md").exists()
         assert (target_dir / "simpletask-plan.md").exists()
         assert (target_dir / "simpletask-split.md").exists()
@@ -882,8 +888,9 @@ class TestInstallPiTemplates:
         assert "simpletask-implement.md" in overwritten
         assert "simpletask-implement.md" not in installed
         assert existing_file.read_text() != "old content"
-        # Other 3 templates are freshly installed
+        # Other 4 templates are freshly installed
         assert set(installed) == {
+            "simpletask-audit.md",
             "simpletask-plan.md",
             "simpletask-split.md",
             "simpletask-review.md",
@@ -902,8 +909,9 @@ class TestInstallPiTemplates:
         assert "simpletask-implement.md" in skipped
         assert overwritten == []
         assert existing_file.read_text() == "old content"
-        # Other 3 templates are freshly installed
+        # Other 4 templates are freshly installed
         assert set(installed) == {
+            "simpletask-audit.md",
             "simpletask-plan.md",
             "simpletask-split.md",
             "simpletask-review.md",
@@ -941,6 +949,7 @@ class TestGetPiInstalledStatus:
         status = get_pi_installed_status()
 
         assert status == {
+            "simpletask-audit.md": {"global": False, "local": False},
             "simpletask-implement.md": {"global": False, "local": False},
             "simpletask-plan.md": {"global": False, "local": False},
             "simpletask-split.md": {"global": False, "local": False},
@@ -967,6 +976,7 @@ class TestGetPiInstalledStatus:
         status = get_pi_installed_status()
 
         assert status == {
+            "simpletask-audit.md": {"global": True, "local": False},
             "simpletask-implement.md": {"global": True, "local": False},
             "simpletask-plan.md": {"global": True, "local": False},
             "simpletask-split.md": {"global": True, "local": False},
@@ -993,6 +1003,7 @@ class TestGetPiInstalledStatus:
         status = get_pi_installed_status()
 
         assert status == {
+            "simpletask-audit.md": {"global": False, "local": True},
             "simpletask-implement.md": {"global": False, "local": True},
             "simpletask-plan.md": {"global": False, "local": True},
             "simpletask-split.md": {"global": False, "local": True},
@@ -1021,6 +1032,7 @@ class TestGetPiInstalledStatus:
         status = get_pi_installed_status()
 
         assert status == {
+            "simpletask-audit.md": {"global": True, "local": True},
             "simpletask-implement.md": {"global": True, "local": True},
             "simpletask-plan.md": {"global": True, "local": True},
             "simpletask-split.md": {"global": True, "local": True},
@@ -1622,7 +1634,7 @@ class TestEditorConfigPiEntry:
             assert tool in gemini_content, f"Gemini missing MCP tool: {tool}"
 
     def test_no_branch_parameter_in_any_template(self):
-        """All 12 templates should not contain deprecated branch=None.
+        """All 15 templates should not contain deprecated branch=None.
 
         The branch parameter is still valid for simpletask_new() but was removed
         from other MCP tools (get, task, criteria, quality, design, etc.) which
@@ -1642,7 +1654,7 @@ class TestEditorConfigPiEntry:
             r"[a-z_]+\([^)]*branch="  # Any simpletask tool with branch= param
         )
 
-        # Check all 4 OpenCode templates
+        # Check all 5 OpenCode templates
         for template in opencode_templates:
             content = template.read_text()
             assert "branch=None" not in content, f"{template.name} has branch=None"
@@ -1652,7 +1664,7 @@ class TestEditorConfigPiEntry:
                 f"{match.group(0) if match else ''}"
             )
 
-        # Check all 4 Qwen templates
+        # Check all 5 Qwen templates
         for template in qwen_templates:
             content = template.read_text()
             assert "branch=None" not in content, f"{template.name} has branch=None"
@@ -1662,7 +1674,7 @@ class TestEditorConfigPiEntry:
                 f"{match.group(0) if match else ''}"
             )
 
-        # Check all 4 Gemini templates
+        # Check all 5 Gemini templates
         for template in gemini_templates:
             content = template.read_text()
             assert "branch=None" not in content, f"{template.name} has branch=None"
@@ -2090,11 +2102,12 @@ class TestGetBundledVibeTemplates:
             assert skill_file.is_file()
 
     def test_returns_expected_templates(self):
-        """Should return the four bundled Vibe skill directories."""
+        """Should return the five bundled Vibe skill directories."""
         templates = get_bundled_vibe_templates()
         template_names = {t.name for t in templates}
 
         expected = {
+            "simpletask-audit",
             "simpletask-plan",
             "simpletask-split",
             "simpletask-implement",
@@ -2146,8 +2159,8 @@ class TestInstallVibeTemplates:
         # Should create target directory
         assert target_dir.exists()
 
-        # Should install all four skill directories
-        assert len(installed) == 4
+        # Should install all five skill directories
+        assert len(installed) == 5
         assert len(skipped) == 0
         assert len(overwritten) == 0
 
@@ -2177,8 +2190,8 @@ class TestInstallVibeTemplates:
         # Should not report overwritten dirs as newly installed
         assert "simpletask-plan" not in installed
 
-        # Should install the other three
-        assert len(installed) == 3
+        # Should install the other four
+        assert len(installed) == 4
 
         # Directory should have new content (not "old content")
         assert (existing_dir / "SKILL.md").read_text() != "old content"
@@ -2204,8 +2217,8 @@ class TestInstallVibeTemplates:
         # Should not report as overwritten
         assert len(overwritten) == 0
 
-        # Should install the other three
-        assert len(installed) == 3
+        # Should install the other four
+        assert len(installed) == 4
 
         # Original content should be unchanged
         assert (existing_dir / "SKILL.md").read_text() == old_content
@@ -2385,6 +2398,28 @@ class TestVibeSkillContent:
         for tool in core_mcp_tools:
             assert tool in content, f"Missing MCP tool reference: {tool}"
 
+    def test_audit_skill_references_core_mcp_tools_and_fallback(self):
+        """Vibe audit skill should reference audit MCP tools and inline fallback."""
+        templates = get_bundled_vibe_templates()
+        audit_template = next((t for t in templates if t.name == "simpletask-audit"), None)
+        assert audit_template is not None
+
+        content = (audit_template / "SKILL.md").read_text()
+
+        core_mcp_tools = [
+            "simpletask_get",
+            "simpletask_audit",
+            "simpletask_iteration",
+            "simpletask_criteria",
+            "simpletask_task",
+        ]
+
+        for tool in core_mcp_tools:
+            assert tool in content, f"Missing MCP tool reference: {tool}"
+
+        assert "gilfoyle" in content
+        assert "inline" in content
+
     def test_no_branch_parameter_in_any_skill(self):
         """No Vibe skill should contain deprecated branch=None."""
         templates = get_bundled_vibe_templates()
@@ -2560,3 +2595,48 @@ class TestEditorConfigVibeEntry:
 
         assert EDITOR_CONFIGS["vibe"].global_agents_dir is None
         assert EDITOR_CONFIGS["vibe"].local_agents_dir is None
+
+    def test_all_audit_templates_reference_same_core_tools(self):
+        """All audit templates should reference the same core MCP tools."""
+        opencode_templates = get_bundled_templates()
+        qwen_templates = get_bundled_qwen_templates()
+        gemini_templates = get_bundled_gemini_templates()
+
+        opencode_audit = next((t for t in opencode_templates if t.stem == "simpletask.audit"), None)
+        qwen_audit = next((t for t in qwen_templates if t.stem == "simpletask.audit"), None)
+        gemini_audit = next((t for t in gemini_templates if t.stem == "simpletask.audit"), None)
+
+        assert opencode_audit is not None
+        assert qwen_audit is not None
+        assert gemini_audit is not None
+
+        core_mcp_tools = [
+            "simpletask_get",
+            "simpletask_audit",
+            "simpletask_iteration",
+            "simpletask_criteria",
+            "simpletask_task",
+        ]
+
+        opencode_content = opencode_audit.read_text()
+        qwen_content = qwen_audit.read_text()
+        gemini_content = gemini_audit.read_text()
+
+        for tool in core_mcp_tools:
+            assert tool in opencode_content, f"OpenCode audit missing MCP tool: {tool}"
+            assert tool in qwen_content, f"Qwen audit missing MCP tool: {tool}"
+            assert tool in gemini_content, f"Gemini audit missing MCP tool: {tool}"
+
+        for content, editor in [
+            (opencode_content, "OpenCode"),
+            (qwen_content, "Qwen"),
+            (gemini_content, "Gemini"),
+        ]:
+            assert "gilfoyle" in content, f"{editor} audit should mention gilfoyle fallback"
+            assert "inline" in content, f"{editor} audit should describe inline fallback"
+            assert "latest_audit_head_sha" in content, (
+                f"{editor} audit should use latest audited HEAD for incremental re-audits"
+            )
+            assert "already tracked" in content, (
+                f"{editor} audit should suppress duplicate tracking for existing findings/tasks"
+            )

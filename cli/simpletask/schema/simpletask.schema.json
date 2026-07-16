@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "simpletask-v1.1.schema.json",
-  "title": "SimpleTask Schema v1.1",
-  "description": "Schema for AI-friendly task definitions with execution specs, quality requirements, and design guidance. Supports schema versions 1.0 (legacy) and 1.1 (canonical).",
+  "$id": "simpletask-v1.2.schema.json",
+  "title": "SimpleTask Schema v1.2",
+  "description": "Schema for AI-friendly task definitions with execution specs, quality requirements, design guidance, and audit history. Supports schema versions 1.0 (legacy), 1.1 (canonical), and 1.2 (with audit_history including audited base/head range).",
   "type": "object",
   "required": [
     "schema_version",
@@ -17,12 +17,14 @@
       "type": "string",
       "enum": [
         "1.0",
-        "1.1"
+        "1.1",
+        "1.2"
       ],
-      "description": "Schema version for compatibility tracking. 1.1 is canonical for all writes.",
+      "description": "Schema version for compatibility tracking. 1.1 is canonical for all writes, 1.2 adds audit_history with audited base/head SHAs.",
       "examples": [
         "1.0",
-        "1.1"
+        "1.1",
+        "1.2"
       ]
     },
     "branch": {
@@ -123,6 +125,16 @@
       "description": "List of development iterations for semantic separation of work rounds",
       "items": {
         "$ref": "#/$defs/Iteration"
+      }
+    },
+    "audit_history": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "description": "History of code audit runs performed on this branch",
+      "items": {
+        "$ref": "#/$defs/AuditRun"
       }
     }
   },
@@ -466,7 +478,8 @@
             "mvn",
             "gradle",
             "make",
-            "earthly"
+            "earthly",
+            "moonly"
           ]
         },
         "args": {
@@ -480,7 +493,7 @@
     },
     "WorkflowExecutionSpec": {
       "type": "object",
-      "description": "Execution spec for workflow runners (make, earthly)",
+      "description": "Execution spec for workflow runners (make, earthly, moonly)",
       "required": [
         "kind",
         "runner",
@@ -498,7 +511,8 @@
           "type": "string",
           "enum": [
             "make",
-            "earthly"
+            "earthly",
+            "moonly"
           ],
           "description": "Workflow runner to use"
         },
@@ -700,6 +714,147 @@
           "type": "string",
           "format": "date-time",
           "description": "Timestamp when the iteration was created (ISO 8601 format)"
+        }
+      }
+    },
+    "AuditFinding": {
+      "type": "object",
+      "description": "A single finding from a code audit run",
+      "required": [
+        "id",
+        "file",
+        "original_severity",
+        "original_category",
+        "verdict",
+        "summary"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^F-\\d{3,}$",
+          "description": "Finding identifier (e.g., F-001)",
+          "examples": ["F-001", "F-002"]
+        },
+        "file": {
+          "type": "string",
+          "description": "File path where the finding was detected"
+        },
+        "original_severity": {
+          "type": "string",
+          "enum": ["critical", "high", "medium", "low"],
+          "description": "Severity as assessed by the auditor"
+        },
+        "original_category": {
+          "type": "string",
+          "enum": [
+            "security",
+            "correctness",
+            "architecture",
+            "performance",
+            "error_handling",
+            "testing",
+            "style"
+          ],
+          "description": "Category of the finding"
+        },
+        "verdict": {
+          "type": "string",
+          "enum": ["confirmed", "false_positive", "uncertain", "reclassified"],
+          "description": "Verdict assigned after review"
+        },
+        "corrected_severity": {
+          "type": ["string", "null"],
+          "enum": ["critical", "high", "medium", "low", null],
+          "description": "Corrected severity (required when verdict=reclassified, must be null otherwise)"
+        },
+        "corrected_category": {
+          "type": ["string", "null"],
+          "enum": [
+            "security",
+            "correctness",
+            "architecture",
+            "performance",
+            "error_handling",
+            "testing",
+            "style",
+            null
+          ],
+          "description": "Corrected category (required when verdict=reclassified, must be null otherwise)"
+        },
+        "task_id": {
+          "type": ["string", "null"],
+          "description": "Task ID this finding is linked to (optional)"
+        },
+        "summary": {
+          "type": "string",
+          "description": "Brief description of the finding"
+        }
+      },
+      "if": {
+        "properties": {
+          "verdict": { "const": "reclassified" }
+        }
+      },
+      "then": {
+        "required": ["corrected_severity", "corrected_category"],
+        "properties": {
+          "corrected_severity": {
+            "type": "string",
+            "enum": ["critical", "high", "medium", "low"]
+          },
+          "corrected_category": {
+            "type": "string",
+            "enum": [
+              "security",
+              "correctness",
+              "architecture",
+              "performance",
+              "error_handling",
+              "testing",
+              "style"
+            ]
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "corrected_severity": { "type": "null" },
+          "corrected_category": { "type": "null" }
+        }
+      }
+    },
+    "AuditRun": {
+      "type": "object",
+      "description": "A single code audit run with associated findings",
+      "required": [
+        "iteration",
+        "base_sha",
+        "head_sha",
+        "findings"
+      ],
+      "properties": {
+        "iteration": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Audit iteration number (monotonically increasing)"
+        },
+        "base_sha": {
+          "type": "string",
+          "pattern": "^[0-9a-fA-F]{7,40}$",
+          "description": "Git SHA of the base commit that was audited (7-40 hex characters)"
+        },
+        "head_sha": {
+          "type": "string",
+          "pattern": "^[0-9a-fA-F]{7,40}$",
+          "description": "Git SHA of the HEAD commit that was audited (7-40 hex characters)"
+        },
+        "findings": {
+          "type": "array",
+          "minItems": 1,
+          "description": "Findings from this audit run (at least one required)",
+          "items": {
+            "$ref": "#/$defs/AuditFinding"
+          }
         }
       }
     }

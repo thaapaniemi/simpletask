@@ -58,6 +58,7 @@ class ToolName(str, Enum):
     # Other tools
     MAKE = "make"
     EARTHLY = "earthly"
+    MOONLY = "moonly"
 
 
 class ExecutionKind(str, Enum):
@@ -72,6 +73,7 @@ class WorkflowRunner(str, Enum):
 
     MAKE = "make"
     EARTHLY = "earthly"
+    MOONLY = "moonly"
 
 
 class AcceptanceCriterion(BaseModel):
@@ -448,21 +450,132 @@ class Task(BaseModel):
     )
 
 
+class Severity(str, Enum):
+    """Severity levels for audit findings."""
+
+    CRITICAL = "critical"
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
+
+
+class FindingCategory(str, Enum):
+    """Categories for audit findings."""
+
+    SECURITY = "security"
+    CORRECTNESS = "correctness"
+    ARCHITECTURE = "architecture"
+    PERFORMANCE = "performance"
+    ERROR_HANDLING = "error_handling"
+    TESTING = "testing"
+    STYLE = "style"
+
+
+class Verdict(str, Enum):
+    """Verdict assigned to an audit finding during review."""
+
+    CONFIRMED = "confirmed"
+    FALSE_POSITIVE = "false_positive"
+    UNCERTAIN = "uncertain"
+    RECLASSIFIED = "reclassified"
+
+
+class AuditFinding(BaseModel):
+    """A single finding from a code audit run."""
+
+    model_config = {"extra": "forbid"}
+
+    id: str = Field(
+        ...,
+        description=(
+            "Finding identifier in F-NNN format. Uses 3+ digits (variable-width): "
+            "get_next_finding_id zero-pads to 3 digits minimum (F-001 to F-999), "
+            "then extends naturally (F-1000, F-1001, ...). IDs are per-run, not "
+            "globally unique across all runs in audit_history."
+        ),
+        pattern=r"^F-\d{3,}$",
+    )
+    file: str = Field(..., description="File path where the finding was detected")
+    original_severity: Severity = Field(..., description="Severity as assessed by the auditor")
+    original_category: FindingCategory = Field(..., description="Category of the finding")
+    verdict: Verdict = Field(..., description="Verdict after review")
+    corrected_severity: Severity | None = Field(
+        None, description="Corrected severity (required when verdict=reclassified)"
+    )
+    corrected_category: FindingCategory | None = Field(
+        None, description="Corrected category (required when verdict=reclassified)"
+    )
+    task_id: str | None = Field(None, description="Task ID this finding is linked to (optional)")
+    summary: str = Field(..., description="Brief description of the finding")
+
+    @model_validator(mode="after")
+    def validate_reclassified_fields(self) -> "AuditFinding":
+        """Enforce reclassified-verdict constraints.
+
+        When verdict=reclassified, corrected_severity and corrected_category are required.
+        For all other verdicts, these fields must not be present.
+        """
+        is_reclassified = self.verdict == Verdict.RECLASSIFIED
+        has_corrected_severity = self.corrected_severity is not None
+        has_corrected_category = self.corrected_category is not None
+
+        if is_reclassified:
+            if not has_corrected_severity:
+                raise ValueError("corrected_severity is required when verdict=reclassified")
+            if not has_corrected_category:
+                raise ValueError("corrected_category is required when verdict=reclassified")
+        else:
+            if has_corrected_severity:
+                raise ValueError(
+                    f"corrected_severity must not be set when verdict={self.verdict.value} "
+                    "(only allowed for verdict=reclassified)"
+                )
+            if has_corrected_category:
+                raise ValueError(
+                    f"corrected_category must not be set when verdict={self.verdict.value} "
+                    "(only allowed for verdict=reclassified)"
+                )
+        return self
+
+
+class AuditRun(BaseModel):
+    """A single code audit run with associated findings."""
+
+    model_config = {"extra": "forbid"}
+
+    iteration: int = Field(
+        ..., ge=1, description="Audit iteration number (monotonically increasing)"
+    )
+    base_sha: str = Field(
+        ...,
+        description="Git SHA of the base commit that was audited (7-40 hex characters)",
+        pattern=r"^[0-9a-fA-F]{7,40}$",
+    )
+    head_sha: str = Field(
+        ...,
+        description="Git SHA of the HEAD commit that was audited (7-40 hex characters)",
+        pattern=r"^[0-9a-fA-F]{7,40}$",
+    )
+    findings: list[AuditFinding] = Field(
+        ..., min_length=1, description="Findings from this audit run (at least one required)"
+    )
+
+
 class SimpleTaskSpec(BaseModel):
     """Top-level model for task YAML files.
 
     This represents the complete structure of a task definition file
     stored in ./.tasks/<branch>.yml
 
-    Supported schema versions: 1.0, 1.1
-    Current write version: 1.1
+    Supported schema versions: 1.0, 1.1, 1.2
+    Current write version: 1.1 (1.2 when audit_history is non-empty)
     """
 
     model_config = {"extra": "forbid"}
 
     schema_version: str = Field(
         default="1.0",
-        description="Schema version for compatibility tracking (supports 1.0 and 1.1)",
+        description="Schema version for compatibility tracking (supports 1.0, 1.1, and 1.2)",
     )
     branch: str = Field(
         ..., description="Branch name / unique task identifier (also git branch name)"
@@ -490,12 +603,15 @@ class SimpleTaskSpec(BaseModel):
     iterations: list[Iteration] | None = Field(
         None, description="Development iterations for grouping tasks"
     )
+    audit_history: list[AuditRun] | None = Field(
+        None, description="History of code audit runs performed on this branch"
+    )
 
     @field_validator("schema_version")
     @classmethod
     def validate_schema_version(cls, v: str) -> str:
-        """Ensure schema version is supported (1.0 or 1.1)."""
-        valid_versions = {"1.0", "1.1"}
+        """Ensure schema version is supported (1.0, 1.1, or 1.2)."""
+        valid_versions = {"1.0", "1.1", "1.2"}
         if v not in valid_versions:
             raise ValueError(
                 f"Unsupported schema version '{v}'. "
@@ -602,17 +718,21 @@ class ProjectDefaults(BaseModel):
 # Export all models
 __all__ = [
     "AcceptanceCriterion",
+    "AuditFinding",
+    "AuditRun",
     "CodeExample",
     "Design",
     "DesignReference",
     "ExecutionKind",
     "FileAction",
+    "FindingCategory",
     "Iteration",
     "LintingConfig",
     "ProjectDefaults",
     "QualityCheckResult",
     "QualityRequirements",
     "SecurityCheckConfig",
+    "Severity",
     "SimpleTaskSpec",
     "Task",
     "TaskStatus",
@@ -620,6 +740,7 @@ __all__ = [
     "ToolExecutionSpec",
     "ToolName",
     "TypeCheckConfig",
+    "Verdict",
     "WorkflowExecutionSpec",
     "WorkflowRunner",
 ]

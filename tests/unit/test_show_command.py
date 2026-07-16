@@ -3,6 +3,7 @@
 Tests cover:
 - Notes section hidden when no notes exist
 - Root notes display with bullets
+- Audit History section display (present/absent, per-run breakdown, JSON output)
 - Task notes display as summary
 - Combined root and task notes display
 - Note truncation at 160 characters
@@ -15,8 +16,20 @@ from unittest.mock import patch
 
 import pytest
 from simpletask.commands.show import show
-from simpletask.core.models import AcceptanceCriterion, Iteration, SimpleTaskSpec, Task, TaskStatus
+from simpletask.core.models import (
+    AcceptanceCriterion,
+    AuditFinding,
+    AuditRun,
+    FindingCategory,
+    Iteration,
+    Severity,
+    SimpleTaskSpec,
+    Task,
+    TaskStatus,
+    Verdict,
+)
 from simpletask.core.yaml_parser import write_task_file
+from simpletask.utils.output import OutputFormat
 
 
 @pytest.fixture
@@ -527,3 +540,177 @@ class TestShowCommandIterations:
 
         task_lines = [c for c in output_calls if "T002" in c or "T003" in c or "T004" in c]
         assert all("    " in c for c in task_lines), "Grouped tasks must have 4-space indent"
+
+
+def _make_finding(
+    finding_id: str = "F-001",
+    verdict: Verdict = Verdict.CONFIRMED,
+) -> AuditFinding:
+    """Build a minimal valid AuditFinding."""
+    return AuditFinding(
+        id=finding_id,
+        file="cli/simpletask/core/models.py",
+        original_severity=Severity.MEDIUM,
+        original_category=FindingCategory.CORRECTNESS,
+        verdict=verdict,
+        summary="Test finding summary",
+    )
+
+
+def _make_spec_with_audit(tmp_path, audit_history=None):
+    """Build a SimpleTaskSpec with optional audit_history and write it to disk."""
+    spec = SimpleTaskSpec(
+        schema_version="1.0",
+        branch="test-branch",
+        title="Test Task",
+        original_prompt="Test prompt",
+        created=datetime(2026, 1, 1, tzinfo=UTC),
+        acceptance_criteria=[
+            AcceptanceCriterion(id="AC1", description="Test criterion", completed=False)
+        ],
+        audit_history=audit_history,
+    )
+    task_file = tmp_path / ".tasks" / "test-branch.yml"
+    task_file.parent.mkdir(parents=True, exist_ok=True)
+    write_task_file(task_file, spec)
+    return task_file, spec
+
+
+class TestAuditHistoryDisplay:
+    """Test show command audit history display."""
+
+    def _capture_output(self, task_file, tmp_path, monkeypatch):
+        """Return (output_call_strs, mock_console) after invoking show()."""
+        monkeypatch.chdir(tmp_path)
+        with patch("simpletask.commands.show.get_task_file_path", return_value=task_file):
+            with patch("simpletask.commands.show.ensure_project") as mock_ensure:
+                mock_ensure.return_value.root = tmp_path
+                with patch("simpletask.commands.show.console") as mock_console:
+                    show(branch="test-branch")
+                    calls = [str(c) for c in mock_console.print.call_args_list]
+                    return calls, mock_console
+
+    def test_audit_section_present_with_runs(self, tmp_path, monkeypatch):
+        """Audit History section is printed when audit_history has at least one run."""
+        run = AuditRun(
+            iteration=1,
+            base_sha="abc1234",
+            head_sha="def5678",
+            findings=[
+                _make_finding("F-001", Verdict.CONFIRMED),
+                _make_finding("F-002", Verdict.FALSE_POSITIVE),
+            ],
+        )
+        task_file, _ = _make_spec_with_audit(tmp_path, audit_history=[run])
+
+        calls, _ = self._capture_output(task_file, tmp_path, monkeypatch)
+
+        assert any("Audit History" in c for c in calls), "Expected Audit History header"
+        assert any("1 run" in c for c in calls), "Expected run count in summary line"
+        assert any("abc1234..def5678" in c for c in calls), "Expected latest range in summary"
+        assert any("run 1" in c for c in calls), "Expected per-run line for iteration 1"
+        # Verdict counts: confirmed: 1  false_positive: 1
+        per_run_lines = [c for c in calls if "run 1" in c]
+        assert per_run_lines, "Expected per-run breakdown line"
+        assert any("confirmed" in c for c in per_run_lines)
+        assert any("false_positive" in c for c in per_run_lines)
+
+    def test_audit_section_absent_when_null(self, tmp_path, monkeypatch):
+        """Audit History section is omitted when audit_history is None."""
+        task_file, _ = _make_spec_with_audit(tmp_path, audit_history=None)
+
+        calls, _ = self._capture_output(task_file, tmp_path, monkeypatch)
+
+        assert not any("Audit History" in c for c in calls), (
+            "Audit History section must not appear when audit_history is None"
+        )
+
+    def test_audit_section_absent_when_empty_list(self, tmp_path, monkeypatch):
+        """Audit History section is omitted when audit_history is an empty list."""
+        task_file, _ = _make_spec_with_audit(tmp_path, audit_history=[])
+
+        calls, _ = self._capture_output(task_file, tmp_path, monkeypatch)
+
+        assert not any("Audit History" in c for c in calls), (
+            "Audit History section must not appear when audit_history is []"
+        )
+
+    def test_per_run_breakdown_multiple_runs(self, tmp_path, monkeypatch):
+        """Each run gets its own breakdown line, sorted by iteration."""
+        run1 = AuditRun(
+            iteration=1,
+            base_sha="aaa1111",
+            head_sha="aaa1112",
+            findings=[_make_finding("F-001", Verdict.CONFIRMED)],
+        )
+        run2 = AuditRun(
+            iteration=2,
+            base_sha="bbb2222",
+            head_sha="bbb2223",
+            findings=[_make_finding("F-001", Verdict.FALSE_POSITIVE)],
+        )
+        task_file, _ = _make_spec_with_audit(tmp_path, audit_history=[run2, run1])
+
+        calls, _ = self._capture_output(task_file, tmp_path, monkeypatch)
+
+        # Summary shows latest audited range (run2 = highest iteration)
+        assert any("bbb2222..bbb2223" in c for c in calls), (
+            "Latest range should be from highest iteration"
+        )
+        assert any("2 runs" in c for c in calls), "Should say 2 runs"
+        # Both per-run lines must appear
+        assert any("run 1" in c for c in calls)
+        assert any("run 2" in c for c in calls)
+
+    def test_json_output_includes_audit_history(self, tmp_path, monkeypatch, capsys):
+        """JSON output includes audit_history with full run and finding data."""
+        import json
+
+        run = AuditRun(
+            iteration=1,
+            base_sha="deadbeef",
+            head_sha="feedcafe",
+            findings=[_make_finding("F-001", Verdict.CONFIRMED)],
+        )
+        task_file, _ = _make_spec_with_audit(tmp_path, audit_history=[run])
+
+        monkeypatch.chdir(tmp_path)
+        with patch("simpletask.commands.show.get_task_file_path", return_value=task_file):
+            with patch("simpletask.commands.show.ensure_project") as mock_ensure:
+                mock_ensure.return_value.root = tmp_path
+                show(branch="test-branch", format=OutputFormat.JSON)
+
+        captured = capsys.readouterr()
+        output = json.loads(captured.out)
+
+        assert "audit_history" in output, "JSON output must contain audit_history key"
+        assert output["audit_history"] is not None
+        assert len(output["audit_history"]) == 1
+        run_data = output["audit_history"][0]
+        assert run_data["iteration"] == 1
+        assert run_data["base_sha"] == "deadbeef"
+        assert run_data["head_sha"] == "feedcafe"
+        assert len(run_data["findings"]) == 1
+        finding_data = run_data["findings"][0]
+        assert finding_data["id"] == "F-001"
+        assert finding_data["verdict"] == "confirmed"
+        assert finding_data["original_severity"] == "medium"
+        assert finding_data["original_category"] == "correctness"
+
+    def test_json_output_audit_history_null_when_absent(self, tmp_path, monkeypatch, capsys):
+        """JSON output has audit_history: null when audit_history is not set."""
+        import json
+
+        task_file, _ = _make_spec_with_audit(tmp_path, audit_history=None)
+
+        monkeypatch.chdir(tmp_path)
+        with patch("simpletask.commands.show.get_task_file_path", return_value=task_file):
+            with patch("simpletask.commands.show.ensure_project") as mock_ensure:
+                mock_ensure.return_value.root = tmp_path
+                show(branch="test-branch", format=OutputFormat.JSON)
+
+        captured = capsys.readouterr()
+        output = json.loads(captured.out)
+
+        assert "audit_history" in output, "JSON output must always contain audit_history key"
+        assert output["audit_history"] is None

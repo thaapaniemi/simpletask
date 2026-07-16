@@ -16,7 +16,6 @@ deps:
     RUN uv pip install --system -e ".[dev]"
     # Install type stubs for mypy
     RUN uv pip install --system types-PyYAML types-jsonschema
-    SAVE IMAGE --cache-hint
 
 # Run all tests with coverage (reports coverage, doesn't fail on threshold)
 test:

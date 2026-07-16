@@ -10,19 +10,57 @@ import pytest
 from simpletask.core.models import (
     AcceptanceCriterion,
     ArchitecturalPattern,
+    AuditFinding,
     Design,
     DesignReference,
+    FindingCategory,
     Iteration,
     LintingConfig,
     QualityRequirements,
+    Severity,
     SimpleTaskSpec,
     Task,
     TaskStatus,
     TestingConfig,
     ToolName,
     TypeCheckConfig,
+    Verdict,
 )
 from simpletask.core.yaml_parser import write_task_file
+
+
+def make_finding(
+    id: str = "F-001",
+    verdict: Verdict = Verdict.CONFIRMED,
+    corrected_severity: Severity | None = None,
+    corrected_category: FindingCategory | None = None,
+) -> AuditFinding:
+    """Create an AuditFinding for testing.
+
+    For verdict=reclassified, corrected_severity and corrected_category are
+    automatically set to LOW/STYLE if not provided explicitly.
+    """
+    kwargs: dict = {
+        "id": id,
+        "file": "src/foo.py",
+        "original_severity": Severity.HIGH,
+        "original_category": FindingCategory.SECURITY,
+        "verdict": verdict,
+        "summary": "Test finding",
+    }
+    if verdict == Verdict.RECLASSIFIED:
+        kwargs["corrected_severity"] = (
+            corrected_severity if corrected_severity is not None else Severity.LOW
+        )
+        kwargs["corrected_category"] = (
+            corrected_category if corrected_category is not None else FindingCategory.STYLE
+        )
+    else:
+        if corrected_severity is not None:
+            kwargs["corrected_severity"] = corrected_severity
+        if corrected_category is not None:
+            kwargs["corrected_category"] = corrected_category
+    return AuditFinding(**kwargs)
 
 
 @pytest.fixture(scope="session")

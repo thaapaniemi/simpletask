@@ -39,13 +39,17 @@ def extract_tool_and_args_from_execution(
         if execution.runner == WorkflowRunner.MAKE:
             # Make target: make <extra_args> <target>
             return (ToolName.MAKE, [*execution.extra_args, execution.target])
-        elif execution.runner == WorkflowRunner.EARTHLY:
-            # Earthly target: earthly [--no-cache] <extra_args> <target>
+        elif execution.runner in (WorkflowRunner.EARTHLY, WorkflowRunner.MOONLY):
+            # Earthly/Moonly target: <runner> [--no-cache] <extra_args> <target>
+            # Note: --no-cache is supported by earthly; moonly passes it through to earthly
             no_cache_flag = ["--no-cache"] if execution.no_cache else []
-            return (ToolName.EARTHLY, [*no_cache_flag, *execution.extra_args, execution.target])
+            tool = (
+                ToolName.EARTHLY if execution.runner == WorkflowRunner.EARTHLY else ToolName.MOONLY
+            )
+            return (tool, [*no_cache_flag, *execution.extra_args, execution.target])
         else:
             raise ValueError(
-                f"Unsupported workflow runner: {execution.runner}. Supported runners: make, earthly"
+                f"Unsupported workflow runner: {execution.runner}. Supported runners: make, earthly, moonly"
             )
 
     raise ValueError(f"Unknown execution type: {type(execution)}")

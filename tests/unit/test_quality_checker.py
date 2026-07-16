@@ -11,8 +11,10 @@ from simpletask.core.models import (
     TestingConfig,
     ToolName,
     TypeCheckConfig,
+    WorkflowExecutionSpec,
+    WorkflowRunner,
 )
-from simpletask.core.quality_checker import QualityChecker
+from simpletask.core.quality_checker import QualityChecker, extract_tool_and_args_from_execution
 
 
 @pytest.fixture
@@ -261,3 +263,43 @@ class TestQualityChecker:
         # Verify timeout of 600 was passed (from sample_requirements)
         calls = mock_runner.run_check.call_args_list
         assert calls[0][0][3] == 600  # timeout is 4th argument
+
+
+class TestExtractToolAndArgsFromExecutionMoonly:
+    """Tests for the WorkflowRunner.MOONLY branch in extract_tool_and_args_from_execution."""
+
+    def _make_spec(self, target: str, no_cache: bool = False, extra_args: list | None = None):
+        return WorkflowExecutionSpec(
+            runner=WorkflowRunner.MOONLY,
+            target=target,
+            no_cache=no_cache,
+            extra_args=extra_args or [],
+        )
+
+    def test_moonly_no_cache_false_returns_correct_tool_and_args(self):
+        """MOONLY runner with no_cache=False returns ToolName.MOONLY and [target]."""
+        spec = self._make_spec(target="+test", no_cache=False)
+        tool, args = extract_tool_and_args_from_execution(spec)
+        assert tool == ToolName.MOONLY
+        assert args == ["+test"]
+
+    def test_moonly_no_cache_true_prepends_no_cache_flag(self):
+        """MOONLY runner with no_cache=True prepends --no-cache before target."""
+        spec = self._make_spec(target="+test", no_cache=True)
+        tool, args = extract_tool_and_args_from_execution(spec)
+        assert tool == ToolName.MOONLY
+        assert args == ["--no-cache", "+test"]
+
+    def test_moonly_extra_args_inserted_before_target(self):
+        """MOONLY runner with extra_args inserts them between --no-cache (if any) and target."""
+        spec = self._make_spec(target="+test", no_cache=False, extra_args=["--verbose"])
+        tool, args = extract_tool_and_args_from_execution(spec)
+        assert tool == ToolName.MOONLY
+        assert args == ["--verbose", "+test"]
+
+    def test_moonly_no_cache_and_extra_args_combined(self):
+        """MOONLY runner with both no_cache and extra_args produces correct arg order."""
+        spec = self._make_spec(target="+lint", no_cache=True, extra_args=["--push"])
+        tool, args = extract_tool_and_args_from_execution(spec)
+        assert tool == ToolName.MOONLY
+        assert args == ["--no-cache", "--push", "+lint"]

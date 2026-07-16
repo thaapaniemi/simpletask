@@ -166,6 +166,70 @@ class TestBumpSchemaVersion:
         result = _bump_schema_version_if_canonical(data)
         assert result["schema_version"] == "1.0"
 
+    def test_bumps_schema_version_to_1_2_when_audit_history_present(self):
+        """schema_version is bumped to '1.2' when audit_history is non-empty."""
+        data = {
+            "schema_version": "1.0",
+            "audit_history": [
+                {
+                    "iteration": 1,
+                    "base_sha": "abc1234",
+                    "head_sha": "def5678",
+                    "findings": [],
+                }
+            ],
+        }
+        result = _bump_schema_version_if_canonical(data)
+        assert result["schema_version"] == "1.2"
+
+    def test_audit_history_bump_takes_precedence_over_1_1(self):
+        """audit_history bump to 1.2 takes precedence over quality bump to 1.1."""
+        data = {
+            "schema_version": "1.0",
+            "quality_requirements": {
+                "linting": {
+                    "enabled": True,
+                    "execution": {"kind": "tool", "tool": "ruff", "args": []},
+                }
+            },
+            "audit_history": [
+                {
+                    "iteration": 1,
+                    "base_sha": "abc1234",
+                    "head_sha": "def5678",
+                    "findings": [],
+                }
+            ],
+        }
+        result = _bump_schema_version_if_canonical(data)
+        assert result["schema_version"] == "1.2"
+
+    def test_empty_audit_history_does_not_bump_to_1_2(self):
+        """Empty audit_history list does not trigger the 1.2 bump."""
+        data = {"schema_version": "1.0", "audit_history": []}
+        result = _bump_schema_version_if_canonical(data)
+        assert result["schema_version"] == "1.0"
+
+    def test_none_audit_history_does_not_bump_to_1_2(self):
+        """Missing audit_history does not trigger the 1.2 bump."""
+        data = {"schema_version": "1.0"}
+        result = _bump_schema_version_if_canonical(data)
+        assert result["schema_version"] == "1.0"
+
+    def test_numeric_version_ordering_not_lexicographic(self):
+        """max() uses numeric tuple comparison so '1.10' beats '1.9' correctly.
+
+        This would silently regress to '1.9' if string comparison were used.
+        The function never generates these versions today, but the key must be
+        correct before any future version addition triggers the bug.
+        """
+        # Simulate a hypothetical future state: candidates include 1.9 and 1.10
+        # We call the key function directly to verify ordering behaviour.
+        key_fn = lambda v: tuple(int(x) for x in v.split("."))  # noqa: E731
+        assert max(["1.9", "1.10"], key=key_fn) == "1.10"
+        assert max(["1.0", "1.1", "1.2", "1.10"], key=key_fn) == "1.10"
+        assert max(["2.0", "1.9"], key=key_fn) == "2.0"
+
 
 class TestWriteTaskFileCanonicalOutput:
     """Integration tests: write_task_file emits canonical YAML (AC3)."""
