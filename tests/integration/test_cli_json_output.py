@@ -151,6 +151,40 @@ class TestShowJsonOutput:
 # ---------------------------------------------------------------------------
 
 
+class TestTaskShowJsonOutput:
+    """Tests for 'simpletask task show --format json'."""
+
+    def test_selected_task_contains_all_serialized_fields(self, json_project):
+        result = runner.invoke(app, ["task", "show", "T001", "--format", "json"])
+        assert result.exit_code == 0, result.output
+        payload = json.loads(result.output)
+        assert set(payload["task"]) == {
+            "id",
+            "name",
+            "status",
+            "goal",
+            "steps",
+            "done_when",
+            "code_examples",
+            "notes",
+            "prerequisites",
+            "files",
+            "iteration",
+        }
+        assert payload["task"]["id"] == "T001"
+        assert payload["task"]["name"] == "First task"
+        assert payload["task"]["done_when"] is None
+        assert payload["task"]["iteration"] is None
+        assert payload["task"]["id"] != "T002"
+
+    def test_unknown_task_id_produces_json_error(self, json_project):
+        result = runner.invoke(app, ["task", "show", "T999", "--format", "json"])
+        assert result.exit_code == 1
+        payload = json.loads(result.stderr)
+        assert payload["success"] is False
+        assert "T999" in payload["message"]
+
+
 class TestTaskListJsonOutput:
     """Tests for 'simpletask task list --format json'."""
 
