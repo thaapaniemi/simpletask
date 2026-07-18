@@ -2,7 +2,7 @@
 description: Scope-bounded code review: verifies implementation against original prompt and acceptance criteria only.
 ---
 
-User input: $ARGUMENTS
+User input: ${input:userInput}
 
 **IMPORTANT: Scope constraint**
 
@@ -16,40 +16,41 @@ This review is strictly scoped to the original prompt and acceptance criteria de
    ```
 
 2. Load task file using MCP tools:
-   
+
    ```
    Use simpletask_get() MCP tool to retrieve task data:
    - Call simpletask_get(include_completed=True) to use current git branch (auto-detected)
    - Returns SimpleTaskGetResponse with spec, file_path, and summary
-   - Note: use include_completed=True so completed tasks appear in spec.tasks for review
    - If error occurs, task file does not exist — abort and inform the user
    ```
-   
+
    simpletask show
 
 **Step 2: Analyze Task Completion**
 
-1. Get task data using MCP tools:
-   
+1. Get all task data using MCP tools:
+
    ```
    Use simpletask_get() MCP tool to retrieve complete task data:
-   - Returns SimpleTaskGetResponse with spec and summary
-   - Call simpletask_get(include_completed=True) so all tasks appear in spec.tasks
-   - spec.tasks: array of all tasks with id, name, status, goal, steps, etc.
-   - summary.tasks_total, tasks_completed, tasks_in_progress, tasks_not_started, tasks_blocked
-   
-   Count tasks by status:
+   - Returns SimpleTaskGetResponse with:
+     - spec.tasks: array of all tasks with id, name, status, goal, steps, etc.
+     - summary.tasks_total, tasks_completed, tasks_in_progress, tasks_not_started, tasks_blocked
+
+   From the response:
    - Filter spec.tasks where status == "completed"
    - Filter spec.tasks where status == "in_progress" (should be 0 after implementation)
    - Filter spec.tasks where status == "not_started" (incomplete)
    - Filter spec.tasks where status == "blocked" (need attention)
    - Filter spec.tasks where status == "paused" (intentionally deferred)
    ```
-   
+
+   Note: use get(include_completed=True) so completed tasks appear in spec.tasks for review.
+   ```
+
    ```bash
    # List all tasks and their statuses
    simpletask task list
-   
+
    # Count tasks by status
    simpletask task list --status completed
    simpletask task list --status in_progress
@@ -61,17 +62,21 @@ This review is strictly scoped to the original prompt and acceptance criteria de
 **Step 3: Check Acceptance Criteria**
 
 1. Get acceptance criteria data using MCP tools:
-   
+
    ```
-   Use simpletask_get() MCP tool to retrieve criteria data:
-   - spec.acceptance_criteria: array of all criteria with id, description, completed
-   - summary.criteria_total, summary.criteria_completed
-   
-   Filter criteria:
-   - Filter spec.acceptance_criteria where completed == True
-   - Filter spec.acceptance_criteria where completed == False (unmet criteria)
+   Use simpletask_get() MCP tool data from Step 1:
+   - Check spec.acceptance_criteria: array of criteria with id, description, completed
+   - summary.criteria_total, criteria_completed provide counts
+
+   From the response:
+   - Filter spec.acceptance_criteria where completed == True (marked complete)
+   - Filter spec.acceptance_criteria where completed == False (remain incomplete)
    ```
-   
+
+   Note: acceptance_criteria are always returned regardless of filtering.
+   ```
+
+   # List acceptance criteria status
    simpletask criteria list
    simpletask criteria list --completed
    simpletask criteria list --incomplete
@@ -100,7 +105,7 @@ Look for:
 
 ### Security (within diff scope only)
 - Exposed credentials, API keys, or secrets introduced by the diff
-- Input validation gaps directly relevant to the feature being implemented
+- Input validation gaps that are directly relevant to the feature being implemented
 - Injection vulnerabilities (SQL, XSS, command injection) in new code only
 
 ### Correctness
@@ -170,7 +175,7 @@ Format: `[CATEGORY] file:line — observation`
 simpletask_note(action="remove", all=True)
 ```
 
-Then persist each design note:
+Then persist each design note via MCP tool:
 
 ```
 Use simpletask_note() MCP tool to persist each note:
@@ -253,14 +258,14 @@ TASK COMPLETION
   - Not Started: [count]
   - Blocked: [count]
   - Paused: [count]
-  
+
   Incomplete tasks:
     - T00X: [task name]
     - T00Y: [task name]
 
 ACCEPTANCE CRITERIA
   Criteria: X/Y met (Z%)
-  
+
   Unmet criteria:
     - AC1: [description]
     - AC2: [description]
@@ -269,12 +274,12 @@ GIT CHANGES
   Branch: [branch-name]
   Commits: N commits ahead of main
   Changes: M files modified, +A/-R lines
-  
+
   Key files changed:
     - path/to/file1.py
     - path/to/file2.py
     - ...
-  
+
   Scope: [FOCUSED | CONTAINS OUT-OF-SCOPE CHANGES]
 
 BLOCKING ISSUES (require fix tasks)
@@ -309,23 +314,29 @@ Only auto-inject fix tasks if there are **Critical or High severity** issues tha
 If blocking issues exist:
 
 1. Create a new iteration to group fix tasks:
-   
+
    ```
    Use simpletask_iteration() MCP tool:
    - Call simpletask_iteration(action="add", label="review fixes")
    - Returns new iteration ID to use when adding fix tasks
    ```
-   
+
+   ```bash
    simpletask iteration add "review fixes"
+   ```
 
 2. For each **blocking** issue only, create a fix task:
-   
+
    ```
-   Use simpletask_task() MCP tool:
-   - Call simpletask_task(action="add", name="Fix: [issue summary]", goal="[detailed goal with file path and remediation]", iteration=<iter_id>)
-   - Returns SimpleTaskWriteResponse with success confirmation
+   Use simpletask_task() MCP tool to add fix tasks:
+   - Call simpletask_task(
+       action="add",
+       name="Fix: [issue summary]",
+       goal="[detailed goal with file path and remediation]",
+       iteration=<iter_id>
+     )
    ```
-   
+
    simpletask task add "Fix: [issue summary]" -g "[detailed goal with file path and remediation]" -i <iter_id>
 
 3. After adding fix tasks, show summary:
@@ -333,18 +344,21 @@ If blocking issues exist:
    Fix tasks added to .tasks/[branch-name].yml:
      - T00X: Fix: [blocking issue 1]
      - T00Y: Fix: [blocking issue 2]
-   
+
    Observations (not tracked as tasks):
      - [Medium/Low items listed here for awareness]
-   
+
    Run /simpletask.implement to execute fix tasks.
    ```
+
+4. Validate the updated task file:
+
    ```
    Use simpletask_get() MCP tool with validation:
    - Call simpletask_get(validate=True, full=True)
    - Check validation.valid in response
    ```
-   
+
    simpletask schema validate
 
 If no blocking issues exist: report "No fix tasks needed." Do NOT create an iteration or any tasks.
@@ -376,10 +390,9 @@ If no blocking issues exist: report "No fix tasks needed." Do NOT create an iter
 ### View Task Information
 
 ```
-Use simpletask_get() MCP tool to retrieve complete task data:
+Use simpletask_get(include_completed=True) MCP tool to retrieve complete task data:
 - Returns SimpleTaskGetResponse with spec and summary
-- Call simpletask_get(include_completed=True) so all tasks appear in spec.tasks
-- spec.tasks: array of all tasks with full details
+- spec.tasks: array of all tasks with full details (including completed)
 - spec.acceptance_criteria: array of all criteria
 - summary: pre-computed status counts
 
@@ -412,7 +425,12 @@ simpletask criteria list --incomplete
 Use simpletask_task() MCP tool:
 
 # Add a fix task (only for Critical/High blocking issues)
-simpletask_task(action="add", name="Fix: [description]", goal="[goal]", iteration=<iter_id>)
+simpletask_task(
+  action="add",
+  name="Fix: [description]",
+  goal="[goal]",
+  iteration=<iter_id>
+)
 ```
 
 # Add a fix task
@@ -460,10 +478,16 @@ simpletask schema validate
 
 Before marking as "READY TO MERGE":
 
-1. **All tasks completed**: `simpletask task list --status completed` shows all tasks
-2. **All criteria met**: `simpletask criteria list --incomplete` returns empty
+1. **All tasks completed**:
+   - MCP: Check `summary.tasks_completed == summary.tasks_total` in `simpletask_get()` response
+   - CLI: `simpletask task list --status completed` shows all tasks
+2. **All criteria met**:
+   - MCP: Check `summary.criteria_completed == summary.criteria_total` in `simpletask_get()` response
+   - CLI: `simpletask criteria list --incomplete` returns empty
 3. **No blocking issues**: No Critical/High security vulnerabilities or correctness failures in the diff
 4. **Tests pass**: All automated tests pass
-5. **Schema valid**: `simpletask schema validate` passes
+5. **Schema valid**:
+   - MCP: `simpletask_get(validate=True)` returns `validation.valid == True`
+   - CLI: `simpletask schema validate` passes
 
 If ANY of these fail, the review should report "NEEDS CHANGES" or "NOT READY".

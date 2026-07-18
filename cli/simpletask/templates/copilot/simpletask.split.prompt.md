@@ -1,8 +1,8 @@
-description = "Split complex tasks into atomic subtasks to reduce cognitive load for AI execution"
+---
+description: Split complex tasks into atomic subtasks to reduce cognitive load for AI execution
+---
 
-prompt = """
-
-User input: {{args}}
+User input: ${input:userInput}
 
 **Purpose:** This tool ensures AI models have minimal context per task by splitting complex tasks into ultra-atomic units (1-2 steps, 5-10 minutes). This eliminates ambiguity and decision-making during implementation.
 
@@ -34,20 +34,23 @@ This phase analyzes the codebase to populate design guidance and quality require
 
 ### 1.5.1: Find Reference Implementations
 
-Search the codebase to find similar existing code. Look for:
+Explore the codebase inline to find similar existing code:
+
+```
+Inline analysis(
+  description="Find reference implementations",
+  prompt="Find files similar to [feature description]. Look for:
 - Similar functionality or patterns
 - Existing implementations we should follow
 - Code that solves related problems
+Thoroughness: [quick/medium/very thorough]"
+)
+```
 
-**Search strategies:**
-- Use glob patterns to find files by name: `**/*[keyword]*.{ext}`
-- Use grep to search for keywords in code: class names, function names, similar features
-- Read README, architecture docs, or AGENTS.md for guidance
-
-**Search scope based on task complexity:**
-- **Simple tasks** - Quick keyword search in obvious locations
-- **Moderate tasks** - Search multiple locations and file types
-- **Complex tasks** - Thorough cross-codebase analysis including tests, configs, docs
+Set thoroughness based on task complexity:
+- **"quick"** - Simple tasks with obvious patterns
+- **"medium"** - Most tasks requiring moderate exploration
+- **"very thorough"** - Complex tasks or unfamiliar codebases
 
 Document findings:
 ```
@@ -63,17 +66,19 @@ Use simpletask_design() MCP tool to add references:
 
 ### 1.5.2: Document Patterns to Follow
 
-Analyze the codebase to identify coding patterns:
-- Design patterns used (Repository, Factory, Observer, etc.)
-- Code organization patterns (directory structure, module boundaries)
-- Naming conventions (classes, functions, variables)
-- Dependency injection patterns
+Analyze the codebase inline to identify coding patterns:
 
-**Search strategies:**
-- Read existing similar modules/classes
-- Check architecture documentation (AGENTS.md, ARCHITECTURE.md, etc.)
-- Analyze import statements and directory structure
-- Look for common abstractions or base classes
+```
+Inline analysis(
+  description="Identify design patterns",
+  prompt="Analyze [relevant files] to identify:
+- Design patterns used (Repository, Factory, Observer, etc.)
+- Code organization patterns
+- Naming conventions
+- Dependency injection patterns
+Thoroughness: [quick/medium/very thorough]"
+)
+```
 
 Document using simpletask_design():
 ```
@@ -87,17 +92,19 @@ Call simpletask_design(
 
 ### 1.5.3: Define Architectural Constraints
 
-Analyze codebase structure to identify constraints:
-- Layer separation rules (UI/business/data, MVC, clean architecture)
-- Circular dependency constraints
-- Module boundaries (what can import what)
-- Technology stack limitations (framework versions, required libraries)
+Analyze the codebase inline to understand constraints:
 
-**Search strategies:**
-- Read project configuration files (pyproject.toml, package.json, etc.)
-- Check documentation for architecture decisions
-- Analyze directory structure and import patterns
-- Look for linting/architectural rules (ruff, ESLint configs)
+```
+Inline analysis(
+  description="Identify architectural constraints",
+  prompt="Analyze codebase structure to identify:
+- Layer separation rules (UI/business/data)
+- Circular dependency constraints
+- Module boundaries
+- Technology stack limitations
+Thoroughness: [quick/medium/very thorough]"
+)
+```
 
 Document using simpletask_design():
 ```
@@ -111,17 +118,19 @@ Call simpletask_design(
 
 ### 1.5.4: Identify Security Considerations
 
-Analyze the codebase for security patterns:
-- Input validation approaches (Pydantic models, schema validators, etc.)
-- Authentication/authorization patterns (JWT, OAuth, session handling)
-- Data sanitization methods (SQL injection prevention, XSS protection)
-- Sensitive data handling (credential storage, secrets management)
+Analyze the codebase inline for security considerations:
 
-**Search strategies:**
-- Search for authentication/authorization code
-- Check how user inputs are validated in similar endpoints
-- Look for security-related imports (cryptography, validators, etc.)
-- Review existing security documentation or SECURITY.md
+```
+Inline analysis(
+  description="Identify security patterns",
+  prompt="Analyze [relevant files] for security patterns:
+- Input validation approaches
+- Authentication/authorization patterns
+- Data sanitization methods
+- Sensitive data handling
+Thoroughness: [quick/medium/very thorough]"
+)
+```
 
 Document using simpletask_design():
 ```
@@ -135,17 +144,19 @@ Call simpletask_design(
 
 ### 1.5.5: Define Error Handling Pattern
 
-Analyze how errors are handled in similar code:
-- Exception types used (built-in vs custom exceptions)
-- Error propagation strategy (raise, return codes, Result types)
-- Logging approach (logging library, log levels, context)
-- User-facing error messages (format, detail level)
+Analyze the codebase inline to understand error handling:
 
-**Search strategies:**
-- Read similar modules to see try/except patterns
-- Search for custom exception definitions
-- Check logging configuration and usage patterns
-- Look for error handling middleware or decorators
+```
+Inline analysis(
+  description="Identify error handling pattern",
+  prompt="Find how errors are handled in [similar files]:
+- Exception types used
+- Error propagation strategy
+- Logging approach
+- User-facing error messages
+Thoroughness: [quick/medium/very thorough]"
+)
+```
 
 Document using simpletask_design():
 ```
@@ -171,18 +182,8 @@ Use simpletask_quality() MCP tool to apply preset:
 
 **Available presets:** python, typescript, node, go, rust, java-maven, java-gradle
 
-**Save analysis results to project defaults (recommended):**
-
-If `.tasks/defaults.yml` does not yet exist, save the analysis results there too so future task files inherit them automatically:
-
-```
-simpletask_design(action="set", field="pattern", value="...", target="defaults")
-simpletask_design(action="set", field="constraint", value="...", target="defaults")
-simpletask_quality(action="preset", preset_name="python", target="defaults")
-# Repeat for all findings above
-```
-
-This is a one-time investment — future `/simpletask.plan` runs will skip this entire Step 1.5.
+Apply design and quality guidance only to the current branch task file; the supported interfaces
+have no `target="defaults"` parameter.
 
 **After completing Step 1.5, reload the task file:**
 ```
@@ -490,4 +491,3 @@ Next steps:
 - **No ambiguity**
 
 If a subtask takes >10 minutes or has >2 steps, split it further.
-"""
