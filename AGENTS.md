@@ -101,18 +101,13 @@ cli/simpletask/           # Main CLI package
 │   │   ├── simpletask.review.md
 │   │   └── agents/                  # OpenCode agents (.md)
 │   │       └── simpletask-plan.md   # NEW: Auto-planning agent
-│   ├── qwen/             # Qwen slash commands (.md)
-│   │   ├── simpletask.plan.md
-│   │   ├── simpletask.split.md      # Task splitting command
-│   │   ├── simpletask.implement.md
-│   │   ├── simpletask.audit.md
-│   │   └── simpletask.review.md
-│   └── gemini/           # Gemini CLI slash commands (.toml)
-│       ├── simpletask.plan.toml
-│       ├── simpletask.split.toml    # Task splitting command
-│       ├── simpletask.implement.toml
-│       ├── simpletask.audit.toml
-│       └── simpletask.review.toml
+│   ├── copilot/          # GitHub Copilot prompt files (.prompt.md)
+│   │   ├── simpletask.plan.prompt.md
+│   │   ├── simpletask.split.prompt.md      # Task splitting prompt
+│   │   ├── simpletask.implement.prompt.md
+│   │   ├── simpletask.audit.prompt.md
+│   │   └── simpletask.review.prompt.md
+│   └── pi/               # Pi prompts (.md)
 └── schema/
     └── task_schema.json  # JSON schema for validation
 
@@ -147,7 +142,7 @@ The `normalize_branch_name()` function in `cli/simpletask/core/project.py` conve
 
 ## AI Workflow Templates (Slash Commands)
 
-simpletask provides AI-assisted workflow templates for OpenCode, Qwen CLI, Gemini CLI, Pi, and Vibe. These templates guide AI models through structured development workflows.
+simpletask provides AI-assisted workflow templates for OpenCode, GitHub Copilot, and Pi. These templates guide AI models through structured development workflows.
 
 ### Available Slash Commands
 
@@ -217,15 +212,15 @@ The split command recognizes and handles these patterns:
 Install templates for your AI editor:
 
 ```bash
-# Install for all editors (OpenCode, Qwen, Gemini, Pi, Vibe)
+# Install for all supported editors (OpenCode, Copilot, Pi)
 simpletask ai install
 
-# Install for specific editor only
+# Install for a specific editor only
 simpletask ai install --opencode
-simpletask ai install --qwen
-simpletask ai install --gemini
+simpletask ai install --copilot
+simpletask ai install --pi
 
-# Install to local directory (.opencode/commands in project)
+# Install to local directories (.opencode, .github, and .pi in project)
 simpletask ai install --local
 
 # List installed templates
@@ -240,24 +235,14 @@ simpletask ai list
 - Agents: `cli/simpletask/templates/opencode/agents/*.md`
   - Installed to: `~/.config/opencode/agents/` or `.opencode/agents/`
 
-**Qwen CLI** (Markdown format):
-- Commands: `cli/simpletask/templates/qwen/*.md`
-  - Installed to: `~/.config/qwen/commands/` or `.qwen/commands/`
-- Agents: Not supported (OpenCode-only feature)
-
-**Gemini CLI** (TOML format):
-- Commands: `cli/simpletask/templates/gemini/*.toml`
-  - Installed to: `~/.gemini/commands/` or `.gemini/commands/`
-- Agents: Not supported (OpenCode-only feature)
+**GitHub Copilot** (Markdown prompts):
+- Prompts: `cli/simpletask/templates/copilot/*.prompt.md`
+  - Installed to: `~/.github/prompts/` or `.github/prompts/`
+- Agents: Not supported
 
 **Pi** (Markdown prompts):
 - Commands: `cli/simpletask/templates/pi/*.md`
   - Installed to: `~/.pi/agent/prompts/` or `.pi/prompts/`
-- Agents: Not supported
-
-**Mistral Vibe** (skill directories):
-- Commands: `cli/simpletask/templates/vibe/*/SKILL.md`
-  - Installed to: `~/.vibe/skills/` or `.vibe/skills/`
 - Agents: Not supported
 
 ### AI Agents
@@ -300,7 +285,7 @@ This installs both:
 | **Branch name generation** | Automatic (no user confirmation) | Asks user for branch name |
 | **Execution** | Runs autonomously, returns structured output | Interactive, guides user step-by-step |
 | **Use case** | Batch automation, programmatic delegation | Interactive exploration and learning |
-| **Support** | OpenCode only | OpenCode, Qwen, Gemini, Pi, Vibe |
+| **Support** | OpenCode only | OpenCode, GitHub Copilot, Pi |
 
 ## Commands
 
@@ -687,29 +672,17 @@ which simpletask
 uv tool dir simpletask
 ```
 
-**Note:** For Qwen CLI and Gemini CLI configuration, see [docs/MCP.md](docs/MCP.md).
+#### GitHub Copilot Prompts
 
-#### Mistral Vibe Configuration
+Install the Markdown prompt files with:
 
-Add to `~/.vibe/config.toml`:
-
-```toml
-[[mcp_servers]]
-name = "simpletask"
-transport = "stdio"
-command = "simpletask"
-args = ["serve"]
+```sh
+simpletask ai install --copilot
+simpletask ai install --copilot --local
 ```
 
-**Note:** If simpletask is installed in a virtualenv, use the full path to the executable:
-
-```toml
-[[mcp_servers]]
-name = "simpletask"
-transport = "stdio"
-command = "/path/to/venv/bin/simpletask"
-args = ["serve"]
-```
+Global prompts are installed to `~/.github/prompts/`; local prompts are installed to
+`.github/prompts/`. See [docs/MCP.md](docs/MCP.md) for the integration details.
 
 ### Breaking Changes in v0.19.0
 
@@ -1999,7 +1972,7 @@ The `.tasks/` directory contains task definition files used during development b
 | `cli/simpletask/core/yaml_parser.py` | YAML file read/write operations |
 | `cli/simpletask/core/git.py` | Git repository operations |
 | `cli/simpletask/core/ai_templates.py` | Template installation and management |
-| `cli/simpletask/templates/` | AI workflow templates (slash commands for OpenCode/Qwen/Gemini) |
+| `cli/simpletask/templates/` | AI workflow templates for OpenCode, GitHub Copilot, and Pi |
 | `cli/simpletask/mcp/server.py` | MCP server implementation |
 | `cli/simpletask/schema/task_schema.json` | JSON schema for task validation |
 | `tests/conftest.py` | Shared test fixtures |

@@ -476,10 +476,6 @@ simpletask schema validate
 
 ## Quality Gates
 
-<!-- NOTE: OpenCode intentionally provides both MCP and CLI references here for 
-     comprehensive guidance, while Qwen/Gemini templates focus on CLI-only workflow.
-     This asymmetry is by design and should not be "harmonized" away. -->
-
 Before marking as "READY TO MERGE":
 
 1. **All tasks completed**: 

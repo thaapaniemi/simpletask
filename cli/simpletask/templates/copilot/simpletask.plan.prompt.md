@@ -1,7 +1,8 @@
-description = "Create specification and implementation plan from feature description using simpletask."
+---
+description: Create specification and implementation plan from feature description using simpletask.
+---
 
-prompt = """
-User input: {{args}}
+User input: ${input:userInput}
 
 **CRITICAL: This is a PLANNING phase. DO NOT implement code or execute tasks. Your job is to create/update the task file with acceptance criteria and task breakdown - then STOP.**
 
@@ -112,31 +113,12 @@ git checkout -b [branch-name]
 
 2. If task file exists but is minimal, you can update it by adding criteria and tasks in subsequent steps.
 
-**Step 3.5: Project Defaults**
+**Step 3.5: Apply project guidance**
 
-Check whether project-level defaults exist and inform the user:
-
-```bash
-# Check if defaults file exists
-ls .tasks/defaults.yml 2>/dev/null && echo "exists" || echo "missing"
-```
-
-- **If `.tasks/defaults.yml` exists:** Inform the user that project defaults (design patterns, quality requirements, constraints, context) were automatically merged into the new task file. No action needed.
-
-- **If `.tasks/defaults.yml` does NOT exist:** Ask the user if they want to run codebase analysis now to set up project-level defaults. These defaults are written once and automatically applied to every future task file.
-
-  If user says **yes**:
-  1. Run the codebase analysis from `/simpletask.split` Step 1.5 (find references, patterns, constraints, security, error handling, quality preset) — but write results to **defaults** using `target="defaults"`:
-     ```
-     simpletask_design(action="set", field="pattern", value="...", target="defaults")
-     simpletask_design(action="set", field="constraint", value="...", target="defaults")
-     simpletask_quality(action="preset", preset_name="python", target="defaults")
-     # etc.
-     ```
-  2. After saving to defaults, also copy the same values into the current task file (call the same tools without `target="defaults"`).
-  3. Inform the user: "Project defaults saved to `.tasks/defaults.yml`. All future task files will inherit these settings automatically."
-
-  If user says **no**: Skip — the user can set up defaults later with `simpletask defaults`.
+Inspect the current task file with `simpletask_get(full=True)`. If the task needs design or
+quality guidance, set it directly on the current task using the supported `simpletask_design`
+and `simpletask_quality` interfaces. Do not use a `target` parameter or a separate defaults
+file; those interfaces operate on the current branch task file.
 
 **Step 4: Add Acceptance Criteria**
 
@@ -203,25 +185,25 @@ Use simpletask_task() MCP tool to add each task:
       "Second specific action",
       "Third specific action"
     ],
-    iteration=<iter_id>  # Optional: assign to an iteration (see below)
+    iteration=<iteration_id>  # Optional: assign to an iteration if iterations are defined
   )
 - Repeat for each implementation task
 ```
 
-**Optional: Group tasks into iterations**
-
-If the feature has natural phases (e.g., MVP, polish, v2), create iterations first:
+**Optionally group tasks into iterations** for phased delivery (e.g., MVP, polish, v2):
 
 ```
-Use simpletask_iteration() MCP tool:
-- Call simpletask_iteration(action="add", label="MVP")
-- Call simpletask_iteration(action="add", label="polish")
+Use simpletask_iteration() MCP tool to create iterations first:
+- simpletask_iteration(action="add", label="MVP")
+- simpletask_iteration(action="add", label="Polish")
+Then assign tasks: simpletask_task(action="add", name="...", iteration=1)
 ```
 
+```bash
+# CLI equivalent
 simpletask iteration add "MVP"
-simpletask iteration add "polish"
-
-Then assign tasks to iterations using the `iteration` parameter when adding tasks.
+simpletask task add "First feature" --iteration 1
+```
 
 **Expected task structure:**
 ```yaml
@@ -230,7 +212,6 @@ tasks:
     name: Short descriptive name
     status: not_started
     goal: One sentence explaining what this task accomplishes
-    iteration: 1  # Optional: iteration ID
     steps:
       - "First specific action - be explicit"
       - "Second specific action - include details"
@@ -283,4 +264,3 @@ The planning phase is complete when:
 2. All acceptance criteria are defined
 3. All implementation tasks are detailed with name, goal, and steps
 4. Validation passes
-"""

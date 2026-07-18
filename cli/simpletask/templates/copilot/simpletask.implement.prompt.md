@@ -1,6 +1,8 @@
-description = "Execute task list to implement feature/fix using simpletask."
-prompt = """
-User input: {{args}}
+---
+description: Execute task list to implement feature/fix using simpletask.
+---
+
+User input: ${input:userInput}
 
 **CRITICAL MANDATES**
 1. Keep task statuses accurate via MCP updates throughout execution.
@@ -30,4 +32,3 @@ Report: tasks completed, tasks blocked/paused, criteria completed, quality resul
 MCP tools used: `simpletask_get`, `simpletask_task`, `simpletask_criteria`, `simpletask_note`, `simpletask_quality`.
 Status values: `not_started`, `in_progress`, `completed`, `blocked`, `paused`.
 Status updates via `simpletask_task`: Returns SimpleTaskWriteResponse with success confirmation.
-"""

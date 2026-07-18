@@ -20,7 +20,7 @@ deps:
 # Run all tests with coverage (reports coverage, doesn't fail on threshold)
 test:
     FROM +deps
-    COPY --dir cli tests .
+    COPY --dir cli tests docs .
     # Initialize git for tests that need git repository context
     RUN git config --global user.email "test@example.com" && \
         git config --global user.name "Test User" && \

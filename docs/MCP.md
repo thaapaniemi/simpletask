@@ -7,9 +7,7 @@ This guide covers how to integrate simpletask with AI editors using the Model Co
 - [Quick Start](#quick-start)
 - [Configuration](#configuration)
   - [OpenCode](#opencode)
-  - [Qwen-CLI](#qwen-cli)
-  - [Gemini CLI](#gemini-cli)
-  - [Mistral Vibe](#mistral-vibe)
+  - [GitHub Copilot](#github-copilot)
   - [Other MCP Clients](#other-mcp-clients)
 - [Available Tools](#available-tools)
   - [get](#get)
@@ -112,120 +110,46 @@ Open OpenCode and ask the AI:
 
 You should see `simpletask_get`, `simpletask_list`, `simpletask_new`, `simpletask_task`, `simpletask_criteria`, `simpletask_quality`, `simpletask_design`, `simpletask_note`, `simpletask_constraint`, and `simpletask_context` in the response (MCP clients automatically prefix tool names with the server name).
 
-### Qwen-CLI
+### GitHub Copilot
 
-Qwen-CLI is a command-line AI assistant with MCP support.
+GitHub Copilot supports Markdown prompt files in VS Code and compatible clients. Install the
+workflow prompts with:
 
-**Configuration file location:**
-- Linux/macOS: `~/.config/qwen-cli/config.json`
-- Windows: `%APPDATA%\qwen-cli\config.json`
+```sh
+simpletask ai install --copilot
+```
 
-**Add this configuration:**
+Prompts are installed globally in `~/.github/prompts/`. For a project-local installation:
+
+```sh
+simpletask ai install --copilot --local  # installs to .github/prompts/
+```
+
+The five prompts are `simpletask.plan.prompt.md`, `simpletask.split.prompt.md`,
+`simpletask.implement.prompt.md`, `simpletask.audit.prompt.md`, and
+`simpletask.review.prompt.md`. They provide the same plan, split, implement, audit, and review
+workflow as the OpenCode and Pi resources.
+
+**Configure the simpletask MCP server:**
+
+In a project workspace, create `.vscode/mcp.json` (or add the server to your VS Code user
+MCP configuration) with:
 
 ```json
 {
-  "mcp_servers": {
+  "servers": {
     "simpletask": {
       "command": "simpletask",
-      "args": ["serve"],
-      "transport": "stdio"
+      "args": ["serve"]
     }
   }
 }
 ```
 
-**If simpletask is installed in a virtualenv**, use the full path:
-
-```json
-{
-  "mcp_servers": {
-    "simpletask": {
-      "command": "/home/user/.local/share/uv/tools/simpletask/bin/simpletask",
-      "args": ["serve"],
-      "transport": "stdio"
-    }
-  }
-}
-```
-
-**Restart Qwen-CLI** after adding the configuration.
-
-**Verify connection:**
-```sh
-qwen-cli "List available MCP tools"
-```
-
-### Gemini CLI
-
-Gemini CLI is a command-line AI assistant with MCP support.
-
-**Configuration file location:**
-- Linux/macOS: `~/.gemini/settings.json`
-- Windows: `%USERPROFILE%\.gemini\settings.json`
-
-**Add this configuration:**
-
-```json
-{
-  "mcpServers": {
-    "simpletask": {
-      "command": "simpletask",
-      "args": ["serve"],
-      "transport": "stdio"
-    }
-  }
-}
-```
-
-**Important:** Gemini CLI uses `mcpServers` (camelCase), not `mcp_servers` like Qwen-CLI.
-
-**If simpletask is installed in a virtualenv**, use the full path:
-
-```json
-{
-  "mcpServers": {
-    "simpletask": {
-      "command": "/home/user/.local/share/uv/tools/simpletask/bin/simpletask",
-      "args": ["serve"],
-      "transport": "stdio"
-    }
-  }
-}
-```
-
-**Restart Gemini CLI** after adding the configuration.
-
-**Verify connection:**
-```sh
-gemini "List available MCP tools"
-```
-
-### Mistral Vibe
-
-Mistral Vibe is a coding assistant that supports custom skills via SKILL.md files. simpletask integrates via skills rather than MCP — each workflow phase (plan, split, implement, review) is a separate skill that guides Vibe through the simpletask workflow.
-
-**Install simpletask skills:**
-
-```sh
-simpletask ai install --vibe
-```
-
-This installs skills to `~/.vibe/skills/`. For project-local installation:
-
-```sh
-simpletask ai install --vibe --local  # installs to .vibe/skills/
-```
-
-**Installed skills:**
-
-| Skill | Description |
-|-------|-------------|
-| `simpletask-plan` | Create task specification from feature description |
-| `simpletask-split` | Analyze codebase and split complex tasks into atomic subtasks |
-| `simpletask-implement` | Execute tasks step-by-step |
-| `simpletask-review` | Review implementation against acceptance criteria |
-
-**Note:** Vibe skills use the simpletask CLI (`simpletask serve` is not required for Vibe). Ensure `simpletask` is on your `PATH` before invoking a skill.
+If `simpletask` is not on PATH, replace `command` with the absolute path to the executable.
+Open the Command Palette and run **MCP: List Servers**, then start `simpletask` and confirm it
+reports as running. In Copilot Chat, ask it to list the available simpletask tools before using
+the installed workflow prompts.
 
 **Verify installation:**
 ```sh

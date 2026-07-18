@@ -100,37 +100,28 @@ The recommended workflow uses slash commands in supported AI editors. These guid
 
 **Supported AI tools:**
 
-- **[OpenCode](https://opencode.ai)**, **[Qwen](https://github.com/QwenLM/qwen-code)**, **[Gemini CLI](https://github.com/google-gemini/gemini-cli)**, and **[Mistral Vibe](https://mistral.ai/news/vibe-coding)** - Install full workflow commands:
+- **[OpenCode](https://opencode.ai)** - Install command templates and the OpenCode planning agent.
+- **[GitHub Copilot](https://github.com/features/copilot)** - Install Markdown prompt files to the
+  standard `~/.github/prompts/` global directory or `.github/prompts/` project directory.
+- **[Pi](https://pi.dev/)** - Install CLI-only Markdown prompts to `~/.pi/agent/prompts/` globally
+  or `.pi/prompts/` locally.
+
   ```sh
-  simpletask ai install              # All four full integrations
-  simpletask ai install --opencode   # OpenCode only
-  simpletask ai install --qwen       # Qwen only
-  simpletask ai install --gemini     # Gemini CLI only
-  simpletask ai install --vibe       # Mistral Vibe only
-  simpletask ai install --local      # Project-local installation
+  simpletask ai install                 # All supported integrations
+  simpletask ai install --opencode      # OpenCode only
+  simpletask ai install --copilot       # GitHub Copilot only
+  simpletask ai install --pi            # Pi only
+  simpletask ai install --local         # Project-local installation
   ```
 
-- **[Pi](https://pi.dev/)** - Install all 4 Pi prompts:
-  ```sh
-  simpletask ai install --pi         # Global Pi prompts install
-  simpletask ai install --pi --local # Project-local Pi prompts install
-  ```
-
-  Pi uses a CLI-only workflow (no MCP tools) that works with Pi's local or remote models.
-  All 4 workflow prompts are available after a single install:
-  - `/simpletask-plan` — Create task specification and implementation plan
-  - `/simpletask-split` — Analyze codebase and split complex tasks into atomic subtasks
-  - `/simpletask-implement` — Execute tasks step-by-step with quality checks
-  - `/simpletask-review` — Review implementation against acceptance criteria
-
-  Install locations:
-  - Global: `~/.pi/agent/prompts/`
-  - Local: `.pi/prompts/`
+Each integration includes the five workflow resources: plan, split, implement, audit, and review.
+Pi uses a CLI-only workflow (no MCP tools) that works with Pi's local or remote models.
 
 The workflow commands are:
 - `/simpletask.plan` - Create specification and implementation plan
 - `/simpletask.split` - Split complex tasks into atomic subtasks (optional)
 - `/simpletask.implement` - Execute tasks from the plan
+- `/simpletask.audit` - Audit implementation and create approved fix tasks
 - `/simpletask.review` - Review implementation against acceptance criteria
 
 See the [MCP Integration Guide](docs/MCP.md) for MCP server configuration and detailed setup instructions.
@@ -270,9 +261,11 @@ ajv validate -s schema/simpletask.schema.json -d .tasks/my-task.yml --spec=draft
 
 ### MCP Server for AI Editors
 
-simpletask includes a Model Context Protocol (MCP) server for integration with AI editors like OpenCode, Qwen-CLI, Gemini CLI, and Mistral Vibe. The MCP server exposes task file operations as structured tools that AI assistants can use to read task definitions, check status, and understand project context.
+simpletask includes a Model Context Protocol (MCP) server for integration with AI editors such as
+OpenCode and GitHub Copilot. The MCP server exposes task file operations as structured tools that
+AI assistants can use to read task definitions, check status, and understand project context.
 
-Pi uses a CLI-only workflow (no MCP tools) and works with Pi's local or remote models. All 4
+Pi uses a CLI-only workflow (no MCP tools) and works with Pi's local or remote models. All five
 workflow prompts are installed with a single `simpletask ai install --pi` command.
 
 **Benefits:**
@@ -284,11 +277,26 @@ workflow prompts are installed with a single `simpletask ai install --pi` comman
 **Quick start:**
 
 ```sh
-# Start the MCP server
+# Start the MCP server (the configured client starts it on demand)
 simpletask serve
 ```
 
-Then configure your AI editor to connect to the server. For detailed setup instructions including configuration for OpenCode, Qwen-CLI, Gemini CLI, and other MCP clients, see the [MCP Integration Guide](docs/MCP.md).
+For GitHub Copilot in VS Code, create `.vscode/mcp.json` in the workspace:
+
+```json
+{
+  "servers": {
+    "simpletask": {
+      "command": "simpletask",
+      "args": ["serve"]
+    }
+  }
+}
+```
+
+Use **MCP: List Servers** from the Command Palette to start and verify the server, then ask
+Copilot Chat to list the available simpletask tools. For detailed setup instructions including
+configuration for OpenCode, GitHub Copilot, and other MCP clients, see the [MCP Integration Guide](docs/MCP.md).
 
 ## Development
 

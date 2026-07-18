@@ -57,9 +57,7 @@ htmlcov/
 
 # AI editor local installations
 .opencode/
-.qwen/
-.gemini/
-.vibe/
+.github/prompts/
 
 # OS
 .DS_Store
