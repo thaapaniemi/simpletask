@@ -31,6 +31,7 @@ from simpletask.core.presets import (
 from simpletask.core.project import ensure_project
 from simpletask.core.quality_ops import apply_quality_preset, update_quality_requirements
 from simpletask.utils.console import console, error, success
+from simpletask.utils.output import OutputFormat, json_error, json_success, resolve_format
 
 # ---------------------------------------------------------------------------
 # App definitions (nested Typers)
@@ -617,6 +618,10 @@ def quality_preset_command(
 @constraint_app.command(name="add")
 def constraint_add_command(
     value: Annotated[str, typer.Argument(help="Constraint text")],
+    format: Annotated[
+        OutputFormat,
+        typer.Option("--format", "-f", help="Output format (rich, plain, json)"),
+    ] = OutputFormat.RICH,
 ) -> None:
     """Add a constraint to project defaults.
 
@@ -625,6 +630,7 @@ def constraint_add_command(
         simpletask defaults constraint add "No shell=True in subprocess calls"
     """
     try:
+        format = resolve_format(format)
         project = ensure_project()
         defaults = _load_or_empty(project)
 
@@ -633,12 +639,30 @@ def constraint_add_command(
         defaults.constraints.append(value)
 
         save_defaults(project, defaults)
-        success("Added constraint to defaults")
+        if format == OutputFormat.JSON:
+            json_success(
+                {
+                    "success": True,
+                    "action": "default_constraint_added",
+                    "message": "Added constraint to defaults",
+                    "summary": {"constraints_total": len(defaults.constraints)},
+                }
+            )
+        else:
+            success("Added constraint to defaults")
 
     except (ValueError, FileNotFoundError) as e:
-        error(str(e))
+        if format == OutputFormat.JSON:
+            json_error(str(e))
+        else:
+            error(str(e))
+        raise typer.Exit(1) from None
     except Exception as e:
-        error(f"Unexpected error: {e}")
+        if format == OutputFormat.JSON:
+            json_error(f"Unexpected error: {e}")
+        else:
+            error(f"Unexpected error: {e}")
+        raise typer.Exit(1) from None
 
 
 # ---------------------------------------------------------------------------

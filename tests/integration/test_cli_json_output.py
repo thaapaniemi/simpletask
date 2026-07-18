@@ -724,6 +724,50 @@ class TestNoteAddJsonOutput:
 
 
 # ---------------------------------------------------------------------------
+# Write commands: constraint and iteration add
+# ---------------------------------------------------------------------------
+
+
+class TestConstraintAndIterationAddJsonOutput:
+    """Tests for constraint and iteration JSON additions."""
+
+    def test_constraint_add_returns_json_success(self, json_project):
+        result = runner.invoke(
+            app, ["constraint", "add", "Use strict validation", "--format", "json"]
+        )
+        assert result.exit_code == 0, result.output
+        parsed = json.loads(result.output)
+        assert parsed["success"] is True
+        assert parsed["action"] == "constraint_added"
+        assert parsed["summary"]["constraints_total"] == 1
+
+    def test_iteration_add_returns_generated_id(self, json_project):
+        result = runner.invoke(app, ["iteration", "add", "Sprint 1", "--format", "json"])
+        assert result.exit_code == 0, result.output
+        parsed = json.loads(result.output)
+        assert parsed["success"] is True
+        assert parsed["action"] == "iteration_added"
+        assert parsed["iteration_id"] == 1
+
+    def test_iteration_add_error_returns_json(self, json_project):
+        result = runner.invoke(
+            app,
+            ["iteration", "add", "Sprint 1", "--branch", "missing", "--format", "json"],
+        )
+        assert result.exit_code != 0
+        parsed = json.loads(result.output)
+        assert parsed["success"] is False
+        assert "message" in parsed
+        assert "\\033[" not in result.output
+
+    def test_iteration_add_default_output_is_human_readable(self, json_project):
+        result = runner.invoke(app, ["iteration", "add", "Sprint 1"])
+        assert result.exit_code == 0
+        with pytest.raises((json.JSONDecodeError, ValueError)):
+            json.loads(result.output)
+
+
+# ---------------------------------------------------------------------------
 # Error path tests
 # ---------------------------------------------------------------------------
 

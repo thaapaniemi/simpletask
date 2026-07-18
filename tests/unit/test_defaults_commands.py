@@ -9,6 +9,7 @@ Tests cover:
 - defaults context set command
 """
 
+import json
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
@@ -539,6 +540,27 @@ class TestConstraintAddCommand:
         assert result is not None
         assert result.constraints is not None
         assert len(result.constraints) == 2
+
+    @patch("simpletask.commands.defaults.commands.ensure_project")
+    def test_json_output(self, mock_ensure, tmp_path, capsys):
+        """constraint add emits a machine-readable success envelope."""
+        mock_ensure.return_value = _make_project(tmp_path)
+
+        constraint_add_command(value="constraint", format="json")
+
+        output = capsys.readouterr().out
+        parsed = json.loads(output)
+        assert parsed["success"] is True
+        assert parsed["action"] == "default_constraint_added"
+
+    @patch("simpletask.commands.defaults.commands.ensure_project")
+    def test_default_output_remains_human_readable(self, mock_ensure, tmp_path, capsys):
+        """constraint add keeps the default human-readable output."""
+        mock_ensure.return_value = _make_project(tmp_path)
+
+        constraint_add_command(value="constraint")
+
+        assert "Added constraint to defaults" in capsys.readouterr().out
 
 
 # ---------------------------------------------------------------------------
