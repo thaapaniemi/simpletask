@@ -19,7 +19,7 @@ classifiers = [
 ]
 
 dependencies = [
-    "typer>=0.26.8",
+    "typer>=0.27.0",
     "rich>=15.0.0",
     "gitpython>=3.1.50",
     "pydantic>=2.13.4",
